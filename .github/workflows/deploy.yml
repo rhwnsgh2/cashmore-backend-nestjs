@@ -21,6 +21,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Notify Slack - Deploy Started
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-type: application/json' \
+            -d '{
+              "text": "🚀 *배포 시작*",
+              "attachments": [{
+                "color": "#2196F3",
+                "fields": [
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": false},
+                  {"title": "Author", "value": "${{ github.actor }}", "short": true}
+                ]
+              }]
+            }'
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -49,3 +66,40 @@ jobs:
             --cluster $ECS_CLUSTER \
             --service $ECS_SERVICE \
             --force-new-deployment
+
+      - name: Notify Slack - Deploy Success
+        if: success()
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-type: application/json' \
+            -d '{
+              "text": "✅ *배포 성공*",
+              "attachments": [{
+                "color": "#4CAF50",
+                "fields": [
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": false},
+                  {"title": "Author", "value": "${{ github.actor }}", "short": true}
+                ]
+              }]
+            }'
+
+      - name: Notify Slack - Deploy Failed
+        if: failure()
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-type: application/json' \
+            -d '{
+              "text": "❌ *배포 실패*",
+              "attachments": [{
+                "color": "#F44336",
+                "fields": [
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": false},
+                  {"title": "Author", "value": "${{ github.actor }}", "short": true},
+                  {"title": "Action", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|로그 확인>", "short": true}
+                ]
+              }]
+            }'
