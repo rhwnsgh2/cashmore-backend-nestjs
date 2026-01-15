@@ -3,6 +3,7 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 export class InfrastructureStack extends cdk.Stack {
@@ -20,6 +21,49 @@ export class InfrastructureStack extends cdk.Stack {
       repositoryName: 'cashmore-backend',
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
+
+    // GitHub OIDC Provider
+    const githubProvider = new iam.OpenIdConnectProvider(this, 'GithubOidcProvider', {
+      url: 'https://token.actions.githubusercontent.com',
+      clientIds: ['sts.amazonaws.com'],
+    });
+
+    // GitHub Actions IAM Role
+    const githubActionsRole = new iam.Role(this, 'GithubActionsRole', {
+      roleName: 'cashmore-github-actions-role',
+      assumedBy: new iam.WebIdentityPrincipal(
+        githubProvider.openIdConnectProviderArn,
+        {
+          StringEquals: {
+            'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
+          },
+          StringLike: {
+            'token.actions.githubusercontent.com:sub': 'repo:rhwnsgh2/cashmore-backend-nestjs:*',
+          },
+        },
+      ),
+    });
+
+    // Grant ECR permissions
+    repository.grantPullPush(githubActionsRole);
+
+    // Grant ECS deployment permissions
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'ecs:UpdateService',
+        'ecs:DescribeServices',
+        'ecs:DescribeTaskDefinition',
+      ],
+      resources: ['*'],
+    }));
+
+    // Grant ECR login permission
+    githubActionsRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['ecr:GetAuthorizationToken'],
+      resources: ['*'],
+    }));
 
     // ECS Cluster
     const cluster = new ecs.Cluster(this, 'CashmoreCluster', {
@@ -94,6 +138,11 @@ export class InfrastructureStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'EcrRepositoryUri', {
       value: repository.repositoryUri,
       description: 'ECR Repository URI',
+    });
+
+    new cdk.CfnOutput(this, 'GithubActionsRoleArn', {
+      value: githubActionsRole.roleArn,
+      description: 'GitHub Actions IAM Role ARN',
     });
   }
 }
