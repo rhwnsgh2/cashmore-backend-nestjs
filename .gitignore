@@ -32,8 +32,8 @@ coverage/
 bun.lockb
 
 # Supabase local
-supabase/
-supabase-test/
+/supabase/
+/supabase-test/
 
 # CDK
 infrastructure/cdk.context.json

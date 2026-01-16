@@ -89,6 +89,13 @@ export class InfrastructureStack extends cdk.Stack {
       clusterName: 'cashmore-cluster',
     });
 
+    // Reference Supabase secret
+    const supabaseSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'SupabaseSecret',
+      'cashmore/supabase',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 1024,
@@ -102,6 +109,12 @@ export class InfrastructureStack extends cdk.Stack {
       environment: {
         NODE_ENV: 'production',
         PORT: '8000',
+      },
+      secrets: {
+        SUPABASE_URL: ecs.Secret.fromSecretsManager(supabaseSecret, 'url'),
+        SUPABASE_ANON_KEY: ecs.Secret.fromSecretsManager(supabaseSecret, 'anonKey'),
+        SUPABASE_SERVICE_ROLE_KEY: ecs.Secret.fromSecretsManager(supabaseSecret, 'serviceRoleKey'),
+        SUPABASE_JWT_SECRET: ecs.Secret.fromSecretsManager(supabaseSecret, 'jwtSecret'),
       },
     });
 
@@ -134,6 +147,9 @@ export class InfrastructureStack extends cdk.Stack {
       healthCheck: {
         path: '/health',
         interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(10),
+        healthyThresholdCount: 2,
+        unhealthyThresholdCount: 3,
       },
     });
 
@@ -191,19 +207,29 @@ exports.handler = async (event) => {
   const newState = message.NewStateValue;
   const reason = message.NewStateReason;
   const timestamp = message.StateChangeTime;
+  const region = 'ap-northeast-2';
 
   const color = newState === 'ALARM' ? '#F44336' : '#4CAF50';
   const emoji = newState === 'ALARM' ? '🚨' : '✅';
+  const stateKorean = newState === 'ALARM' ? '경보 발생' : '정상 복구';
+
+  // AWS Console URLs
+  const alarmUrl = 'https://' + region + '.console.aws.amazon.com/cloudwatch/home?region=' + region + '#alarmsV2:alarm/' + encodeURIComponent(alarmName);
+  const logsUrl = 'https://' + region + '.console.aws.amazon.com/cloudwatch/home?region=' + region + '#logsV2:log-groups/log-group/$252Fecs$252Fcashmore';
+  const ecsUrl = 'https://' + region + '.console.aws.amazon.com/ecs/v2/clusters/cashmore-cluster/services/cashmore-service?region=' + region;
+
+  const links = '<' + alarmUrl + '|알람 상세> | <' + logsUrl + '|로그 확인> | <' + ecsUrl + '|ECS 서비스>';
 
   const payload = {
-    text: emoji + ' *CloudWatch Alarm*',
+    text: emoji + ' *CloudWatch 알람*',
     attachments: [{
       color: color,
       fields: [
-        { title: 'Alarm', value: alarmName, short: true },
-        { title: 'State', value: newState, short: true },
-        { title: 'Reason', value: reason, short: false },
-        { title: 'Time', value: timestamp, short: true }
+        { title: '알람명', value: alarmName, short: true },
+        { title: '상태', value: stateKorean, short: true },
+        { title: '원인', value: reason, short: false },
+        { title: '발생 시각', value: timestamp, short: true },
+        { title: '바로가기', value: links, short: false }
       ]
     }]
   };
@@ -306,7 +332,7 @@ exports.handler = async (event) => {
         evaluationPeriods: 1,
         comparisonOperator:
           cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-        alarmDescription: 'Unhealthy hosts detected',
+        alarmDescription: 'Unhealthy 호스트 감지',
       },
     );
     unhealthyHostAlarm.addAlarmAction(new cw_actions.SnsAction(alarmTopic));
@@ -387,14 +413,14 @@ exports.handler = async (event) => {
   const serviceName = detail.serviceName;
 
   const payload = {
-    text: '📊 *ECS Scaling Event*',
+    text: '📊 *ECS 스케일링 이벤트*',
     attachments: [{
       color: '#2196F3',
       fields: [
-        { title: 'Service', value: serviceName, short: true },
-        { title: 'Desired', value: String(desiredCount), short: true },
-        { title: 'Running', value: String(runningCount), short: true },
-        { title: 'Time', value: event.time, short: true }
+        { title: '서비스', value: serviceName, short: true },
+        { title: '목표 태스크 수', value: String(desiredCount), short: true },
+        { title: '실행 중인 태스크 수', value: String(runningCount), short: true },
+        { title: '발생 시각', value: event.time, short: true }
       ]
     }]
   };

@@ -1,12 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// 테스트 전용 Supabase 설정 (로컬 테스트 인스턴스)
-// 절대로 프로덕션/개발 환경에서 import하지 마세요!
-const TEST_SUPABASE_URL = 'http://localhost:54331';
-const TEST_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-const TEST_SUPABASE_SERVICE_ROLE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+// 테스트 전용 Supabase 설정 (.env.test에서 읽음)
+const TEST_SUPABASE_URL = process.env.SUPABASE_URL!;
+const TEST_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
+const TEST_SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 let testClient: SupabaseClient | null = null;
 let testAdminClient: SupabaseClient | null = null;

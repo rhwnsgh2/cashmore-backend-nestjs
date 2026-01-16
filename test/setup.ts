@@ -16,6 +16,7 @@ export async function getTestDbClient(): Promise<Client> {
       password: process.env.DATABASE_PASSWORD || 'postgres',
       database: process.env.DATABASE_NAME || 'postgres',
     });
+
     await client.connect();
   }
   return client;
