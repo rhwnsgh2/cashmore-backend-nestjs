@@ -16,9 +16,15 @@ async function bootstrap() {
   app.enableCors();
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
-  // Development에서만 요청 로그 출력
+  // 요청 로깅: development는 전체, production은 에러(4xx, 5xx)만
   if (configService.get<string>('nodeEnv') === 'development') {
     app.use(morgan('dev'));
+  } else {
+    app.use(
+      morgan('combined', {
+        skip: (_req, res) => res.statusCode < 400,
+      }),
+    );
   }
 
   // Swagger 설정

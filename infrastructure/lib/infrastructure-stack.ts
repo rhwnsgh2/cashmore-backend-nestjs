@@ -13,6 +13,8 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
 export class InfrastructureStack extends cdk.Stack {
@@ -88,6 +90,7 @@ export class InfrastructureStack extends cdk.Stack {
     const cluster = new ecs.Cluster(this, 'CashmoreCluster', {
       vpc,
       clusterName: 'cashmore-cluster',
+      containerInsights: true,
     });
 
     // Reference Supabase secret
@@ -123,14 +126,34 @@ export class InfrastructureStack extends cdk.Stack {
       },
       secrets: {
         SUPABASE_URL: ecs.Secret.fromSecretsManager(supabaseSecret, 'url'),
-        SUPABASE_ANON_KEY: ecs.Secret.fromSecretsManager(supabaseSecret, 'anonKey'),
-        SUPABASE_SERVICE_ROLE_KEY: ecs.Secret.fromSecretsManager(supabaseSecret, 'serviceRoleKey'),
-        SUPABASE_JWT_SECRET: ecs.Secret.fromSecretsManager(supabaseSecret, 'jwtSecret'),
+        SUPABASE_ANON_KEY: ecs.Secret.fromSecretsManager(
+          supabaseSecret,
+          'anonKey',
+        ),
+        SUPABASE_SERVICE_ROLE_KEY: ecs.Secret.fromSecretsManager(
+          supabaseSecret,
+          'serviceRoleKey',
+        ),
+        SUPABASE_JWT_SECRET: ecs.Secret.fromSecretsManager(
+          supabaseSecret,
+          'jwtSecret',
+        ),
       },
     });
 
     container.addPortMappings({
       containerPort: 8000,
+    });
+
+    // S3 Bucket for ALB Access Logs
+    const albLogsBucket = new s3.Bucket(this, 'AlbLogsBucket', {
+      bucketName: `cashmore-alb-logs-${this.account}`,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      lifecycleRules: [
+        {
+          expiration: cdk.Duration.days(30),
+        },
+      ],
     });
 
     // ALB
@@ -139,20 +162,52 @@ export class InfrastructureStack extends cdk.Stack {
       internetFacing: true,
     });
 
+    // Enable ALB Access Logs
+    alb.logAccessLogs(albLogsBucket, 'alb-logs');
+
+    // ACM Certificate for api.cashmore.kr (DNS validation - manual)
+    const certificate = new acm.Certificate(this, 'CashmoreCertificate', {
+      domainName: 'api.cashmore.kr',
+      validation: acm.CertificateValidation.fromDns(),
+    });
+
     // ECS Service
     const service = new ecs.FargateService(this, 'CashmoreService', {
       cluster,
       taskDefinition,
       desiredCount: 2,
       serviceName: 'cashmore-service',
+      circuitBreaker: {
+        enable: true,
+        rollback: true,
+      },
+      minHealthyPercent: 100,
+      maxHealthyPercent: 200,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      assignPublicIp: false,
+      healthCheckGracePeriod: cdk.Duration.seconds(60),
     });
 
-    // ALB Target Group
-    const listener = alb.addListener('CashmoreListener', {
+    // Security: ALB에서만 ECS로 접근 허용
+    service.connections.allowFrom(alb, ec2.Port.tcp(8000));
+
+    // HTTPS Listener (port 443)
+    const httpsListener = alb.addListener('CashmoreHttpsListener', {
+      port: 443,
+      certificates: [certificate],
+    });
+
+    // HTTP Listener (port 80) - Redirect to HTTPS
+    alb.addListener('CashmoreListener', {
       port: 80,
+      defaultAction: elbv2.ListenerAction.redirect({
+        protocol: 'HTTPS',
+        port: '443',
+        permanent: true,
+      }),
     });
 
-    const targetGroup = listener.addTargets('CashmoreTarget', {
+    const targetGroup = httpsListener.addTargets('CashmoreTarget', {
       port: 8000,
       targets: [service],
       healthCheck: {
@@ -482,6 +537,11 @@ exports.handler = async (event) => {
       description: 'ALB DNS Name',
     });
 
+    new cdk.CfnOutput(this, 'ApiDomainName', {
+      value: 'https://api.cashmore.kr',
+      description: 'API Domain',
+    });
+
     new cdk.CfnOutput(this, 'EcrRepositoryUri', {
       value: `${this.account}.dkr.ecr.${this.region}.amazonaws.com/cashmore-backend`,
       description: 'ECR Repository URI',
@@ -491,5 +551,9 @@ exports.handler = async (event) => {
       value: githubActionsRole.roleArn,
       description: 'GitHub Actions IAM Role ARN',
     });
+
+    // Resource Tagging
+    cdk.Tags.of(this).add('Project', 'Cashmore');
+    cdk.Tags.of(this).add('Environment', 'Production');
   }
 }

@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -19,6 +20,8 @@ interface JwtPayload {
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(
     private configService: ConfigService,
     private authService: AuthService,
@@ -29,6 +32,7 @@ export class JwtAuthGuard implements CanActivate {
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
+      this.logger.warn('No token provided in request');
       throw new UnauthorizedException('No token provided');
     }
 
@@ -44,6 +48,7 @@ export class JwtAuthGuard implements CanActivate {
       const userId = await this.authService.getUserIdByAuthId(payload.sub);
 
       if (!userId) {
+        this.logger.warn(`User not found for authId: ${payload.sub}`);
         throw new UnauthorizedException('User not found');
       }
 
@@ -55,11 +60,16 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
+        this.logger.warn(
+          `Token expired: exp=${error.expiredAt?.toISOString()}`,
+        );
         throw new UnauthorizedException('Token expired');
       }
       if (error instanceof jwt.JsonWebTokenError) {
+        this.logger.warn(`Invalid token: ${error.message}`);
         throw new UnauthorizedException('Invalid token');
       }
+      this.logger.error(`Unexpected auth error: ${error}`);
       throw error;
     }
   }
