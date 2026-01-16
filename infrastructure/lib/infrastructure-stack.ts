@@ -12,6 +12,7 @@ import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 
 export class InfrastructureStack extends cdk.Stack {
@@ -102,10 +103,20 @@ export class InfrastructureStack extends cdk.Stack {
       cpu: 512,
     });
 
+    // Log Group
+    const logGroup = new logs.LogGroup(this, 'CashmoreLogGroup', {
+      logGroupName: '/ecs/cashmore',
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Container
     const container = taskDefinition.addContainer('CashmoreContainer', {
       image: ecs.ContainerImage.fromEcrRepository(repository),
-      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'cashmore' }),
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'cashmore',
+        logGroup: logGroup,
+      }),
       environment: {
         NODE_ENV: 'production',
         PORT: '8000',
