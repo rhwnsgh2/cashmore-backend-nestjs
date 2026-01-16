@@ -474,22 +474,43 @@ exports.handler = async (event) => {
   if (!webhookUrl) return;
 
   const detail = event.detail;
-  const desiredCount = detail.desiredCount;
-  const runningCount = detail.runningCount;
+  const eventName = detail.eventName;
   const serviceName = detail.serviceName;
 
-  const payload = {
-    text: '📊 *ECS 스케일링 이벤트*',
-    attachments: [{
-      color: '#2196F3',
-      fields: [
-        { title: '서비스', value: serviceName, short: true },
-        { title: '목표 태스크 수', value: String(desiredCount), short: true },
-        { title: '실행 중인 태스크 수', value: String(runningCount), short: true },
-        { title: '발생 시각', value: event.time, short: true }
-      ]
-    }]
-  };
+  let payload;
+
+  if (eventName === 'SERVICE_STEADY_STATE') {
+    // 배포 완료 알림
+    payload = {
+      text: '✅ *배포 완료*',
+      attachments: [{
+        color: '#4CAF50',
+        fields: [
+          { title: '서비스', value: serviceName, short: true },
+          { title: '상태', value: '모든 태스크 정상 실행 중', short: true },
+          { title: '완료 시각', value: event.time, short: false }
+        ]
+      }]
+    };
+  } else if (eventName === 'SERVICE_DESIRED_COUNT_UPDATED') {
+    // 스케일링 이벤트
+    const desiredCount = detail.desiredCount;
+    const runningCount = detail.runningCount;
+    payload = {
+      text: '📊 *ECS 스케일링 이벤트*',
+      attachments: [{
+        color: '#2196F3',
+        fields: [
+          { title: '서비스', value: serviceName, short: true },
+          { title: '목표 태스크 수', value: String(desiredCount), short: true },
+          { title: '실행 중인 태스크 수', value: String(runningCount), short: true },
+          { title: '발생 시각', value: event.time, short: true }
+        ]
+      }]
+    };
+  } else {
+    return; // 알 수 없는 이벤트는 무시
+  }
 
   const url = new URL(webhookUrl);
   const options = {
@@ -516,16 +537,16 @@ exports.handler = async (event) => {
 
     slackWebhookSecret.grantRead(scalingEventLambda);
 
-    // EventBridge Rule for ECS Service Scaling
+    // EventBridge Rule for ECS Service Events (Scaling + Deployment Complete)
     new events.Rule(this, 'EcsScalingRule', {
-      ruleName: 'cashmore-ecs-scaling',
+      ruleName: 'cashmore-ecs-events',
       eventPattern: {
         source: ['aws.ecs'],
         detailType: ['ECS Service Action'],
         detail: {
           clusterArn: [cluster.clusterArn],
           eventType: ['INFO'],
-          eventName: ['SERVICE_DESIRED_COUNT_UPDATED'],
+          eventName: ['SERVICE_DESIRED_COUNT_UPDATED', 'SERVICE_STEADY_STATE'],
         },
       },
       targets: [new events_targets.LambdaFunction(scalingEventLambda)],

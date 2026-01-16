@@ -67,9 +67,37 @@ export async function cleanAuthUsers(): Promise<void> {
   await db.query('DELETE FROM auth.users');
 }
 
+// Disable all Slack notification triggers (prevent Slack spam during tests)
+export async function disableSlackTriggers(): Promise<void> {
+  const db = await getTestDbClient();
+
+  // Disable Slack triggers on public schema tables
+  const triggers = [
+    { table: 'user', trigger: 'on_added_user' },
+    { table: 'user', trigger: 'on_delete_user' },
+    { table: 'account_info', trigger: 'on_added_account_info' },
+    { table: 'claim', trigger: 'on_complete_claim' },
+    { table: 'claim', trigger: 'on_insert_claim' },
+    { table: 'claim', trigger: 'on_rejected_claim' },
+    { table: 'claim', trigger: 'on_update_claim' },
+    { table: 'partner_user', trigger: 'on_insert_partner_user' },
+  ];
+
+  for (const { table, trigger } of triggers) {
+    try {
+      await db.query(
+        `ALTER TABLE "public"."${table}" DISABLE TRIGGER "${trigger}"`,
+      );
+    } catch {
+      // Trigger might not exist, ignore
+    }
+  }
+}
+
 // Global hooks (skip in CI without DB)
 if (process.env.SKIP_DB_TESTS !== 'true') {
   beforeAll(async () => {
+    await disableSlackTriggers();
     await truncateAllTables();
   });
 
