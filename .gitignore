@@ -8,6 +8,7 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.test
 
 # IDE
 .idea/
@@ -29,3 +30,10 @@ coverage/
 
 # Bun
 bun.lockb
+
+# Supabase local
+supabase/
+supabase-test/
+
+# CDK
+infrastructure/cdk.context.json
