@@ -46,16 +46,18 @@ describe('Point API (e2e) - Real DB', () => {
         expect(response.body.message).toBe('No token provided');
       });
 
-      it('만료된 토큰으로 요청하면 401을 반환한다', async () => {
+      it('만료된 토큰도 서명이 유효하면 허용한다', async () => {
+        // 프론트 race condition 대응을 위해 만료된 토큰도 허용
+        // TODO: 프론트 토큰 갱신 로직 개선 후 이 동작 재검토
         const testUser = await createTestUser(supabase);
         const expiredToken = generateExpiredToken(testUser.auth_id);
 
         const response = await request(app.getHttpServer())
           .get('/point/total')
           .set('Authorization', `Bearer ${expiredToken}`)
-          .expect(401);
+          .expect(200);
 
-        expect(response.body.message).toBe('Token expired');
+        expect(response.body).toHaveProperty('totalPoint');
       });
 
       it('잘못된 토큰으로 요청하면 401을 반환한다', async () => {
