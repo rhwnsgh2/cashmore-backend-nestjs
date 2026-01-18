@@ -457,16 +457,58 @@ exports.handler = async (event) => {
         code: lambda.Code.fromInline(`
 const https = require('https');
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+const { ECSClient, DescribeServicesCommand, DescribeTasksCommand, ListTasksCommand, DescribeTaskDefinitionCommand } = require('@aws-sdk/client-ecs');
 
-const client = new SecretsManagerClient({ region: 'ap-northeast-2' });
+const secretsClient = new SecretsManagerClient({ region: 'ap-northeast-2' });
+const ecsClient = new ECSClient({ region: 'ap-northeast-2' });
 let cachedWebhookUrl = null;
 
 async function getWebhookUrl() {
   if (cachedWebhookUrl) return cachedWebhookUrl;
   const command = new GetSecretValueCommand({ SecretId: 'cashmore/slack-webhook' });
-  const response = await client.send(command);
+  const response = await secretsClient.send(command);
   cachedWebhookUrl = response.SecretString;
   return cachedWebhookUrl;
+}
+
+async function getServiceDetails(clusterArn, serviceName) {
+  try {
+    // Get service info
+    const serviceResp = await ecsClient.send(new DescribeServicesCommand({
+      cluster: clusterArn,
+      services: [serviceName]
+    }));
+    const svc = serviceResp.services?.[0];
+    if (!svc) return null;
+
+    // Get task definition details
+    const taskDefResp = await ecsClient.send(new DescribeTaskDefinitionCommand({
+      taskDefinition: svc.taskDefinition
+    }));
+    const container = taskDefResp.taskDefinition?.containerDefinitions?.[0];
+    const image = container?.image || 'unknown';
+
+    // Extract image tag (commit hash)
+    const imageTag = image.split(':')[1] || 'latest';
+
+    // Get running tasks
+    const listTasksResp = await ecsClient.send(new ListTasksCommand({
+      cluster: clusterArn,
+      serviceName: serviceName,
+      desiredStatus: 'RUNNING'
+    }));
+
+    return {
+      runningCount: svc.runningCount,
+      desiredCount: svc.desiredCount,
+      pendingCount: svc.pendingCount,
+      imageTag: imageTag,
+      deployments: svc.deployments || []
+    };
+  } catch (err) {
+    console.error('Failed to get service details:', err);
+    return null;
+  }
 }
 
 exports.handler = async (event) => {
@@ -476,35 +518,59 @@ exports.handler = async (event) => {
   const detail = event.detail;
   const eventName = detail.eventName;
   const serviceName = detail.serviceName;
+  const clusterArn = detail.clusterArn;
 
   let payload;
 
   if (eventName === 'SERVICE_STEADY_STATE') {
-    // 배포 완료 알림
+    // 배포 완료 - ECS에서 상세 정보 조회
+    const info = await getServiceDetails(clusterArn, serviceName);
+
+    if (info) {
+      const primaryDeploy = info.deployments.find(d => d.status === 'PRIMARY');
+      const deployStarted = primaryDeploy?.createdAt ? new Date(primaryDeploy.createdAt) : null;
+      const now = new Date(event.time);
+      const durationMin = deployStarted ? Math.round((now - deployStarted) / 60000) : null;
+
+      payload = {
+        text: '✅ *배포 완료*',
+        attachments: [{
+          color: '#4CAF50',
+          fields: [
+            { title: '서비스', value: serviceName, short: true },
+            { title: '이미지 태그', value: info.imageTag, short: true },
+            { title: '실행 중 태스크', value: String(info.runningCount) + '개', short: true },
+            { title: '배포 소요 시간', value: durationMin ? durationMin + '분' : '-', short: true },
+            { title: '완료 시각', value: event.time, short: false }
+          ]
+        }]
+      };
+    } else {
+      payload = {
+        text: '✅ *배포 완료*',
+        attachments: [{
+          color: '#4CAF50',
+          fields: [
+            { title: '서비스', value: serviceName, short: true },
+            { title: '완료 시각', value: event.time, short: false }
+          ]
+        }]
+      };
+    }
+  } else if (eventName === 'SERVICE_DEPLOYMENT_IN_PROGRESS') {
+    // 배포 시작
+    const info = await getServiceDetails(clusterArn, serviceName);
+
     payload = {
-      text: '✅ *배포 완료*',
+      text: '🔄 *배포 시작*',
       attachments: [{
-        color: '#4CAF50',
+        color: '#FF9800',
         fields: [
           { title: '서비스', value: serviceName, short: true },
-          { title: '상태', value: '모든 태스크 정상 실행 중', short: true },
-          { title: '완료 시각', value: event.time, short: false }
-        ]
-      }]
-    };
-  } else if (eventName === 'SERVICE_DESIRED_COUNT_UPDATED') {
-    // 스케일링 이벤트
-    const desiredCount = detail.desiredCount;
-    const runningCount = detail.runningCount;
-    payload = {
-      text: '📊 *ECS 스케일링 이벤트*',
-      attachments: [{
-        color: '#2196F3',
-        fields: [
-          { title: '서비스', value: serviceName, short: true },
-          { title: '목표 태스크 수', value: String(desiredCount), short: true },
-          { title: '실행 중인 태스크 수', value: String(runningCount), short: true },
-          { title: '발생 시각', value: event.time, short: true }
+          { title: '새 이미지', value: info?.imageTag || 'unknown', short: true },
+          { title: '현재 태스크', value: info ? String(info.runningCount) + '개' : '-', short: true },
+          { title: '목표 태스크', value: info ? String(info.desiredCount) + '개' : '-', short: true },
+          { title: '시작 시각', value: event.time, short: false }
         ]
       }]
     };
@@ -531,13 +597,26 @@ exports.handler = async (event) => {
   });
 };
       `),
-        timeout: cdk.Duration.seconds(10),
+        timeout: cdk.Duration.seconds(30),
       },
+    );
+
+    // Lambda에 ECS 읽기 권한 부여
+    scalingEventLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'ecs:DescribeServices',
+          'ecs:DescribeTasks',
+          'ecs:ListTasks',
+          'ecs:DescribeTaskDefinition',
+        ],
+        resources: ['*'],
+      }),
     );
 
     slackWebhookSecret.grantRead(scalingEventLambda);
 
-    // EventBridge Rule for ECS Service Events (Scaling + Deployment Complete)
+    // EventBridge Rule for ECS Deployment Events
     new events.Rule(this, 'EcsScalingRule', {
       ruleName: 'cashmore-ecs-events',
       eventPattern: {
@@ -546,7 +625,10 @@ exports.handler = async (event) => {
         detail: {
           clusterArn: [cluster.clusterArn],
           eventType: ['INFO'],
-          eventName: ['SERVICE_DESIRED_COUNT_UPDATED', 'SERVICE_STEADY_STATE'],
+          eventName: [
+            'SERVICE_DEPLOYMENT_IN_PROGRESS', // 배포 시작
+            'SERVICE_STEADY_STATE', // 배포 완료
+          ],
         },
       },
       targets: [new events_targets.LambdaFunction(scalingEventLambda)],
