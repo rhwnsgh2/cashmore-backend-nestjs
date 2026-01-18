@@ -32,6 +32,7 @@ USER nestjs
 
 ENV NODE_ENV=production
 ENV PORT=8000
+ENV NO_COLOR=1
 
 EXPOSE 8000
 
