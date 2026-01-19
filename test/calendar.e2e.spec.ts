@@ -5,7 +5,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
-import { createTestUser, TestUser } from './helpers/user.helper';
+import { createTestUser } from './helpers/user.helper';
 import { createReceiptSubmissions } from './helpers/streak.helper';
 import { createPointActions } from './helpers/point.helper';
 import { generateTestToken } from './helpers/auth.helper';
