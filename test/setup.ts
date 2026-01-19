@@ -1,4 +1,3 @@
-import { beforeAll, afterAll } from 'vitest';
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 
@@ -94,14 +93,5 @@ export async function disableSlackTriggers(): Promise<void> {
   }
 }
 
-// Global hooks (skip in CI without DB)
-if (process.env.SKIP_DB_TESTS !== 'true') {
-  beforeAll(async () => {
-    await disableSlackTriggers();
-    await truncateAllTables();
-  });
-
-  afterAll(async () => {
-    await closeTestDbClient();
-  });
-}
+// NOTE: Global hooks removed - integration/e2e tests should call these functions explicitly
+// This prevents unit tests from attempting DB connections in CI
