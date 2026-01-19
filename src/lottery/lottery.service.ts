@@ -33,7 +33,8 @@ export class LotteryService {
   ) {}
 
   async getMyLotteries(userId: string): Promise<LotteryResponse[]> {
-    const lotteries = await this.lotteryRepository.findAvailableLotteries(userId);
+    const lotteries =
+      await this.lotteryRepository.findAvailableLotteries(userId);
 
     return lotteries.map((lottery) => {
       const convertedType = convertLotteryType(lottery.lottery_type_id);

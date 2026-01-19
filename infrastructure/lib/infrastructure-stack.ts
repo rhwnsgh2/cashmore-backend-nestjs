@@ -145,6 +145,20 @@ export class InfrastructureStack extends cdk.Stack {
       containerPort: 8000,
     });
 
+    // CloudWatch Metrics 권한 추가 (API 메트릭 전송용)
+    taskDefinition.addToTaskRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['cloudwatch:PutMetricData'],
+        resources: ['*'],
+        conditions: {
+          StringEquals: {
+            'cloudwatch:namespace': 'Cashmore/API',
+          },
+        },
+      }),
+    );
+
     // S3 Bucket for ALB Access Logs
     const albLogsBucket = new s3.Bucket(this, 'AlbLogsBucket', {
       bucketName: `cashmore-alb-logs-${this.account}`,
@@ -227,6 +241,12 @@ export class InfrastructureStack extends cdk.Stack {
 
     scaling.scaleOnCpuUtilization('CpuScaling', {
       targetUtilizationPercent: 70,
+    });
+
+    // Request Count 기반 스케일링 (응답 지연 전에 미리 스케일 아웃)
+    scaling.scaleOnRequestCount('RequestScaling', {
+      targetGroup: targetGroup,
+      requestsPerTarget: 100, // 태스크당 동시 요청 100개 초과 시 스케일 아웃
     });
 
     // SNS Topic for Alarms

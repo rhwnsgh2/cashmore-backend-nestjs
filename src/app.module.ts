@@ -9,6 +9,7 @@ import { SupabaseModule } from './supabase/supabase.module';
 import { PointModule } from './point/point.module';
 import { LotteryModule } from './lottery/lottery.module';
 import { AuthModule } from './auth/auth.module';
+import { MetricsModule } from './common/metrics';
 import configuration from './config/configuration';
 
 @Module({
@@ -34,6 +35,7 @@ import configuration from './config/configuration';
     HealthModule,
     PointModule,
     LotteryModule,
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [
