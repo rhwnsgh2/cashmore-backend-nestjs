@@ -10,6 +10,7 @@ import { PointModule } from './point/point.module';
 import { LotteryModule } from './lottery/lottery.module';
 import { UserModule } from './user/user.module';
 import { StreakModule } from './streak/streak.module';
+import { CalendarModule } from './calendar/calendar.module';
 import { AuthModule } from './auth/auth.module';
 import { MetricsModule } from './common/metrics';
 import configuration from './config/configuration';
@@ -39,6 +40,7 @@ import configuration from './config/configuration';
     LotteryModule,
     UserModule,
     StreakModule,
+    CalendarModule,
     MetricsModule,
   ],
   controllers: [AppController],
