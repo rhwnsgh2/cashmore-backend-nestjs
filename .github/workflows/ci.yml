@@ -40,6 +40,25 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Notify Slack - CI Failed
+        if: failure()
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-type: application/json' \
+            -d '{
+              "text": "❌ *CI 실패*",
+              "attachments": [{
+                "color": "#F44336",
+                "fields": [
+                  {"title": "Repository", "value": "${{ github.repository }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": false},
+                  {"title": "Author", "value": "${{ github.actor }}", "short": true},
+                  {"title": "Action", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|로그 확인>", "short": true}
+                ]
+              }]
+            }'
+
   deploy:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
