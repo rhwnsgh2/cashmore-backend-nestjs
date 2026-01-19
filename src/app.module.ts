@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { PointModule } from './point/point.module';
+import { LotteryModule } from './lottery/lottery.module';
 import { AuthModule } from './auth/auth.module';
 import configuration from './config/configuration';
 
@@ -32,6 +33,7 @@ import configuration from './config/configuration';
     AuthModule,
     HealthModule,
     PointModule,
+    LotteryModule,
   ],
   controllers: [AppController],
   providers: [
