@@ -211,8 +211,28 @@ export class PointTotalResponseDto {
 }
 ```
 
+## Auth 모듈 사용법
+
+JWT 인증 및 사용자 ID 매핑을 담당.
+
+```typescript
+// Controller에서 현재 사용자 ID 가져오기
+import { CurrentUser } from '../auth';
+
+@Get('info')
+@UseGuards(JwtAuthGuard)
+async getInfo(@CurrentUser() userId: string) {
+  return this.service.getInfo(userId);
+}
+```
+
+- `JwtAuthGuard`: JWT 토큰 검증
+- `CurrentUser` 데코레이터: 컨트롤러에서 userId 추출
+- `AuthService`: auth_id → user_id 매핑 (LRU Cache, TTL 1시간)
+
 ## 주의사항
 
+- 새 모듈 생성 후 반드시 `AppModule`에 import 추가
 - 테스트 DB의 `user_id` 컬럼은 UUID 타입 - 문자열이 아닌 실제 UUID 사용
 - FK 제약 조건: `point_actions` 등은 `public.user` 테이블 참조 → 테스트 시 유저 먼저 생성
 - `truncateAllTables()`는 `CASCADE` 옵션으로 FK 순서 무관하게 정리

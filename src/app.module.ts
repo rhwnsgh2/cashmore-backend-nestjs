@@ -9,6 +9,7 @@ import { SupabaseModule } from './supabase/supabase.module';
 import { PointModule } from './point/point.module';
 import { LotteryModule } from './lottery/lottery.module';
 import { UserModule } from './user/user.module';
+import { StreakModule } from './streak/streak.module';
 import { AuthModule } from './auth/auth.module';
 import { MetricsModule } from './common/metrics';
 import configuration from './config/configuration';
@@ -37,6 +38,7 @@ import configuration from './config/configuration';
     PointModule,
     LotteryModule,
     UserModule,
+    StreakModule,
     MetricsModule,
   ],
   controllers: [AppController],
