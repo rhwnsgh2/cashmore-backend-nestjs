@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
+import { UserProvider } from 'src/user/interfaces/user-repository.interface';
 
 export interface TestUser {
   id: string;
@@ -7,6 +8,7 @@ export interface TestUser {
   email?: string;
   nickname?: string;
   marketing_info: boolean;
+  provider: UserProvider;
 }
 
 /**
@@ -39,6 +41,7 @@ export async function createTestUser(
     email,
     nickname: overrides.nickname ?? 'test-user',
     marketing_info: overrides.marketing_info ?? false,
+    provider: overrides.provider ?? 'other',
   };
 
   const { error } = await supabase.from('user').insert(user);

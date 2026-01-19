@@ -13,7 +13,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "SKIP_DB_TESTS=true vitest run --exclude '**/test/**'",
+    "test": "vitest run --exclude '**/*.integration.spec.ts' --exclude '**/*.e2e.spec.ts'",
     "test:all": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
