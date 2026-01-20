@@ -568,8 +568,11 @@ exports.handler = async (event) => {
 
   const detail = event.detail;
   const eventName = detail.eventName;
-  const serviceName = detail.serviceName;
   const clusterArn = detail.clusterArn;
+
+  // resources에서 서비스 ARN 추출 (예: arn:aws:ecs:region:account:service/cluster-name/service-name)
+  const serviceArn = event.resources?.[0] || '';
+  const serviceName = serviceArn.split('/').pop() || 'unknown';
 
   let payload;
 
