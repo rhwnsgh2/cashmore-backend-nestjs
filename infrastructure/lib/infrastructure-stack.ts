@@ -246,7 +246,7 @@ export class InfrastructureStack extends cdk.Stack {
     // Request Count 기반 스케일링 (응답 지연 전에 미리 스케일 아웃)
     scaling.scaleOnRequestCount('RequestScaling', {
       targetGroup: targetGroup,
-      requestsPerTarget: 100, // 태스크당 동시 요청 100개 초과 시 스케일 아웃
+      requestsPerTarget: 1500, // 태스크당 분당 1500개 요청 초과 시 스케일 아웃
     });
 
     // SNS Topic for Alarms
@@ -478,9 +478,11 @@ exports.handler = async (event) => {
 const https = require('https');
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 const { ECSClient, DescribeServicesCommand, DescribeTasksCommand, ListTasksCommand, DescribeTaskDefinitionCommand } = require('@aws-sdk/client-ecs');
+const { ApplicationAutoScalingClient, DescribeScalingActivitiesCommand } = require('@aws-sdk/client-application-auto-scaling');
 
 const secretsClient = new SecretsManagerClient({ region: 'ap-northeast-2' });
 const ecsClient = new ECSClient({ region: 'ap-northeast-2' });
+const autoScalingClient = new ApplicationAutoScalingClient({ region: 'ap-northeast-2' });
 let cachedWebhookUrl = null;
 
 async function getWebhookUrl() {
@@ -527,6 +529,35 @@ async function getServiceDetails(clusterArn, serviceName) {
     };
   } catch (err) {
     console.error('Failed to get service details:', err);
+    return null;
+  }
+}
+
+async function getScalingReason(clusterName, serviceName) {
+  try {
+    const resourceId = 'service/' + clusterName + '/' + serviceName;
+    const resp = await autoScalingClient.send(new DescribeScalingActivitiesCommand({
+      ServiceNamespace: 'ecs',
+      ResourceId: resourceId,
+      MaxResults: 1
+    }));
+
+    const activity = resp.ScalingActivities?.[0];
+    if (!activity) return null;
+
+    // 최근 5분 이내의 활동만 반환
+    const activityTime = new Date(activity.StartTime);
+    const now = new Date();
+    if ((now - activityTime) > 5 * 60 * 1000) return null;
+
+    return {
+      cause: activity.Cause || 'Unknown',
+      description: activity.Description || '',
+      statusCode: activity.StatusCode,
+      startTime: activity.StartTime
+    };
+  } catch (err) {
+    console.error('Failed to get scaling reason:', err);
     return null;
   }
 }
@@ -594,6 +625,50 @@ exports.handler = async (event) => {
         ]
       }]
     };
+  } else if (eventName === 'SERVICE_DESIRED_COUNT_UPDATED') {
+    // Auto Scaling 이벤트
+    const clusterName = clusterArn.split('/').pop();
+    const info = await getServiceDetails(clusterArn, serviceName);
+    const scalingInfo = await getScalingReason(clusterName, serviceName);
+
+    // 스케일링 이유 파싱 (CPU, Request Count 등)
+    let scalingType = '수동 조정';
+    let emoji = '📊';
+    if (scalingInfo?.cause) {
+      if (scalingInfo.cause.includes('CPUUtilization')) {
+        scalingType = 'CPU 기반 스케일링';
+        emoji = '🔥';
+      } else if (scalingInfo.cause.includes('RequestCount') || scalingInfo.cause.includes('ALBRequestCount')) {
+        scalingType = '요청 수 기반 스케일링';
+        emoji = '📈';
+      } else if (scalingInfo.cause.includes('minimum capacity')) {
+        scalingType = '최소 용량 유지';
+        emoji = '📉';
+      } else if (scalingInfo.cause.includes('maximum capacity')) {
+        scalingType = '최대 용량 도달';
+        emoji = '🚫';
+      }
+    }
+
+    // desiredCount 변경 정보 추출
+    const capacityChange = detail.capacityProviderStrategy || [];
+    const desiredCount = info?.desiredCount || '-';
+    const runningCount = info?.runningCount || '-';
+
+    payload = {
+      text: emoji + ' *Auto Scaling*',
+      attachments: [{
+        color: '#2196F3',
+        fields: [
+          { title: '서비스', value: serviceName, short: true },
+          { title: '스케일링 유형', value: scalingType, short: true },
+          { title: '현재 실행 중', value: String(runningCount) + '개', short: true },
+          { title: '목표 태스크', value: String(desiredCount) + '개', short: true },
+          { title: '이유', value: scalingInfo?.cause ? scalingInfo.cause.substring(0, 200) : '정보 없음', short: false },
+          { title: '시각', value: event.time, short: false }
+        ]
+      }]
+    };
   } else {
     return; // 알 수 없는 이벤트는 무시
   }
@@ -634,6 +709,14 @@ exports.handler = async (event) => {
       }),
     );
 
+    // Lambda에 Application Auto Scaling 읽기 권한 부여
+    scalingEventLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['application-autoscaling:DescribeScalingActivities'],
+        resources: ['*'],
+      }),
+    );
+
     slackWebhookSecret.grantRead(scalingEventLambda);
 
     // EventBridge Rule for ECS Deployment Events
@@ -648,6 +731,7 @@ exports.handler = async (event) => {
           eventName: [
             'SERVICE_DEPLOYMENT_IN_PROGRESS', // 배포 시작
             'SERVICE_STEADY_STATE', // 배포 완료
+            'SERVICE_DESIRED_COUNT_UPDATED', // Auto Scaling
           ],
         },
       },

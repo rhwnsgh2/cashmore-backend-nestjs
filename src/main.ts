@@ -12,6 +12,10 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port') ?? 8000;
 
+  // ALB 뒤에서 실제 클라이언트 IP 인식 (X-Forwarded-For 헤더 사용)
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', true);
+
   app.use(helmet());
   app.enableCors();
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
