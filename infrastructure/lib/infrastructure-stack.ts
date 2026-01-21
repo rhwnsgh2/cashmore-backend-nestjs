@@ -545,10 +545,10 @@ async function getScalingReason(clusterName, serviceName) {
     const activity = resp.ScalingActivities?.[0];
     if (!activity) return null;
 
-    // 최근 5분 이내의 활동만 반환
+    // 최근 10분 이내의 활동만 반환
     const activityTime = new Date(activity.StartTime);
     const now = new Date();
-    if ((now - activityTime) > 5 * 60 * 1000) return null;
+    if ((now - activityTime) > 10 * 60 * 1000) return null;
 
     return {
       cause: activity.Cause || 'Unknown',
@@ -581,12 +581,7 @@ exports.handler = async (event) => {
     const info = await getServiceDetails(clusterArn, serviceName);
 
     if (info) {
-      const primaryDeploy = info.deployments.find(d => d.status === 'PRIMARY');
-      const deployStarted = primaryDeploy?.createdAt ? new Date(primaryDeploy.createdAt) : null;
-      const now = new Date(event.time);
-      const durationMin = deployStarted ? Math.round((now - deployStarted) / 60000) : null;
-
-      payload = {
+        payload = {
         text: '✅ *배포 완료*',
         attachments: [{
           color: '#4CAF50',
@@ -594,7 +589,6 @@ exports.handler = async (event) => {
             { title: '서비스', value: serviceName, short: true },
             { title: '이미지 태그', value: info.imageTag, short: true },
             { title: '실행 중 태스크', value: String(info.runningCount) + '개', short: true },
-            { title: '배포 소요 시간', value: durationMin ? durationMin + '분' : '-', short: true },
             { title: '완료 시각', value: event.time, short: false }
           ]
         }]

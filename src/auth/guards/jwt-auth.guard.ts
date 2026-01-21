@@ -25,7 +25,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private configService: ConfigService,
     private authService: AuthService,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -58,7 +58,10 @@ export class JwtAuthGuard implements CanActivate {
         );
       }
 
-      const userId = await this.authService.getUserIdByAuthId(payload.sub);
+      const userId = await this.authService.getUserIdByToken(
+        token,
+        payload.sub,
+      );
 
       if (!userId) {
         this.logger.warn(`User not found for authId: ${payload.sub}`);

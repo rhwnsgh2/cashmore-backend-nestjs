@@ -25,7 +25,7 @@ export class UserController {
 
   @Get('info')
   @UseGuards(JwtAuthGuard)
-  @Header('Cache-Control', 'private, max-age=300')
+  @Header('Cache-Control', 'private, max-age=60')
   @Header('Vary', 'Authorization')
   @ApiBearerAuth()
   @ApiOperation({

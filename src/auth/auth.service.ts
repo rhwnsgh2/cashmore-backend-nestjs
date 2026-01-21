@@ -8,17 +8,21 @@ interface UserIdResult {
 
 @Injectable()
 export class AuthService {
+  // 토큰 → userId 캐시 (토큰 갱신 시 자동으로 새 캐시 엔트리 생성)
   private userIdCache: LRUCache<string, string>;
 
   constructor(private supabaseService: SupabaseService) {
     this.userIdCache = new LRUCache<string, string>({
       max: 100000,
-      ttl: 1000 * 60 * 60, // 1시간
+      ttl: 1000 * 60 * 60, // 1시간 (토큰 갱신 주기가 하루이므로 여유있게)
     });
   }
 
-  async getUserIdByAuthId(authId: string): Promise<string | null> {
-    const cached = this.userIdCache.get(authId);
+  async getUserIdByToken(
+    token: string,
+    authId: string,
+  ): Promise<string | null> {
+    const cached = this.userIdCache.get(token);
     if (cached) {
       return cached;
     }
@@ -35,7 +39,7 @@ export class AuthService {
       return null;
     }
 
-    this.userIdCache.set(authId, data.id);
+    this.userIdCache.set(token, data.id);
     return data.id;
   }
 }
