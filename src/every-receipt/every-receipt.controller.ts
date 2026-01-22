@@ -7,9 +7,10 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { EveryReceiptService } from './every-receipt.service';
-import { GetEveryReceiptsResponseDto } from './dto/get-every-receipts.dto';
+import { EveryReceiptDto } from './dto/get-every-receipts.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { EveryReceipt } from './interfaces/every-receipt-repository.interface';
 
 @ApiTags('EveryReceipt')
 @Controller('every_receipt')
@@ -26,14 +27,14 @@ export class EveryReceiptController {
   @ApiResponse({
     status: 200,
     description: '영수증 목록 조회 성공',
-    type: GetEveryReceiptsResponseDto,
+    type: [EveryReceiptDto],
   })
   @ApiUnauthorizedResponse({
     description: '인증 실패 (토큰 없음, 만료, 유효하지 않음)',
   })
   async getEveryReceipts(
     @CurrentUser('userId') userId: string,
-  ): Promise<GetEveryReceiptsResponseDto> {
+  ): Promise<EveryReceipt[]> {
     return this.everyReceiptService.getEveryReceipts(userId);
   }
 }

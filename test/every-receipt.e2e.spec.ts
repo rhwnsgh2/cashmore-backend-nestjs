@@ -49,9 +49,7 @@ describe('EveryReceipt API (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body).toEqual({
-        receipts: [],
-      });
+      expect(response.body).toEqual([]);
     });
 
     it('영수증 목록을 최신순으로 반환한다', async () => {
@@ -80,9 +78,9 @@ describe('EveryReceipt API (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body.receipts).toHaveLength(2);
-      expect(response.body.receipts[0].pointAmount).toBe(250);
-      expect(response.body.receipts[1].pointAmount).toBe(200);
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0].pointAmount).toBe(250);
+      expect(response.body[1].pointAmount).toBe(200);
     });
 
     it('모든 상태의 영수증을 반환한다', async () => {
@@ -115,11 +113,9 @@ describe('EveryReceipt API (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body.receipts).toHaveLength(3);
+      expect(response.body).toHaveLength(3);
 
-      const statuses = response.body.receipts.map(
-        (r: { status: string }) => r.status,
-      );
+      const statuses = response.body.map((r: { status: string }) => r.status);
       expect(statuses).toContain('completed');
       expect(statuses).toContain('pending');
       expect(statuses).toContain('rejected');
@@ -150,8 +146,8 @@ describe('EveryReceipt API (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body.receipts).toHaveLength(1);
-      expect(response.body.receipts[0].pointAmount).toBe(250);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].pointAmount).toBe(250);
     });
 
     it('영수증 필드가 올바르게 매핑된다', async () => {
@@ -173,7 +169,7 @@ describe('EveryReceipt API (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      const receipt = response.body.receipts[0];
+      const receipt = response.body[0];
       expect(receipt).toHaveProperty('id');
       expect(receipt).toHaveProperty('createdAt');
       expect(receipt.pointAmount).toBe(250);

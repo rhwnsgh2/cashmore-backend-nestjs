@@ -5,10 +5,6 @@ import {
   EveryReceipt,
 } from './interfaces/every-receipt-repository.interface';
 
-export interface GetEveryReceiptsResult {
-  receipts: EveryReceipt[];
-}
-
 @Injectable()
 export class EveryReceiptService {
   constructor(
@@ -16,11 +12,7 @@ export class EveryReceiptService {
     private everyReceiptRepository: IEveryReceiptRepository,
   ) {}
 
-  async getEveryReceipts(userId: string): Promise<GetEveryReceiptsResult> {
-    const receipts = await this.everyReceiptRepository.findByUserId(userId);
-
-    return {
-      receipts,
-    };
+  async getEveryReceipts(userId: string): Promise<EveryReceipt[]> {
+    return this.everyReceiptRepository.findByUserId(userId);
   }
 }
