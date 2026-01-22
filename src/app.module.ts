@@ -14,6 +14,7 @@ import { CalendarModule } from './calendar/calendar.module';
 import { EveryReceiptModule } from './every-receipt/every-receipt.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { EventPointModule } from './event-point/event-point.module';
+import { UserModalModule } from './user-modal/user-modal.module';
 import { AuthModule } from './auth/auth.module';
 import { MetricsModule } from './common/metrics';
 import configuration from './config/configuration';
@@ -47,6 +48,7 @@ import configuration from './config/configuration';
     EveryReceiptModule,
     AttendanceModule,
     EventPointModule,
+    UserModalModule,
     MetricsModule,
   ],
   controllers: [AppController],
