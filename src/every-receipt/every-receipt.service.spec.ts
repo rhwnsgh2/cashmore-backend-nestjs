@@ -30,9 +30,7 @@ describe('EveryReceiptService', () => {
     it('영수증이 없으면 빈 배열을 반환한다', async () => {
       const result = await service.getEveryReceipts(userId);
 
-      expect(result).toEqual({
-        receipts: [],
-      });
+      expect(result).toEqual([]);
     });
 
     it('영수증 목록을 반환한다', async () => {
@@ -55,9 +53,9 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getEveryReceipts(userId);
 
-      expect(result.receipts).toHaveLength(2);
-      expect(result.receipts[0].id).toBe('receipt-1');
-      expect(result.receipts[1].id).toBe('receipt-2');
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('receipt-1');
+      expect(result[1].id).toBe('receipt-2');
     });
 
     it('영수증을 최신순으로 정렬하여 반환한다', async () => {
@@ -80,8 +78,8 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getEveryReceipts(userId);
 
-      expect(result.receipts[0].id).toBe('receipt-new');
-      expect(result.receipts[1].id).toBe('receipt-old');
+      expect(result[0].id).toBe('receipt-new');
+      expect(result[1].id).toBe('receipt-old');
     });
 
     it('pending 상태의 영수증도 포함한다', async () => {
@@ -97,9 +95,9 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getEveryReceipts(userId);
 
-      expect(result.receipts).toHaveLength(1);
-      expect(result.receipts[0].status).toBe('pending');
-      expect(result.receipts[0].pointAmount).toBeNull();
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe('pending');
+      expect(result[0].pointAmount).toBeNull();
     });
 
     it('rejected 상태의 영수증도 포함한다', async () => {
@@ -115,8 +113,8 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getEveryReceipts(userId);
 
-      expect(result.receipts).toHaveLength(1);
-      expect(result.receipts[0].status).toBe('rejected');
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe('rejected');
     });
 
     it('다른 사용자의 영수증은 포함하지 않는다', async () => {
@@ -144,8 +142,8 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getEveryReceipts(userId);
 
-      expect(result.receipts).toHaveLength(1);
-      expect(result.receipts[0].id).toBe('my-receipt');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('my-receipt');
     });
   });
 });
