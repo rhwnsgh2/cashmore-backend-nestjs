@@ -32,10 +32,10 @@ describe('Attendance API (e2e)', () => {
     await truncateAllTables();
   });
 
-  describe('GET /attendance', () => {
+  describe('GET /attendances', () => {
     it('토큰 없이 요청하면 401을 반환한다', async () => {
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .expect(401);
 
       expect(response.body.message).toBe('No token provided');
@@ -46,7 +46,7 @@ describe('Attendance API (e2e)', () => {
       const token = generateTestToken(testUser.auth_id);
 
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -71,7 +71,7 @@ describe('Attendance API (e2e)', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -101,7 +101,7 @@ describe('Attendance API (e2e)', () => {
       });
 
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -129,7 +129,7 @@ describe('Attendance API (e2e)', () => {
       });
 
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -166,7 +166,7 @@ describe('Attendance API (e2e)', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -194,7 +194,7 @@ describe('Attendance API (e2e)', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -221,7 +221,7 @@ describe('Attendance API (e2e)', () => {
       });
 
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -257,7 +257,7 @@ describe('Attendance API (e2e)', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get('/attendance')
+        .get('/attendances')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 

@@ -12,7 +12,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Attendance')
-@Controller('attendance')
+@Controller('attendances')
 export class AttendanceController {
   constructor(private attendanceService: AttendanceService) {}
 
