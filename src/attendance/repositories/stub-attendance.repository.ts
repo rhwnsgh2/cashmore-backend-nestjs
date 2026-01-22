@@ -21,13 +21,11 @@ export class StubAttendanceRepository implements IAttendanceRepository {
     this.pointActions.clear();
   }
 
-  async findByUserId(userId: string): Promise<AttendanceRecord[]> {
-    return this.attendances.get(userId) || [];
+  findByUserId(userId: string): Promise<AttendanceRecord[]> {
+    return Promise.resolve(this.attendances.get(userId) || []);
   }
 
-  async findPointActionsByUserId(
-    userId: string,
-  ): Promise<AttendancePointAction[]> {
-    return this.pointActions.get(userId) || [];
+  findPointActionsByUserId(userId: string): Promise<AttendancePointAction[]> {
+    return Promise.resolve(this.pointActions.get(userId) || []);
   }
 }
