@@ -12,7 +12,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('EveryReceipt')
-@Controller('every-receipt')
+@Controller('every_receipt')
 export class EveryReceiptController {
   constructor(private everyReceiptService: EveryReceiptService) {}
 

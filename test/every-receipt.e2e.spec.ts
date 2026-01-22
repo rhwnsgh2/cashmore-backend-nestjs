@@ -31,10 +31,10 @@ describe('EveryReceipt API (e2e)', () => {
     await truncateAllTables();
   });
 
-  describe('GET /every-receipt', () => {
+  describe('GET /every_receipt', () => {
     it('토큰 없이 요청하면 401을 반환한다', async () => {
       const response = await request(app.getHttpServer())
-        .get('/every-receipt')
+        .get('/every_receipt')
         .expect(401);
 
       expect(response.body.message).toBe('No token provided');
@@ -45,7 +45,7 @@ describe('EveryReceipt API (e2e)', () => {
       const token = generateTestToken(testUser.auth_id);
 
       const response = await request(app.getHttpServer())
-        .get('/every-receipt')
+        .get('/every_receipt')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -76,7 +76,7 @@ describe('EveryReceipt API (e2e)', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get('/every-receipt')
+        .get('/every_receipt')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -111,7 +111,7 @@ describe('EveryReceipt API (e2e)', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get('/every-receipt')
+        .get('/every_receipt')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -146,7 +146,7 @@ describe('EveryReceipt API (e2e)', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get('/every-receipt')
+        .get('/every_receipt')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -169,7 +169,7 @@ describe('EveryReceipt API (e2e)', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get('/every-receipt')
+        .get('/every_receipt')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 

@@ -12,6 +12,7 @@ import { UserModule } from './user/user.module';
 import { StreakModule } from './streak/streak.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { EveryReceiptModule } from './every-receipt/every-receipt.module';
+import { AttendanceModule } from './attendance/attendance.module';
 import { AuthModule } from './auth/auth.module';
 import { MetricsModule } from './common/metrics';
 import configuration from './config/configuration';
@@ -43,6 +44,7 @@ import configuration from './config/configuration';
     StreakModule,
     CalendarModule,
     EveryReceiptModule,
+    AttendanceModule,
     MetricsModule,
   ],
   controllers: [AppController],

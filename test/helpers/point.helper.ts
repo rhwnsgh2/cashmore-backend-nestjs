@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 export type PointActionType =
   | 'EVERY_RECEIPT'
   | 'ATTENDANCE'
+  | 'ATTENDANCE_AD'
   | 'EXCHANGE_POINT_TO_CASH'
   | 'REFERRAL'
   | 'EVENT';
