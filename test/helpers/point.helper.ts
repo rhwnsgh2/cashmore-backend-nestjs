@@ -6,7 +6,11 @@ export type PointActionType =
   | 'ATTENDANCE_AD'
   | 'EXCHANGE_POINT_TO_CASH'
   | 'REFERRAL'
-  | 'EVENT';
+  | 'EVENT'
+  | 'COUPANG_VISIT'
+  | 'ONBOARDING_EVENT'
+  | 'AFFILIATE'
+  | 'LOTTERY';
 
 export type PointActionStatus = 'done' | 'pending' | 'cancelled';
 
