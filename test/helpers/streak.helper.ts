@@ -7,6 +7,8 @@ export interface TestReceiptSubmission {
   user_id: string;
   created_at?: string;
   status?: ReceiptStatus;
+  point?: number | null;
+  image_url?: string | null;
 }
 
 /**
@@ -20,6 +22,8 @@ export async function createReceiptSubmission(
     user_id: data.user_id,
     created_at: data.created_at ?? new Date().toISOString(),
     status: data.status ?? 'completed',
+    point: data.point ?? 0,
+    image_url: data.image_url ?? '',
   };
 
   const { data: result, error } = await supabase
@@ -47,6 +51,8 @@ export async function createReceiptSubmissions(
     user_id: s.user_id,
     created_at: s.created_at ?? new Date().toISOString(),
     status: s.status ?? 'completed',
+    point: s.point ?? 0,
+    image_url: s.image_url ?? '',
   }));
 
   for (let i = 0; i < data.length; i += BATCH_SIZE) {

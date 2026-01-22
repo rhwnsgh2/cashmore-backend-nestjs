@@ -11,6 +11,7 @@ import { LotteryModule } from './lottery/lottery.module';
 import { UserModule } from './user/user.module';
 import { StreakModule } from './streak/streak.module';
 import { CalendarModule } from './calendar/calendar.module';
+import { EveryReceiptModule } from './every-receipt/every-receipt.module';
 import { AuthModule } from './auth/auth.module';
 import { MetricsModule } from './common/metrics';
 import configuration from './config/configuration';
@@ -41,6 +42,7 @@ import configuration from './config/configuration';
     UserModule,
     StreakModule,
     CalendarModule,
+    EveryReceiptModule,
     MetricsModule,
   ],
   controllers: [AppController],
