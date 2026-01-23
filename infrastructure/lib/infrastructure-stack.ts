@@ -102,8 +102,8 @@ export class InfrastructureStack extends cdk.Stack {
 
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
-      memoryLimitMiB: 1024,
-      cpu: 512,
+      memoryLimitMiB: 2048,
+      cpu: 1024,
     });
 
     // Log Group
@@ -159,6 +159,20 @@ export class InfrastructureStack extends cdk.Stack {
       }),
     );
 
+    // ECS Exec을 위한 SSM 권한 추가
+    taskDefinition.addToTaskRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'ssmmessages:CreateControlChannel',
+          'ssmmessages:CreateDataChannel',
+          'ssmmessages:OpenControlChannel',
+          'ssmmessages:OpenDataChannel',
+        ],
+        resources: ['*'],
+      }),
+    );
+
     // S3 Bucket for ALB Access Logs
     const albLogsBucket = new s3.Bucket(this, 'AlbLogsBucket', {
       bucketName: `cashmore-alb-logs-${this.account}`,
@@ -200,6 +214,7 @@ export class InfrastructureStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       assignPublicIp: false,
       healthCheckGracePeriod: cdk.Duration.seconds(60),
+      enableExecuteCommand: true, // 컨테이너 디버깅용 ECS Exec 활성화
     });
 
     // Security: ALB에서만 ECS로 접근 허용
@@ -240,7 +255,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     scaling.scaleOnCpuUtilization('CpuScaling', {
-      targetUtilizationPercent: 70,
+      targetUtilizationPercent: 50,
     });
 
     // Request Count 기반 스케일링 (응답 지연 전에 미리 스케일 아웃)
@@ -666,6 +681,44 @@ exports.handler = async (event) => {
         ]
       }]
     };
+  } else if (eventName === 'SERVICE_TASK_START_IMPACTED') {
+    // 태스크 시작
+    const info = await getServiceDetails(clusterArn, serviceName);
+    const taskCount = detail.taskArns?.length || 1;
+
+    payload = {
+      text: '🟢 *태스크 시작*',
+      attachments: [{
+        color: '#4CAF50',
+        fields: [
+          { title: '서비스', value: serviceName, short: true },
+          { title: '시작된 태스크', value: String(taskCount) + '개', short: true },
+          { title: '현재 실행 중', value: info ? String(info.runningCount) + '개' : '-', short: true },
+          { title: '목표', value: info ? String(info.desiredCount) + '개' : '-', short: true },
+          { title: '시각', value: event.time, short: false }
+        ]
+      }]
+    };
+  } else if (eventName === 'SERVICE_TASK_STOP_IMPACTED') {
+    // 태스크 중지
+    const info = await getServiceDetails(clusterArn, serviceName);
+    const taskCount = detail.taskArns?.length || 1;
+    const stoppedReason = detail.stoppedReason || '알 수 없음';
+
+    payload = {
+      text: '🔴 *태스크 중지*',
+      attachments: [{
+        color: '#F44336',
+        fields: [
+          { title: '서비스', value: serviceName, short: true },
+          { title: '중지된 태스크', value: String(taskCount) + '개', short: true },
+          { title: '현재 실행 중', value: info ? String(info.runningCount) + '개' : '-', short: true },
+          { title: '목표', value: info ? String(info.desiredCount) + '개' : '-', short: true },
+          { title: '중지 이유', value: stoppedReason.substring(0, 100), short: false },
+          { title: '시각', value: event.time, short: false }
+        ]
+      }]
+    };
   } else {
     return; // 알 수 없는 이벤트는 무시
   }
@@ -729,6 +782,8 @@ exports.handler = async (event) => {
             'SERVICE_DEPLOYMENT_IN_PROGRESS', // 배포 시작
             'SERVICE_STEADY_STATE', // 배포 완료
             'SERVICE_DESIRED_COUNT_UPDATED', // Auto Scaling
+            'SERVICE_TASK_START_IMPACTED', // 태스크 시작
+            'SERVICE_TASK_STOP_IMPACTED', // 태스크 중지
           ],
         },
       },
