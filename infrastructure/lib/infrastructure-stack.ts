@@ -578,11 +578,14 @@ async function getScalingReason(clusterName, serviceName) {
 }
 
 exports.handler = async (event) => {
+  console.log('Received event:', JSON.stringify(event, null, 2));
+
   const webhookUrl = await getWebhookUrl();
   if (!webhookUrl) return;
 
   const detail = event.detail;
   const eventName = detail.eventName;
+  console.log('Event name:', eventName);
   const clusterArn = detail.clusterArn;
 
   // resources에서 서비스 ARN 추출 (예: arn:aws:ecs:region:account:service/cluster-name/service-name)

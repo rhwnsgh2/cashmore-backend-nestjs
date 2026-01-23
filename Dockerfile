@@ -1,4 +1,4 @@
-# Build stage
+# Build stage - Bun for fast builds
 FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
@@ -11,8 +11,8 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-# Production stage
-FROM oven/bun:1-alpine AS production
+# Production stage - Node.js runtime
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
@@ -39,4 +39,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["bun", "run", "dist/src/main.js"]
+CMD ["node", "dist/src/main.js"]

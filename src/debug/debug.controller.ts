@@ -1,12 +1,7 @@
 import { Controller, Get, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-
-declare const Bun:
-  | {
-      gc: (full: boolean) => void;
-      generateHeapSnapshot: (filename?: string) => string;
-    }
-  | undefined;
+import * as v8 from 'v8';
+import * as fs from 'fs';
 
 @ApiTags('Debug')
 @Controller('debug')
@@ -27,33 +22,38 @@ export class DebugController {
   }
 
   @Post('gc')
-  @ApiOperation({ summary: 'GC 강제 실행 (Bun)' })
+  @ApiOperation({ summary: 'GC 강제 실행' })
   forceGC() {
-    if (typeof Bun !== 'undefined' && Bun.gc) {
-      const before = process.memoryUsage();
-      Bun.gc(true);
-      const after = process.memoryUsage();
+    const before = process.memoryUsage();
 
+    if (global.gc) {
+      global.gc();
+      const after = process.memoryUsage();
       return {
         success: true,
         freed: Math.round((before.rss - after.rss) / 1024 / 1024),
         unit: 'MB',
       };
     }
-    return { success: false, error: 'Bun runtime required' };
+
+    return {
+      success: false,
+      error: 'GC not exposed. Run node with --expose-gc flag',
+    };
   }
 
   @Post('heap-snapshot')
-  @ApiOperation({ summary: '힙 스냅샷 생성 (Bun)' })
+  @ApiOperation({ summary: '힙 스냅샷 생성' })
   generateHeapSnapshot() {
-    if (typeof Bun !== 'undefined' && Bun.generateHeapSnapshot) {
-      const filename = Bun.generateHeapSnapshot();
-      return {
-        success: true,
-        filename,
-        message: 'Use ECS Exec to retrieve: aws ecs execute-command ...',
-      };
-    }
-    return { success: false, error: 'Bun runtime required' };
+    const filename = `/tmp/heap-${Date.now()}.heapsnapshot`;
+    v8.writeHeapSnapshot(filename);
+
+    const stats = fs.statSync(filename);
+    return {
+      success: true,
+      filename,
+      size: `${Math.round(stats.size / 1024 / 1024)} MB`,
+      message: 'Use ECS Exec to retrieve the file',
+    };
   }
 }
