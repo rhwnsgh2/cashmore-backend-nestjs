@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { PointModule } from './point/point.module';
 import { LotteryModule } from './lottery/lottery.module';
+import { AdLotterySlotModule } from './ad-lottery-slot/ad-lottery-slot.module';
 import { UserModule } from './user/user.module';
 import { StreakModule } from './streak/streak.module';
 import { CalendarModule } from './calendar/calendar.module';
@@ -43,6 +44,7 @@ import configuration from './config/configuration';
     HealthModule,
     PointModule,
     LotteryModule,
+    AdLotterySlotModule,
     UserModule,
     StreakModule,
     CalendarModule,
