@@ -28,7 +28,7 @@ export class StubAdLotterySlotRepository implements IAdLotterySlotRepository {
   }
 
   // IAdLotterySlotRepository 구현
-  async hasWatchedInSlot(
+  hasWatchedInSlot(
     userId: string,
     slotTime: SlotTime,
     startTime: string,
@@ -36,11 +36,13 @@ export class StubAdLotterySlotRepository implements IAdLotterySlotRepository {
     const userSlots = this.slots.get(userId) || [];
     const startMoment = dayjs(startTime);
 
-    return userSlots.some(
+    const result = userSlots.some(
       (slot) =>
         slot.slot_time === slotTime &&
-        dayjs(slot.created_at).isAfter(startMoment) ||
-        dayjs(slot.created_at).isSame(startMoment),
+        (dayjs(slot.created_at).isAfter(startMoment) ||
+          dayjs(slot.created_at).isSame(startMoment)),
     );
+
+    return Promise.resolve(result);
   }
 }
