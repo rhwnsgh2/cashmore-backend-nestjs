@@ -18,4 +18,16 @@ export class PointTotalResponseDto {
     example: '2026-01-31',
   })
   expiringDate: string;
+
+  @ApiProperty({
+    description: '지난주 적립 포인트 (월~일 기준)',
+    example: 500,
+  })
+  lastWeekPoint: number;
+
+  @ApiProperty({
+    description: '이번주 적립 포인트 (월~일 기준)',
+    example: 300,
+  })
+  weeklyPoint: number;
 }

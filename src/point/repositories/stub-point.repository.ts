@@ -1,9 +1,10 @@
-import type {
-  IPointRepository,
-  PointAction,
-  PointSnapshot,
-  MonthlyEarnedPoint,
-  WithdrawalAction,
+import {
+  type IPointRepository,
+  type PointAction,
+  type PointSnapshot,
+  type MonthlyEarnedPoint,
+  type WithdrawalAction,
+  POINT_ADD_TYPES,
 } from '../interfaces/point-repository.interface';
 
 /**
@@ -72,5 +73,28 @@ export class StubPointRepository implements IPointRepository {
 
   findWithdrawalActions(userId: string): Promise<WithdrawalAction[]> {
     return Promise.resolve(this.withdrawalActions.get(userId) || []);
+  }
+
+  findEarnedPointsBetween(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<number> {
+    const actions = this.pointActions.get(userId) || [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const addTypes: readonly string[] = POINT_ADD_TYPES;
+    const total = actions
+      .filter((action) => {
+        const date = new Date(action.created_at);
+        return (
+          date >= start &&
+          date < end &&
+          addTypes.includes(action.type) &&
+          action.status === 'done'
+        );
+      })
+      .reduce((sum, action) => sum + action.point_amount, 0);
+    return Promise.resolve(total);
   }
 }

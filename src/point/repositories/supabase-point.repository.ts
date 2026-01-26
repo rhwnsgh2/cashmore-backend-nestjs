@@ -6,6 +6,7 @@ import {
   PointSnapshot,
   MonthlyEarnedPoint,
   WithdrawalAction,
+  POINT_ADD_TYPES,
 } from '../interfaces/point-repository.interface';
 
 @Injectable()
@@ -92,5 +93,28 @@ export class SupabasePointRepository implements IPointRepository {
     }
 
     return (data as WithdrawalAction[]) || [];
+  }
+
+  async findEarnedPointsBetween(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .select('point_amount')
+      .eq('user_id', userId)
+      .eq('status', 'done')
+      .in('type', [...POINT_ADD_TYPES])
+      .gte('created_at', startDate)
+      .lt('created_at', endDate);
+
+    if (error) {
+      throw error;
+    }
+
+    const rows = (data || []) as { point_amount: number }[];
+    return rows.reduce((sum, row) => sum + (row.point_amount || 0), 0);
   }
 }

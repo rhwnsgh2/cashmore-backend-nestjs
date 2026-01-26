@@ -17,6 +17,8 @@ export interface PointTotalResult {
   totalPoint: number;
   expiringPoints: number;
   expiringDate: string;
+  lastWeekPoint: number;
+  weeklyPoint: number;
 }
 
 @Injectable()
@@ -27,17 +29,39 @@ export class PointService {
   ) {}
 
   async getPointTotal(userId: string): Promise<PointTotalResult> {
+    const now = dayjs().tz('Asia/Seoul');
+
     const totalPoint = await this.calculateTotalPoint(userId);
     const expiringPoints = await this.calculateExpiringPoints(userId);
-    const expiringDate = dayjs()
-      .tz('Asia/Seoul')
-      .endOf('month')
-      .format('YYYY-MM-DD');
+    const expiringDate = now.endOf('month').format('YYYY-MM-DD');
+
+    // 이번주 월요일 ~ 다음주 월요일
+    const thisWeekStart = now.startOf('week').add(1, 'day'); // 월요일
+    const thisWeekEnd = thisWeekStart.add(7, 'day');
+
+    // 지난주 월요일 ~ 이번주 월요일
+    const lastWeekStart = thisWeekStart.subtract(7, 'day');
+    const lastWeekEnd = thisWeekStart;
+
+    const [lastWeekPoint, weeklyPoint] = await Promise.all([
+      this.pointRepository.findEarnedPointsBetween(
+        userId,
+        lastWeekStart.toISOString(),
+        lastWeekEnd.toISOString(),
+      ),
+      this.pointRepository.findEarnedPointsBetween(
+        userId,
+        thisWeekStart.toISOString(),
+        thisWeekEnd.toISOString(),
+      ),
+    ]);
 
     return {
       totalPoint,
       expiringPoints,
       expiringDate,
+      lastWeekPoint,
+      weeklyPoint,
     };
   }
 

@@ -1,34 +1,8 @@
-import type {
-  PointAction,
-  WithdrawalAction,
+import {
+  type PointAction,
+  type WithdrawalAction,
+  POINT_ADD_TYPES,
 } from '../interfaces/point-repository.interface';
-
-// 포인트를 적립하는 타입들 (status가 "done"일 때만)
-export const POINT_ADD_TYPES = [
-  'EVERY_RECEIPT',
-  'INVITE_REWARD',
-  'INVITED_USER_REWARD',
-  'INVITE_2_REWARD',
-  'INVITE_5_REWARD',
-  'COUPANG_VISIT',
-  'ONBOARDING_EVENT',
-  'AFFILIATE',
-  'EVERY_RECEIPT_MORE_POINT_AD_SHOW',
-  'ATTENDANCE_AD',
-  'ATTENDANCE',
-  'WEEKLY_ATTENDANCE_BONUS',
-  'INVITE_STEP_REWARD',
-  'INVITED_USER_REWARD_RANDOM',
-  'LOTTERY',
-  'STEP_REWARD_3000',
-  'STEP_REWARD_5000',
-] as const;
-
-// 포인트를 차감하는 타입들
-export const POINT_SUBTRACT_TYPES = [
-  'EXCHANGE_POINT_TO_CASH',
-  'POINT_EXPIRATION',
-] as const;
 
 /**
  * 포인트 액션 목록을 받아서 총 포인트를 계산합니다.
