@@ -14,11 +14,11 @@ interface EveryReceiptRow {
   image_url: string | null;
 }
 
-const DEFAULT_LIMIT = 120;
+const DEFAULT_LIMIT = 10;
 
 @Injectable()
 export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
-  constructor(private supabaseService: SupabaseService) {}
+  constructor(private supabaseService: SupabaseService) { }
 
   async findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]> {
     const { data, error } = await this.supabaseService
