@@ -16,7 +16,7 @@ const TIMEZONE = 'Asia/Seoul';
 
 @Injectable()
 export class SupabaseCalendarRepository implements ICalendarRepository {
-  constructor(private supabaseService: SupabaseService) { }
+  constructor(private supabaseService: SupabaseService) {}
 
   async findDailyReceiptCounts(
     userId: string,

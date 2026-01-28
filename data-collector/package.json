@@ -1,0 +1,23 @@
+{
+  "name": "cashmore-data-collector",
+  "version": "0.0.1",
+  "description": "AppLovin data collector for BigQuery",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/handlers/applovin.ts --bundle --platform=node --target=node20 --outfile=dist/applovin.js --external:@google-cloud/bigquery",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.700.0",
+    "@google-cloud/bigquery": "^7.9.0",
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^22.10.7",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.17"
+  }
+}

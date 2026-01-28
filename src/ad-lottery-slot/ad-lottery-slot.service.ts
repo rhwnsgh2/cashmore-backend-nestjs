@@ -164,7 +164,9 @@ export class AdLotterySlotService {
   /**
    * 광고 시청 가능 여부 확인
    */
-  async checkAvailability(userId: string): Promise<SlotAvailabilityResponseDto> {
+  async checkAvailability(
+    userId: string,
+  ): Promise<SlotAvailabilityResponseDto> {
     const currentSlotRange = this.getCurrentSlotTimeRange();
     const { slot: currentSlot, startTime } = currentSlotRange;
 

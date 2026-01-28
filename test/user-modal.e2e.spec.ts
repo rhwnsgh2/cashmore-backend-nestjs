@@ -78,9 +78,7 @@ describe('UserModal API (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.modals).toHaveLength(2);
 
-      const names = response.body.modals.map(
-        (m: { name: string }) => m.name,
-      );
+      const names = response.body.modals.map((m: { name: string }) => m.name);
       expect(names).toContain('onboarding');
       expect(names).toContain('interview');
     });

@@ -23,5 +23,5 @@
     "noFallthroughCasesInSwitch": false,
     "types": ["node", "vitest/globals"]
   },
-  "exclude": ["node_modules", "dist", "infrastructure"]
+  "exclude": ["node_modules", "dist", "infrastructure", "data-collector"]
 }

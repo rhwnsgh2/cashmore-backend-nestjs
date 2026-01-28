@@ -23,7 +23,8 @@ export class SlotAvailabilityResponseDto {
   nextSlot?: SlotTime;
 
   @ApiPropertyOptional({
-    description: '다음 슬롯 시작 시간 (ISO 8601 형식, 이미 시청한 경우에만 제공)',
+    description:
+      '다음 슬롯 시작 시간 (ISO 8601 형식, 이미 시청한 경우에만 제공)',
     example: '2026-01-23T04:00:00.000Z',
   })
   nextSlotTime?: string;

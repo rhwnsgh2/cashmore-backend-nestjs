@@ -6,9 +6,7 @@ import type {
 } from '../interfaces/ad-lottery-slot-repository.interface';
 
 @Injectable()
-export class SupabaseAdLotterySlotRepository
-  implements IAdLotterySlotRepository
-{
+export class SupabaseAdLotterySlotRepository implements IAdLotterySlotRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async hasWatchedInSlot(

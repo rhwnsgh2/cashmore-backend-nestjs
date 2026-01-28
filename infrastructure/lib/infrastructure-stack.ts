@@ -15,6 +15,7 @@ import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as appscaling from 'aws-cdk-lib/aws-applicationautoscaling';
 import { Construct } from 'constructs';
 
 export class InfrastructureStack extends cdk.Stack {
@@ -24,7 +25,7 @@ export class InfrastructureStack extends cdk.Stack {
     // VPC
     const vpc = new ec2.Vpc(this, 'CashmoreVpc', {
       maxAzs: 2,
-      natGateways: 1,
+      natGateways: 1, // TODO: ECS가 Public Subnet으로 이동 후 수동 삭제 필요
     });
 
     // ECR Repository (import existing)
@@ -211,8 +212,8 @@ export class InfrastructureStack extends cdk.Stack {
       },
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      assignPublicIp: false,
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      assignPublicIp: true, // Public Subnet에서 인터넷 접근 필요
       healthCheckGracePeriod: cdk.Duration.seconds(60),
       enableExecuteCommand: true, // 컨테이너 디버깅용 ECS Exec 활성화
     });
@@ -261,7 +262,48 @@ export class InfrastructureStack extends cdk.Stack {
     // Request Count 기반 스케일링 (응답 지연 전에 미리 스케일 아웃)
     scaling.scaleOnRequestCount('RequestScaling', {
       targetGroup: targetGroup,
-      requestsPerTarget: 1500, // 태스크당 분당 1500개 요청 초과 시 스케일 아웃
+      requestsPerTarget: 3000, // 태스크당 분당 3000개 요청 초과 시 스케일 아웃
+    });
+
+    // 예약 스케일링: 피크 시간(09, 13, 18, 22시 KST) 10분 전에 미리 태스크 증가
+    // 09시 피크 대비 (08:50 KST = 23:50 UTC 전날)
+    scaling.scaleOnSchedule('MorningPeakPrepare', {
+      schedule: appscaling.Schedule.cron({ hour: '23', minute: '50' }),
+      minCapacity: 6,
+    });
+    scaling.scaleOnSchedule('MorningPeakEnd', {
+      schedule: appscaling.Schedule.cron({ hour: '0', minute: '30' }),
+      minCapacity: 2,
+    });
+
+    // 13시 피크 대비 (12:50 KST = 03:50 UTC)
+    scaling.scaleOnSchedule('LunchPeakPrepare', {
+      schedule: appscaling.Schedule.cron({ hour: '3', minute: '50' }),
+      minCapacity: 6,
+    });
+    scaling.scaleOnSchedule('LunchPeakEnd', {
+      schedule: appscaling.Schedule.cron({ hour: '4', minute: '30' }),
+      minCapacity: 2,
+    });
+
+    // 18시 피크 대비 (17:50 KST = 08:50 UTC)
+    scaling.scaleOnSchedule('EveningPeakPrepare', {
+      schedule: appscaling.Schedule.cron({ hour: '8', minute: '50' }),
+      minCapacity: 6,
+    });
+    scaling.scaleOnSchedule('EveningPeakEnd', {
+      schedule: appscaling.Schedule.cron({ hour: '9', minute: '30' }),
+      minCapacity: 2,
+    });
+
+    // 22시 피크 대비 (21:50 KST = 12:50 UTC)
+    scaling.scaleOnSchedule('NightPeakPrepare', {
+      schedule: appscaling.Schedule.cron({ hour: '12', minute: '50' }),
+      minCapacity: 6,
+    });
+    scaling.scaleOnSchedule('NightPeakEnd', {
+      schedule: appscaling.Schedule.cron({ hour: '13', minute: '30' }),
+      minCapacity: 2,
     });
 
     // SNS Topic for Alarms
@@ -578,14 +620,11 @@ async function getScalingReason(clusterName, serviceName) {
 }
 
 exports.handler = async (event) => {
-  console.log('Received event:', JSON.stringify(event, null, 2));
-
   const webhookUrl = await getWebhookUrl();
   if (!webhookUrl) return;
 
   const detail = event.detail;
   const eventName = detail.eventName;
-  console.log('Event name:', eventName);
   const clusterArn = detail.clusterArn;
 
   // resources에서 서비스 ARN 추출 (예: arn:aws:ecs:region:account:service/cluster-name/service-name)
@@ -595,11 +634,72 @@ exports.handler = async (event) => {
   let payload;
 
   if (eventName === 'SERVICE_STEADY_STATE') {
-    // 배포 완료 - ECS에서 상세 정보 조회
+    // 서비스 안정 상태 - 스케일링인지 배포인지 구분
+    const clusterName = clusterArn.split('/').pop();
     const info = await getServiceDetails(clusterArn, serviceName);
+    const scalingInfo = await getScalingReason(clusterName, serviceName);
 
-    if (info) {
-        payload = {
+    // 최근 스케일링 활동이 있으면 스케일링 완료, 없으면 배포 완료
+    // statusCode가 InProgress나 Successful이면 스케일링 이벤트로 처리
+    if (scalingInfo && (scalingInfo.statusCode === 'Successful' || scalingInfo.statusCode === 'InProgress')) {
+      // 스케일링 완료 알림
+      let scalingType = '스케일링';
+      let emoji = '📊';
+      let metricType = '알 수 없음';
+      let direction = '';
+
+      if (scalingInfo.cause) {
+        // 스케일링 타입 감지 (정책 이름에서 CpuScaling 또는 RequestScaling 확인)
+        if (scalingInfo.cause.includes('CpuScaling')) {
+          metricType = 'CPU';
+        } else if (scalingInfo.cause.includes('RequestScaling')) {
+          metricType = '요청 수';
+        } else if (scalingInfo.cause.includes('minimum capacity')) {
+          metricType = '최소 용량';
+        } else if (scalingInfo.cause.includes('maximum capacity')) {
+          metricType = '최대 용량';
+        }
+
+        // 스케일 방향 감지 (AlarmHigh = 스케일 아웃, AlarmLow = 스케일 인)
+        if (scalingInfo.cause.includes('AlarmHigh')) {
+          direction = '아웃';
+          emoji = '📈';
+        } else if (scalingInfo.cause.includes('AlarmLow')) {
+          direction = '인';
+          emoji = '📉';
+        }
+
+        scalingType = metricType + ' 기반 스케일' + direction;
+      }
+
+      // description에서 목표 태스크 수 추출 (예: "Setting desired count to 6.")
+      let targetCount = '-';
+      if (scalingInfo.description) {
+        const match = scalingInfo.description.match(/Setting desired count to (\\d+)/);
+        if (match) {
+          targetCount = match[1];
+        }
+      }
+
+      // 태스크 변경 정보 구성
+      const currentCount = info?.runningCount || '-';
+      const taskChange = targetCount !== '-' ? currentCount + ' → ' + targetCount + '개' : currentCount + '개';
+
+      payload = {
+        text: emoji + ' *' + scalingType + '*',
+        attachments: [{
+          color: direction === '아웃' ? '#FF9800' : '#2196F3',
+          fields: [
+            { title: '서비스', value: serviceName, short: true },
+            { title: '태스크 변경', value: taskChange, short: true },
+            { title: '트리거', value: metricType + ' 임계값 ' + (direction === '아웃' ? '초과' : '미만'), short: true },
+            { title: '완료 시각', value: event.time, short: true }
+          ]
+        }]
+      };
+    } else if (info) {
+      // 배포 완료 알림
+      payload = {
         text: '✅ *배포 완료*',
         attachments: [{
           color: '#4CAF50',
@@ -613,7 +713,7 @@ exports.handler = async (event) => {
       };
     } else {
       payload = {
-        text: '✅ *배포 완료*',
+        text: '✅ *서비스 안정 상태*',
         attachments: [{
           color: '#4CAF50',
           fields: [
@@ -640,47 +740,74 @@ exports.handler = async (event) => {
         ]
       }]
     };
+  } else if (eventName === 'SERVICE_DEPLOYMENT_COMPLETED') {
+    // 배포 완료 (STEADY_STATE와 별도)
+    const info = await getServiceDetails(clusterArn, serviceName);
+
+    payload = {
+      text: '✅ *배포 완료*',
+      attachments: [{
+        color: '#4CAF50',
+        fields: [
+          { title: '서비스', value: serviceName, short: true },
+          { title: '이미지 태그', value: info?.imageTag || 'unknown', short: true },
+          { title: '실행 중 태스크', value: info ? String(info.runningCount) + '개' : '-', short: true },
+          { title: '완료 시각', value: event.time, short: false }
+        ]
+      }]
+    };
   } else if (eventName === 'SERVICE_DESIRED_COUNT_UPDATED') {
-    // Auto Scaling 이벤트
+    // Auto Scaling 이벤트 (참고: AWS 제한으로 Auto Scaling 시에는 이 이벤트가 발생하지 않음)
     const clusterName = clusterArn.split('/').pop();
     const info = await getServiceDetails(clusterArn, serviceName);
     const scalingInfo = await getScalingReason(clusterName, serviceName);
 
-    // 스케일링 이유 파싱 (CPU, Request Count 등)
-    let scalingType = '수동 조정';
+    // 스케일링 이유 파싱 (정책 이름에서 CpuScaling 또는 RequestScaling 확인)
+    let metricType = '수동';
     let emoji = '📊';
+    let direction = '';
+
     if (scalingInfo?.cause) {
-      if (scalingInfo.cause.includes('CPUUtilization')) {
-        scalingType = 'CPU 기반 스케일링';
-        emoji = '🔥';
-      } else if (scalingInfo.cause.includes('RequestCount') || scalingInfo.cause.includes('ALBRequestCount')) {
-        scalingType = '요청 수 기반 스케일링';
-        emoji = '📈';
+      if (scalingInfo.cause.includes('CpuScaling')) {
+        metricType = 'CPU';
+      } else if (scalingInfo.cause.includes('RequestScaling')) {
+        metricType = '요청 수';
       } else if (scalingInfo.cause.includes('minimum capacity')) {
-        scalingType = '최소 용량 유지';
-        emoji = '📉';
+        metricType = '최소 용량';
       } else if (scalingInfo.cause.includes('maximum capacity')) {
-        scalingType = '최대 용량 도달';
-        emoji = '🚫';
+        metricType = '최대 용량';
+      }
+
+      if (scalingInfo.cause.includes('AlarmHigh')) {
+        direction = ' 아웃';
+        emoji = '📈';
+      } else if (scalingInfo.cause.includes('AlarmLow')) {
+        direction = ' 인';
+        emoji = '📉';
       }
     }
 
-    // desiredCount 변경 정보 추출
-    const capacityChange = detail.capacityProviderStrategy || [];
-    const desiredCount = info?.desiredCount || '-';
+    // description에서 목표 태스크 수 추출
+    let targetCount = info?.desiredCount || '-';
+    if (scalingInfo?.description) {
+      const match = scalingInfo.description.match(/Setting desired count to (\\d+)/);
+      if (match) {
+        targetCount = match[1];
+      }
+    }
+
     const runningCount = info?.runningCount || '-';
+    const taskChange = runningCount + ' → ' + targetCount + '개';
 
     payload = {
-      text: emoji + ' *Auto Scaling*',
+      text: emoji + ' *' + metricType + ' 기반 스케일' + direction + '*',
       attachments: [{
-        color: '#2196F3',
+        color: direction === ' 아웃' ? '#FF9800' : '#2196F3',
         fields: [
           { title: '서비스', value: serviceName, short: true },
-          { title: '스케일링 유형', value: scalingType, short: true },
-          { title: '현재 실행 중', value: String(runningCount) + '개', short: true },
-          { title: '목표 태스크', value: String(desiredCount) + '개', short: true },
-          { title: '이유', value: scalingInfo?.cause ? scalingInfo.cause.substring(0, 200) : '정보 없음', short: false },
-          { title: '시각', value: event.time, short: false }
+          { title: '태스크 변경', value: taskChange, short: true },
+          { title: '트리거', value: metricType + ' 임계값 ' + (direction === ' 아웃' ? '초과' : '미만'), short: true },
+          { title: '시각', value: event.time, short: true }
         ]
       }]
     };
@@ -739,7 +866,10 @@ exports.handler = async (event) => {
       res.on('data', () => {});
       res.on('end', () => resolve({ statusCode: 200 }));
     });
-    req.on('error', reject);
+    req.on('error', (err) => {
+      console.error('Slack request error:', err);
+      reject(err);
+    });
     req.write(JSON.stringify(payload));
     req.end();
   });
@@ -780,13 +910,14 @@ exports.handler = async (event) => {
         detailType: ['ECS Service Action'],
         detail: {
           clusterArn: [cluster.clusterArn],
-          eventType: ['INFO'],
+          // eventType 필터 제거 - INFO, WARN 등 모든 타입 캡처
           eventName: [
             'SERVICE_DEPLOYMENT_IN_PROGRESS', // 배포 시작
-            'SERVICE_STEADY_STATE', // 배포 완료
+            'SERVICE_DEPLOYMENT_COMPLETED', // 배포 완료
+            'SERVICE_STEADY_STATE', // 서비스 안정 상태
             'SERVICE_DESIRED_COUNT_UPDATED', // Auto Scaling
-            'SERVICE_TASK_START_IMPACTED', // 태스크 시작
-            'SERVICE_TASK_STOP_IMPACTED', // 태스크 중지
+            'SERVICE_TASK_START_IMPACTED', // 태스크 시작 영향
+            'SERVICE_TASK_STOP_IMPACTED', // 태스크 중지 영향
           ],
         },
       },

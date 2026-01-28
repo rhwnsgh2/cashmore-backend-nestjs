@@ -6,7 +6,11 @@ import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
 import { createTestUser } from './helpers/user.helper';
-import { createReceiptSubmissions } from './helpers/streak.helper';
+import {
+  createReceiptSubmission,
+  createReceiptSubmissions,
+  createReceiptReReview,
+} from './helpers/streak.helper';
 import { generateTestToken } from './helpers/auth.helper';
 
 describe('EveryReceipt API (e2e)', () => {
@@ -175,6 +179,129 @@ describe('EveryReceipt API (e2e)', () => {
       expect(receipt.pointAmount).toBe(250);
       expect(receipt.status).toBe('completed');
       expect(receipt.imageUrl).toBe('https://example.com/receipt.jpg');
+    });
+  });
+
+  describe('GET /every_receipt/:id', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/every_receipt/1')
+        .expect(401);
+
+      expect(response.body.message).toBe('No token provided');
+    });
+
+    it('존재하지 않는 영수증이면 404를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .get('/every_receipt/999999')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+
+    it('다른 사용자의 영수증은 조회할 수 없다', async () => {
+      const testUser = await createTestUser(supabase);
+      const otherUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const receipt = await createReceiptSubmission(supabase, {
+        user_id: otherUser.id,
+        status: 'completed',
+        point: 25,
+      });
+
+      await request(app.getHttpServer())
+        .get(`/every_receipt/${(receipt as any).id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+
+    it('score_data가 없는 영수증의 기본 정보를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const receipt = await createReceiptSubmission(supabase, {
+        user_id: testUser.id,
+        status: 'completed',
+        point: 25,
+        image_url: 'https://example.com/receipt.jpg',
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/every_receipt/${(receipt as any).id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.id).toBe((receipt as any).id);
+      expect(response.body.pointAmount).toBe(25);
+      expect(response.body.status).toBe('completed');
+      expect(response.body.imageUrl).toBe('https://example.com/receipt.jpg');
+      expect(response.body.adShowPoint).toBe(0);
+      expect(response.body.reReviewStatus).toBeNull();
+      expect(response.body.grade).toBeUndefined();
+    });
+
+    it('score_data가 있으면 등급 정보를 포함한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const scoreData = {
+        items: { score: 10, reason: 'good' },
+        store_name: { score: 5, reason: 'found' },
+        total_score: 80,
+        receipt_type: { score: 25, reason: 'offline' },
+        date_validity: { score: 15, reason: 'valid' },
+        image_quality: { score: 10, reason: 'clear', image_quality: 5 },
+        store_details: { score: 5, reason: 'found' },
+        payment_amount: { score: 5, reason: 'found' },
+        payment_method: { score: 5, reason: 'found' },
+        is_duplicate_receipt: false,
+        same_store_count_with_in_7_days: { score: 0, reason: 'first' },
+      };
+
+      const receipt = await createReceiptSubmission(supabase, {
+        user_id: testUser.id,
+        status: 'completed',
+        point: 30,
+        score_data: scoreData,
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/every_receipt/${(receipt as any).id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.receiptType).toBe('offline');
+      expect(response.body.storeInfo).toBe('both');
+      expect(response.body.paymentInfo).toBe('both');
+      expect(response.body.hasItems).toBe(true);
+      expect(response.body.grade).toBe('A+');
+      expect(response.body.totalScore).toBe(80);
+    });
+
+    it('재검수 상태를 포함한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const receipt = await createReceiptSubmission(supabase, {
+        user_id: testUser.id,
+        status: 'completed',
+        point: 25,
+      });
+
+      await createReceiptReReview(supabase, {
+        every_receipt_id: (receipt as any).id,
+        status: 'pending',
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/every_receipt/${(receipt as any).id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.reReviewStatus).toBe('pending');
     });
   });
 });

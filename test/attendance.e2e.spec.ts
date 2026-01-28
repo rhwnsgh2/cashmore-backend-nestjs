@@ -6,7 +6,10 @@ import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
 import { createTestUser } from './helpers/user.helper';
-import { createAttendance, createAttendances } from './helpers/attendance.helper';
+import {
+  createAttendance,
+  createAttendances,
+} from './helpers/attendance.helper';
 import { createPointAction, createPointActions } from './helpers/point.helper';
 import { generateTestToken } from './helpers/auth.helper';
 

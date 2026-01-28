@@ -182,8 +182,7 @@ describe('AdLotterySlotService', () => {
       const currentSlotRange = service.getCurrentSlotTimeRange();
 
       // 다른 슬롯 시간 찾기
-      const otherSlot =
-        currentSlotRange.slot === '09:00' ? '13:00' : '09:00';
+      const otherSlot = currentSlotRange.slot === '09:00' ? '13:00' : '09:00';
 
       repository.addSlot({
         id: 'slot-1',
@@ -216,7 +215,9 @@ describe('AdLotterySlotService', () => {
       const result = await service.checkAvailability(userId);
 
       expect(result.currentSlot).toBeDefined();
-      expect(['09:00', '13:00', '18:00', '22:00']).toContain(result.currentSlot);
+      expect(['09:00', '13:00', '18:00', '22:00']).toContain(
+        result.currentSlot,
+      );
     });
   });
 });
