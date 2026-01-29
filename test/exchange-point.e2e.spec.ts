@@ -5,8 +5,8 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
-import { createTestUser, TestUser } from './helpers/user.helper';
-import { createPointAction, createPointActions } from './helpers/point.helper';
+import { createTestUser } from './helpers/user.helper';
+import { createPointAction } from './helpers/point.helper';
 import { generateTestToken } from './helpers/auth.helper';
 
 describe('ExchangePoint API (e2e) - Real DB', () => {
