@@ -148,4 +148,86 @@ describe('LotteryService', () => {
       expect(result[0].id).toBe('issued-lottery');
     });
   });
+
+  describe('issueLottery', () => {
+    const userId = 'test-user-id';
+
+    it('복권을 발급한다', async () => {
+      const result = await service.issueLottery(userId, 'MAX_500');
+
+      expect(result.user_id).toBe(userId);
+      expect(result.lottery_type_id).toBe('MAX_500');
+      expect(result.status).toBe('ISSUED');
+      expect(result.reward_amount).toBeGreaterThan(0);
+      expect(result.id).toBeDefined();
+    });
+
+    it('STANDARD_5 타입은 MAX_500으로 변환하여 저장한다', async () => {
+      const result = await service.issueLottery(userId, 'STANDARD_5');
+
+      expect(result.lottery_type_id).toBe('MAX_500');
+    });
+
+    it('MAX_100 타입 복권을 발급한다', async () => {
+      const result = await service.issueLottery(userId, 'MAX_100');
+
+      expect(result.lottery_type_id).toBe('MAX_100');
+      expect(result.reward_amount).toBeGreaterThan(0);
+    });
+
+    it('MAX_1000 타입 복권을 발급한다', async () => {
+      const result = await service.issueLottery(userId, 'MAX_1000');
+
+      expect(result.lottery_type_id).toBe('MAX_1000');
+      expect(result.reward_amount).toBeGreaterThan(0);
+    });
+
+    it('잘못된 타입이면 BadRequestException을 던진다', async () => {
+      await expect(
+        service.issueLottery(userId, 'INVALID' as any),
+      ).rejects.toThrow('Invalid lottery type');
+    });
+
+    it('reason을 포함하여 발급할 수 있다', async () => {
+      const result = await service.issueLottery(
+        userId,
+        'MAX_500',
+        'ad_reward_lottery_13:00',
+      );
+
+      expect(result).toBeDefined();
+      expect(result.user_id).toBe(userId);
+    });
+  });
+
+  describe('issueAndUseLottery', () => {
+    const userId = 'test-user-id';
+
+    it('복권을 발급하고 즉시 사용한다', async () => {
+      const result = await service.issueAndUseLottery(userId, 'MAX_500');
+
+      expect(result.userId).toBe(userId);
+      expect(result.status).toBe('USED');
+      expect(result.rewardAmount).toBeGreaterThan(0);
+      expect(result.usedAt).toBeDefined();
+      expect(result.id).toBeDefined();
+    });
+
+    it('사용 후 복권 상태가 USED로 변경된다', async () => {
+      const result = await service.issueAndUseLottery(userId, 'MAX_500');
+
+      // stub에서 복권 상태 확인
+      const lotteries = await service.getMyLotteries(userId);
+      // USED 상태이므로 getMyLotteries에서 반환되지 않아야 함
+      const found = lotteries.find((l) => l.id === result.id);
+      expect(found).toBeUndefined();
+    });
+
+    it('STANDARD_5 타입도 issueAndUse가 가능하다', async () => {
+      const result = await service.issueAndUseLottery(userId, 'STANDARD_5');
+
+      expect(result.status).toBe('USED');
+      expect(result.rewardAmount).toBeGreaterThan(0);
+    });
+  });
 });

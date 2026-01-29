@@ -319,4 +319,129 @@ describe('Lottery API (e2e) - Real DB', () => {
       });
     });
   });
+
+  describe('POST /lottery/issue', () => {
+    let testUser: TestUser;
+    let token: string;
+
+    beforeEach(async () => {
+      testUser = await createTestUser(supabase);
+      token = generateTestToken(testUser.auth_id);
+    });
+
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/lottery/issue')
+        .send({ lotteryType: 'MAX_500' })
+        .expect(401);
+    });
+
+    it('MAX_500 복권을 발급한다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/lottery/issue')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryType: 'MAX_500' })
+        .expect(201);
+
+      expect(response.body.id).toBeDefined();
+      expect(response.body.userId).toBe(testUser.id);
+      expect(response.body.lotteryTypeId).toBe('MAX_500');
+      expect(response.body.status).toBe('ISSUED');
+      expect(response.body.rewardAmount).toBeGreaterThan(0);
+      expect(response.body.issuedAt).toBeDefined();
+      expect(response.body.expiresAt).toBeDefined();
+    });
+
+    it('STANDARD_5 타입은 MAX_500으로 변환되어 저장된다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/lottery/issue')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryType: 'STANDARD_5' })
+        .expect(201);
+
+      expect(response.body.lotteryTypeId).toBe('MAX_500');
+    });
+
+    it('발급된 복권이 /lottery/my에서 조회된다', async () => {
+      await request(app.getHttpServer())
+        .post('/lottery/issue')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryType: 'MAX_500' })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get('/lottery/my')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].status).toBe('ISSUED');
+    });
+
+    it('reason을 포함하여 발급할 수 있다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/lottery/issue')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryType: 'MAX_500', reason: 'ad_reward_lottery_13:00' })
+        .expect(201);
+
+      expect(response.body.id).toBeDefined();
+    });
+  });
+
+  describe('POST /lottery/issueAndUse', () => {
+    let testUser: TestUser;
+    let token: string;
+
+    beforeEach(async () => {
+      testUser = await createTestUser(supabase);
+      token = generateTestToken(testUser.auth_id);
+    });
+
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/lottery/issueAndUse')
+        .send({ lotteryType: 'STANDARD_5' })
+        .expect(401);
+    });
+
+    it('STANDARD_5 복권을 발급하고 즉시 사용한다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/lottery/issueAndUse')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryType: 'STANDARD_5' })
+        .expect(201);
+
+      expect(response.body.id).toBeDefined();
+      expect(response.body.userId).toBe(testUser.id);
+      expect(response.body.status).toBe('USED');
+      expect(response.body.rewardAmount).toBeGreaterThan(0);
+      expect(response.body.usedAt).toBeDefined();
+    });
+
+    it('사용된 복권은 /lottery/my에서 조회되지 않는다', async () => {
+      await request(app.getHttpServer())
+        .post('/lottery/issueAndUse')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryType: 'STANDARD_5' })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get('/lottery/my')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(0);
+    });
+
+    it('STANDARD_5 이외의 타입은 400을 반환한다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/lottery/issueAndUse')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryType: 'MAX_500' })
+        .expect(400);
+
+      expect(response.body.message).toBe('Invalid lottery type');
+    });
+  });
 });

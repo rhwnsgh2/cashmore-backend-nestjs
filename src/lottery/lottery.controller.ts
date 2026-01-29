@@ -1,4 +1,12 @@
-import { Controller, Get, Header, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Header,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -8,8 +16,14 @@ import {
 } from '@nestjs/swagger';
 import { LotteryService } from './lottery.service';
 import { LotteryResponseDto } from './dto/get-my-lotteries.dto';
+import {
+  IssueLotteryRequestDto,
+  IssueLotteryResponseDto,
+  IssueAndUseLotteryResponseDto,
+} from './dto/issue-lottery.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { LotteryType } from './interfaces/lottery-repository.interface';
 
 @ApiTags('Lottery')
 @Controller('lottery')
@@ -37,5 +51,57 @@ export class LotteryController {
     @CurrentUser('userId') userId: string,
   ): Promise<LotteryResponseDto[]> {
     return this.lotteryService.getMyLotteries(userId);
+  }
+
+  @Post('issue')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '복권 발급',
+    description: '복권을 발급합니다.',
+  })
+  @ApiResponse({ status: 201, type: IssueLotteryResponseDto })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async issueLottery(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: IssueLotteryRequestDto,
+  ): Promise<IssueLotteryResponseDto> {
+    const lottery = await this.lotteryService.issueLottery(
+      userId,
+      dto.lotteryType as LotteryType,
+      dto.reason,
+    );
+    return {
+      id: lottery.id,
+      userId: lottery.user_id,
+      lotteryTypeId: lottery.lottery_type_id,
+      status: lottery.status,
+      issuedAt: lottery.issued_at,
+      expiresAt: lottery.expires_at,
+      rewardAmount: lottery.reward_amount,
+    };
+  }
+
+  @Post('issueAndUse')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '복권 발급 및 즉시 사용',
+    description: '복권을 발급하고 즉시 사용하여 포인트를 지급합니다.',
+  })
+  @ApiResponse({ status: 201, type: IssueAndUseLotteryResponseDto })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async issueAndUseLottery(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: IssueLotteryRequestDto,
+  ): Promise<IssueAndUseLotteryResponseDto> {
+    if (dto.lotteryType !== 'STANDARD_5') {
+      throw new BadRequestException('Invalid lottery type');
+    }
+    return this.lotteryService.issueAndUseLottery(
+      userId,
+      dto.lotteryType as LotteryType,
+      dto.reason,
+    );
   }
 }

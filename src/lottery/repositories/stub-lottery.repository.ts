@@ -1,7 +1,11 @@
 import dayjs from 'dayjs';
+import { randomUUID } from 'crypto';
 import type {
   ILotteryRepository,
+  InsertLotteryData,
+  InsertPointActionData,
   Lottery,
+  LotteryStatus,
 } from '../interfaces/lottery-repository.interface';
 
 /**
@@ -35,5 +39,44 @@ export class StubLotteryRepository implements ILotteryRepository {
       .slice(0, 20);
 
     return Promise.resolve(available);
+  }
+
+  insertLottery(data: InsertLotteryData): Promise<Lottery> {
+    const lottery: Lottery = {
+      id: randomUUID(),
+      user_id: data.user_id,
+      lottery_type_id: data.lottery_type_id,
+      status: data.status,
+      issued_at: data.issued_at,
+      expires_at: data.expires_at,
+      reward_amount: data.reward_amount,
+      used_at: null,
+    };
+
+    const userLotteries = this.lotteries.get(data.user_id) || [];
+    userLotteries.push(lottery);
+    this.lotteries.set(data.user_id, userLotteries);
+
+    return Promise.resolve(lottery);
+  }
+
+  updateLotteryStatus(
+    lotteryId: string,
+    status: LotteryStatus,
+    usedAt: string,
+  ): Promise<void> {
+    for (const userLotteries of this.lotteries.values()) {
+      const lottery = userLotteries.find((l) => l.id === lotteryId);
+      if (lottery) {
+        lottery.status = status;
+        lottery.used_at = usedAt;
+        break;
+      }
+    }
+    return Promise.resolve();
+  }
+
+  insertPointAction(_data: InsertPointActionData): Promise<void> {
+    return Promise.resolve();
   }
 }

@@ -13,15 +13,34 @@ export interface Lottery {
   used_at: string | null;
 }
 
+export interface InsertLotteryData {
+  user_id: string;
+  lottery_type_id: LotteryType;
+  status: LotteryStatus;
+  issued_at: string;
+  expires_at: string;
+  reward_amount: number;
+  reason?: string | null;
+}
+
+export interface InsertPointActionData {
+  user_id: string;
+  type: string;
+  point_amount: number;
+  additional_data: Record<string, unknown>;
+  status: string;
+}
+
 // Repository 인터페이스
 export interface ILotteryRepository {
-  /**
-   * 사용자의 사용 가능한 복권 목록 조회
-   * - status: ISSUED
-   * - expires_at > now
-   * - 최신순 정렬, 최대 20개
-   */
   findAvailableLotteries(userId: string): Promise<Lottery[]>;
+  insertLottery(data: InsertLotteryData): Promise<Lottery>;
+  updateLotteryStatus(
+    lotteryId: string,
+    status: LotteryStatus,
+    usedAt: string,
+  ): Promise<void>;
+  insertPointAction(data: InsertPointActionData): Promise<void>;
 }
 
 // DI 토큰
