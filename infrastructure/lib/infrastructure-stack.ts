@@ -73,6 +73,7 @@ export class InfrastructureStack extends cdk.Stack {
           'ecs:UpdateService',
           'ecs:DescribeServices',
           'ecs:DescribeTaskDefinition',
+          'ecs:RegisterTaskDefinition',
         ],
         resources: ['*'],
       }),
@@ -145,6 +146,18 @@ export class InfrastructureStack extends cdk.Stack {
     container.addPortMappings({
       containerPort: 8000,
     });
+
+    // Grant PassRole for ECS task definition registration (GitHub Actions deploy)
+    githubActionsRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['iam:PassRole'],
+        resources: [
+          taskDefinition.taskRole.roleArn,
+          taskDefinition.executionRole!.roleArn,
+        ],
+      }),
+    );
 
     // CloudWatch Metrics 권한 추가 (API 메트릭 전송용)
     taskDefinition.addToTaskRolePolicy(
