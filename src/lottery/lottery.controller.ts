@@ -1,12 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Header,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Header, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -19,7 +11,8 @@ import { LotteryResponseDto } from './dto/get-my-lotteries.dto';
 import {
   IssueLotteryRequestDto,
   IssueLotteryResponseDto,
-  IssueAndUseLotteryResponseDto,
+  ShowAdAndClaimRequestDto,
+  ShowAdAndClaimResponseDto,
 } from './dto/issue-lottery.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -82,26 +75,34 @@ export class LotteryController {
     };
   }
 
-  @Post('issueAndUse')
+  @Post('showAdAndClaim')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '복권 발급 및 즉시 사용',
-    description: '복권을 발급하고 즉시 사용하여 포인트를 지급합니다.',
+    summary: '광고 시청 후 복권 발급 및 즉시 사용',
+    description:
+      '광고를 시청하고 복권을 발급하여 즉시 사용합니다. ad_lottery_slots에 기록됩니다.',
   })
-  @ApiResponse({ status: 201, type: IssueAndUseLotteryResponseDto })
+  @ApiResponse({ status: 201, type: ShowAdAndClaimResponseDto })
   @ApiUnauthorizedResponse({ description: '인증 실패' })
-  async issueAndUseLottery(
+  async showAdAndClaim(
     @CurrentUser('userId') userId: string,
-    @Body() dto: IssueLotteryRequestDto,
-  ): Promise<IssueAndUseLotteryResponseDto> {
-    if (dto.lotteryType !== 'STANDARD_5') {
-      throw new BadRequestException('Invalid lottery type');
-    }
-    return this.lotteryService.issueAndUseLottery(
+    @Body() dto: ShowAdAndClaimRequestDto,
+  ): Promise<ShowAdAndClaimResponseDto> {
+    const { success, lottery } = await this.lotteryService.showAdAndClaim(
       userId,
-      dto.lotteryType as LotteryType,
-      dto.reason,
+      dto.adId,
+      dto.slotTime,
     );
+    return {
+      success,
+      lottery: {
+        id: lottery.id,
+        userId: lottery.userId,
+        rewardAmount: lottery.rewardAmount,
+        status: lottery.status,
+        usedAt: lottery.usedAt,
+      },
+    };
   }
 }

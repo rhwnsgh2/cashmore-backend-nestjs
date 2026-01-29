@@ -38,7 +38,19 @@ export class IssueLotteryResponseDto {
   rewardAmount: number;
 }
 
-export class IssueAndUseLotteryResponseDto {
+export class ShowAdAndClaimRequestDto {
+  @ApiProperty({ description: '광고 ID', example: 'ad_123' })
+  adId: string;
+
+  @ApiProperty({
+    description: '슬롯 시간',
+    example: '13:00',
+    enum: ['09:00', '13:00', '18:00', '22:00'],
+  })
+  slotTime: '09:00' | '13:00' | '18:00' | '22:00';
+}
+
+export class ShowAdAndClaimLotteryDto {
   @ApiProperty({ description: '복권 ID' })
   id: string;
 
@@ -53,4 +65,12 @@ export class IssueAndUseLotteryResponseDto {
 
   @ApiProperty({ description: '사용 일시' })
   usedAt: string;
+}
+
+export class ShowAdAndClaimResponseDto {
+  @ApiProperty({ description: '성공 여부', example: true })
+  success: boolean;
+
+  @ApiProperty({ description: '복권 결과', type: ShowAdAndClaimLotteryDto })
+  lottery: ShowAdAndClaimLotteryDto;
 }

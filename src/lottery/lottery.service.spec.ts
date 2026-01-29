@@ -200,34 +200,33 @@ describe('LotteryService', () => {
     });
   });
 
-  describe('issueAndUseLottery', () => {
+  describe('showAdAndClaim', () => {
     const userId = 'test-user-id';
 
-    it('복권을 발급하고 즉시 사용한다', async () => {
-      const result = await service.issueAndUseLottery(userId, 'MAX_500');
+    it('광고 시청 후 복권을 발급하고 즉시 사용한다', async () => {
+      const result = await service.showAdAndClaim(userId, 'ad_123', '13:00');
 
-      expect(result.userId).toBe(userId);
-      expect(result.status).toBe('USED');
-      expect(result.rewardAmount).toBeGreaterThan(0);
-      expect(result.usedAt).toBeDefined();
-      expect(result.id).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.lottery.userId).toBe(userId);
+      expect(result.lottery.status).toBe('USED');
+      expect(result.lottery.rewardAmount).toBeGreaterThan(0);
+      expect(result.lottery.usedAt).toBeDefined();
+      expect(result.lottery.id).toBeDefined();
     });
 
     it('사용 후 복권 상태가 USED로 변경된다', async () => {
-      const result = await service.issueAndUseLottery(userId, 'MAX_500');
+      const result = await service.showAdAndClaim(userId, 'ad_123', '09:00');
 
-      // stub에서 복권 상태 확인
       const lotteries = await service.getMyLotteries(userId);
-      // USED 상태이므로 getMyLotteries에서 반환되지 않아야 함
-      const found = lotteries.find((l) => l.id === result.id);
+      const found = lotteries.find((l) => l.id === result.lottery.id);
       expect(found).toBeUndefined();
     });
 
-    it('STANDARD_5 타입도 issueAndUse가 가능하다', async () => {
-      const result = await service.issueAndUseLottery(userId, 'STANDARD_5');
+    it('다른 슬롯 시간도 정상 동작한다', async () => {
+      const result = await service.showAdAndClaim(userId, 'ad_456', '22:00');
 
-      expect(result.status).toBe('USED');
-      expect(result.rewardAmount).toBeGreaterThan(0);
+      expect(result.success).toBe(true);
+      expect(result.lottery.status).toBe('USED');
     });
   });
 });

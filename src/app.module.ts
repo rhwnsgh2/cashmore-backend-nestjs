@@ -19,6 +19,7 @@ import { UserModalModule } from './user-modal/user-modal.module';
 import { AuthModule } from './auth/auth.module';
 import { MetricsModule } from './common/metrics';
 import { DebugModule } from './debug/debug.module';
+import { ExchangePointModule } from './exchange-point/exchange-point.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -54,6 +55,7 @@ import configuration from './config/configuration';
     UserModalModule,
     MetricsModule,
     DebugModule,
+    ExchangePointModule,
   ],
   controllers: [AppController],
   providers: [

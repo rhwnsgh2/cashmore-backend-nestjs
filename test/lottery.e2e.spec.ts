@@ -389,7 +389,7 @@ describe('Lottery API (e2e) - Real DB', () => {
     });
   });
 
-  describe('POST /lottery/issueAndUse', () => {
+  describe('POST /lottery/showAdAndClaim', () => {
     let testUser: TestUser;
     let token: string;
 
@@ -400,30 +400,31 @@ describe('Lottery API (e2e) - Real DB', () => {
 
     it('토큰 없이 요청하면 401을 반환한다', async () => {
       await request(app.getHttpServer())
-        .post('/lottery/issueAndUse')
-        .send({ lotteryType: 'STANDARD_5' })
+        .post('/lottery/showAdAndClaim')
+        .send({ adId: 'ad_123', slotTime: '13:00' })
         .expect(401);
     });
 
-    it('STANDARD_5 복권을 발급하고 즉시 사용한다', async () => {
+    it('광고 시청 후 복권을 발급하고 즉시 사용한다', async () => {
       const response = await request(app.getHttpServer())
-        .post('/lottery/issueAndUse')
+        .post('/lottery/showAdAndClaim')
         .set('Authorization', `Bearer ${token}`)
-        .send({ lotteryType: 'STANDARD_5' })
+        .send({ adId: 'ad_123', slotTime: '13:00' })
         .expect(201);
 
-      expect(response.body.id).toBeDefined();
-      expect(response.body.userId).toBe(testUser.id);
-      expect(response.body.status).toBe('USED');
-      expect(response.body.rewardAmount).toBeGreaterThan(0);
-      expect(response.body.usedAt).toBeDefined();
+      expect(response.body.success).toBe(true);
+      expect(response.body.lottery.id).toBeDefined();
+      expect(response.body.lottery.userId).toBe(testUser.id);
+      expect(response.body.lottery.status).toBe('USED');
+      expect(response.body.lottery.rewardAmount).toBeGreaterThan(0);
+      expect(response.body.lottery.usedAt).toBeDefined();
     });
 
     it('사용된 복권은 /lottery/my에서 조회되지 않는다', async () => {
       await request(app.getHttpServer())
-        .post('/lottery/issueAndUse')
+        .post('/lottery/showAdAndClaim')
         .set('Authorization', `Bearer ${token}`)
-        .send({ lotteryType: 'STANDARD_5' })
+        .send({ adId: 'ad_123', slotTime: '09:00' })
         .expect(201);
 
       const response = await request(app.getHttpServer())
@@ -432,16 +433,6 @@ describe('Lottery API (e2e) - Real DB', () => {
         .expect(200);
 
       expect(response.body).toHaveLength(0);
-    });
-
-    it('STANDARD_5 이외의 타입은 400을 반환한다', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/lottery/issueAndUse')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ lotteryType: 'MAX_500' })
-        .expect(400);
-
-      expect(response.body.message).toBe('Invalid lottery type');
     });
   });
 });

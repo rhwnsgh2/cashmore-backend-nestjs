@@ -5,6 +5,7 @@ import type {
   ILotteryRepository,
   InsertLotteryData,
   InsertPointActionData,
+  InsertAdLotterySlotData,
   Lottery,
   LotteryStatus,
 } from '../interfaces/lottery-repository.interface';
@@ -70,6 +71,17 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
     const { error } = await this.supabaseService
       .getClient()
       .from('point_actions')
+      .insert(data as any);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async insertAdLotterySlot(data: InsertAdLotterySlotData): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('ad_lottery_slots')
       .insert(data as any);
 
     if (error) {

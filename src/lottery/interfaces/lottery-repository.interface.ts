@@ -31,6 +31,15 @@ export interface InsertPointActionData {
   status: string;
 }
 
+export type SlotTime = '09:00' | '13:00' | '18:00' | '22:00';
+
+export interface InsertAdLotterySlotData {
+  user_id: string;
+  slot_time: SlotTime;
+  reward_type: string;
+  reward_metadata: Record<string, unknown>;
+}
+
 // Repository 인터페이스
 export interface ILotteryRepository {
   findAvailableLotteries(userId: string): Promise<Lottery[]>;
@@ -41,6 +50,7 @@ export interface ILotteryRepository {
     usedAt: string,
   ): Promise<void>;
   insertPointAction(data: InsertPointActionData): Promise<void>;
+  insertAdLotterySlot(data: InsertAdLotterySlotData): Promise<void>;
 }
 
 // DI 토큰

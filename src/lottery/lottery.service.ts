@@ -126,12 +126,12 @@ export class LotteryService {
     return lottery;
   }
 
-  async issueAndUseLottery(
+  async showAdAndClaim(
     userId: string,
-    lotteryType: LotteryType,
-    reason?: string,
+    adId: string,
+    slotTime: '09:00' | '13:00' | '18:00' | '22:00',
   ) {
-    const lottery = await this.issueLottery(userId, lotteryType, reason);
+    const lottery = await this.issueLottery(userId, 'STANDARD_5', `ad_reward_${adId}`);
 
     const usedAt = dayjs().toISOString();
     await this.lotteryRepository.updateLotteryStatus(
@@ -151,12 +151,27 @@ export class LotteryService {
       status: 'done',
     });
 
+    // ad_lottery_slots에 광고 시청 기록
+    await this.lotteryRepository.insertAdLotterySlot({
+      user_id: userId,
+      slot_time: slotTime,
+      reward_type: 'LOTTERY',
+      reward_metadata: {
+        reason: '광고 시청 보상',
+        reward_id: lottery.id,
+        lottery_type: 'STANDARD_5',
+      },
+    });
+
     return {
-      id: lottery.id,
-      userId: lottery.user_id,
-      rewardAmount: lottery.reward_amount,
-      status: 'USED' as const,
-      usedAt,
+      success: true,
+      lottery: {
+        id: lottery.id,
+        userId: lottery.user_id,
+        rewardAmount: lottery.reward_amount,
+        status: 'USED' as const,
+        usedAt,
+      },
     };
   }
 

@@ -4,6 +4,7 @@ import type {
   ILotteryRepository,
   InsertLotteryData,
   InsertPointActionData,
+  InsertAdLotterySlotData,
   Lottery,
   LotteryStatus,
 } from '../interfaces/lottery-repository.interface';
@@ -77,6 +78,10 @@ export class StubLotteryRepository implements ILotteryRepository {
   }
 
   insertPointAction(_data: InsertPointActionData): Promise<void> {
+    return Promise.resolve();
+  }
+
+  insertAdLotterySlot(_data: InsertAdLotterySlotData): Promise<void> {
     return Promise.resolve();
   }
 }
