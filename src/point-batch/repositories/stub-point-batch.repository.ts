@@ -53,40 +53,39 @@ export class StubPointBatchRepository implements IPointBatchRepository {
   }
 
   // IPointBatchRepository 구현
-  async calculateMonthlyEarnedPoints(
+  calculateMonthlyEarnedPoints(
     _yearMonth: string,
     _earnTypes: readonly string[],
   ): Promise<MonthlyEarnedPoint[]> {
-    return this.aggregationTargets;
+    return Promise.resolve(this.aggregationTargets);
   }
 
-  async upsertMonthlyEarnedPoints(
+  upsertMonthlyEarnedPoints(
     yearMonth: string,
     targets: MonthlyEarnedPoint[],
   ): Promise<number> {
     this.upsertedMonthly.push({ yearMonth, targets });
-    return targets.length;
+    return Promise.resolve(targets.length);
   }
 
-  async findExpirationTargets(
+  findExpirationTargets(
     _expirationMonth: string,
     _withdrawRules: readonly WithdrawRule[],
   ): Promise<ExpirationTarget[]> {
-    return this.expirationTargets;
+    return Promise.resolve(this.expirationTargets);
   }
 
-  async insertExpirationActions(
+  insertExpirationActions(
     targets: ExpirationTarget[],
     baseDate: string,
     expirationMonth: string,
   ): Promise<number> {
     this.insertedExpirations.push({ targets, baseDate, expirationMonth });
-    return targets.length;
+    return Promise.resolve(targets.length);
   }
 
-  async deleteExpirationActions(expirationMonth: string): Promise<number> {
+  deleteExpirationActions(expirationMonth: string): Promise<number> {
     this.deletedExpirationMonths.push(expirationMonth);
-    // 해당 월에 삽입된 소멸 레코드 수 반환
     const matched = this.insertedExpirations.filter(
       (e) => e.expirationMonth === expirationMonth,
     );
@@ -94,6 +93,6 @@ export class StubPointBatchRepository implements IPointBatchRepository {
     this.insertedExpirations = this.insertedExpirations.filter(
       (e) => e.expirationMonth !== expirationMonth,
     );
-    return count;
+    return Promise.resolve(count);
   }
 }
