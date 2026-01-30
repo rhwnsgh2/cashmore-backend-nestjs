@@ -140,6 +140,14 @@ export class InfrastructureStack extends cdk.Stack {
           supabaseSecret,
           'jwtSecret',
         ),
+        SUPABASE_DB_URL: ecs.Secret.fromSecretsManager(
+          supabaseSecret,
+          'dbUrl',
+        ),
+        BATCH_API_KEY: ecs.Secret.fromSecretsManager(
+          supabaseSecret,
+          'batchApiKey',
+        ),
       },
     });
 
@@ -769,6 +777,24 @@ exports.handler = async (event) => {
         ]
       }]
     };
+  } else if (eventName === 'SERVICE_DEPLOYMENT_FAILED') {
+    // 배포 실패 (circuit breaker 롤백 등)
+    const info = await getServiceDetails(clusterArn, serviceName);
+    const reason = detail.eventDetail?.reason || 'unknown';
+
+    payload = {
+      text: '🚨 *배포 실패*',
+      attachments: [{
+        color: '#F44336',
+        fields: [
+          { title: '서비스', value: serviceName, short: true },
+          { title: '이미지 태그', value: info?.imageTag || 'unknown', short: true },
+          { title: '실패 사유', value: reason, short: false },
+          { title: '실행 중 태스크', value: info ? String(info.runningCount) + '개' : '-', short: true },
+          { title: '실패 시각', value: event.time, short: false }
+        ]
+      }]
+    };
   } else if (eventName === 'SERVICE_DESIRED_COUNT_UPDATED') {
     // Auto Scaling 이벤트 (참고: AWS 제한으로 Auto Scaling 시에는 이 이벤트가 발생하지 않음)
     const clusterName = clusterArn.split('/').pop();
@@ -927,6 +953,7 @@ exports.handler = async (event) => {
           eventName: [
             'SERVICE_DEPLOYMENT_IN_PROGRESS', // 배포 시작
             'SERVICE_DEPLOYMENT_COMPLETED', // 배포 완료
+            'SERVICE_DEPLOYMENT_FAILED', // 배포 실패
             'SERVICE_STEADY_STATE', // 서비스 안정 상태
             'SERVICE_DESIRED_COUNT_UPDATED', // Auto Scaling
             'SERVICE_TASK_START_IMPACTED', // 태스크 시작 영향
