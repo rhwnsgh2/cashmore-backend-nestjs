@@ -25,7 +25,7 @@
 
 set -euo pipefail
 
-API_URL="${BATCH_API_URL:-http://localhost:8000}"
+API_URL="${BATCH_API_URL:-https://api.cashmore.kr}"
 API_KEY="${BATCH_API_KEY:-}"
 
 if [ -z "$API_KEY" ]; then
