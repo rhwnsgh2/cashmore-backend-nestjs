@@ -7,16 +7,16 @@ import type {
 } from '../interfaces/exchange-point-repository.interface';
 
 @Injectable()
-export class SupabaseExchangePointRepository
-  implements IExchangePointRepository
-{
+export class SupabaseExchangePointRepository implements IExchangePointRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async findByUserId(userId: string): Promise<ExchangePoint[]> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('point_actions')
-      .select('id, user_id, type, point_amount, status, created_at, additional_data')
+      .select(
+        'id, user_id, type, point_amount, status, created_at, additional_data',
+      )
       .eq('user_id', userId)
       .eq('type', 'EXCHANGE_POINT_TO_CASH');
 
@@ -40,8 +40,7 @@ export class SupabaseExchangePointRepository
     }
 
     return (data || []).reduce(
-      (sum: number, item: { point_amount: number }) =>
-        sum + item.point_amount,
+      (sum: number, item: { point_amount: number }) => sum + item.point_amount,
       0,
     );
   }
@@ -63,14 +62,13 @@ export class SupabaseExchangePointRepository
     return { id: (result as { id: number }).id };
   }
 
-  async findById(
-    id: number,
-    userId: string,
-  ): Promise<ExchangePoint | null> {
+  async findById(id: number, userId: string): Promise<ExchangePoint | null> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('point_actions')
-      .select('id, user_id, type, point_amount, status, created_at, additional_data')
+      .select(
+        'id, user_id, type, point_amount, status, created_at, additional_data',
+      )
       .eq('id', id)
       .eq('user_id', userId)
       .eq('type', 'EXCHANGE_POINT_TO_CASH')

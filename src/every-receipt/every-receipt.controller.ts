@@ -23,7 +23,7 @@ import { EveryReceipt } from './interfaces/every-receipt-repository.interface';
 @ApiTags('EveryReceipt')
 @Controller('every_receipt')
 export class EveryReceiptController {
-  constructor(private everyReceiptService: EveryReceiptService) { }
+  constructor(private everyReceiptService: EveryReceiptService) {}
 
   @Get()
   @UseGuards(JwtAuthGuard)

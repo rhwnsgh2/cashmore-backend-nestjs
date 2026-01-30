@@ -10,7 +10,8 @@ export type PointActionType =
   | 'COUPANG_VISIT'
   | 'ONBOARDING_EVENT'
   | 'AFFILIATE'
-  | 'LOTTERY';
+  | 'LOTTERY'
+  | 'POINT_EXPIRATION';
 
 export type PointActionStatus = 'done' | 'pending' | 'cancelled';
 

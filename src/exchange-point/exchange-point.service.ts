@@ -1,4 +1,9 @@
-import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { IExchangePointRepository } from './interfaces/exchange-point-repository.interface';
 import { EXCHANGE_POINT_REPOSITORY } from './interfaces/exchange-point-repository.interface';
 
@@ -17,8 +22,7 @@ export class ExchangePointService {
   ) {}
 
   async getExchangeHistory(userId: string): Promise<ExchangePointResponse[]> {
-    const exchanges =
-      await this.exchangePointRepository.findByUserId(userId);
+    const exchanges = await this.exchangePointRepository.findByUserId(userId);
 
     return exchanges.map((e) => ({
       id: e.id,

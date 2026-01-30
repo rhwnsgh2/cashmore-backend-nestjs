@@ -37,7 +37,7 @@ export class LotteryService {
   constructor(
     @Inject(LOTTERY_REPOSITORY)
     private lotteryRepository: ILotteryRepository,
-  ) { }
+  ) {}
 
   private static readonly MAX_500_REWARDS = [
     { amount: 5, probability: 93.9 },
@@ -131,7 +131,11 @@ export class LotteryService {
     adId: string,
     slotTime: '09:00' | '13:00' | '18:00' | '22:00',
   ) {
-    const lottery = await this.issueLottery(userId, 'STANDARD_5', `ad_reward_${adId}`);
+    const lottery = await this.issueLottery(
+      userId,
+      'STANDARD_5',
+      `ad_reward_${adId}`,
+    );
 
     const usedAt = dayjs().toISOString();
     await this.lotteryRepository.updateLotteryStatus(

@@ -4,9 +4,7 @@ import type {
   InsertExchangePointData,
 } from '../interfaces/exchange-point-repository.interface';
 
-export class StubExchangePointRepository
-  implements IExchangePointRepository
-{
+export class StubExchangePointRepository implements IExchangePointRepository {
   private exchanges: Map<string, ExchangePoint[]> = new Map();
   private totalPoints: Map<string, number> = new Map();
   private nextId = 1;

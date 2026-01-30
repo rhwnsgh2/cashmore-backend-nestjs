@@ -12,7 +12,7 @@ export class EveryReceiptService {
   constructor(
     @Inject(EVERY_RECEIPT_REPOSITORY)
     private everyReceiptRepository: IEveryReceiptRepository,
-  ) { }
+  ) {}
 
   async getEveryReceipts(userId: string): Promise<EveryReceipt[]> {
     return this.everyReceiptRepository.findByUserId(userId);

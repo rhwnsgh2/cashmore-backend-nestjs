@@ -21,10 +21,7 @@ export interface IExchangePointRepository {
   findByUserId(userId: string): Promise<ExchangePoint[]>;
   getTotalPoints(userId: string): Promise<number>;
   insertExchangeRequest(data: InsertExchangePointData): Promise<{ id: number }>;
-  findById(
-    id: number,
-    userId: string,
-  ): Promise<ExchangePoint | null>;
+  findById(id: number, userId: string): Promise<ExchangePoint | null>;
   cancelExchangeRequest(id: number, userId: string): Promise<void>;
 }
 
