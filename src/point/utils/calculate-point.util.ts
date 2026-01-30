@@ -1,8 +1,14 @@
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import {
   type PointAction,
   type WithdrawalAction,
   POINT_ADD_TYPES,
 } from '../interfaces/point-repository.interface';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 /**
  * 포인트 액션 목록을 받아서 총 포인트를 계산합니다.
@@ -73,4 +79,84 @@ export function calculateExpiringPoints(
 
   // 소멸 포인트 계산: 6개월전적립 - 전체출금 (음수 방지)
   return Math.max(0, totalEarnedBeforeExpiration - totalWithdrawn);
+}
+
+/**
+ * 포인트 액션 목록을 받아서 월별로 적립된 포인트를 계산합니다.
+ * created_at을 한국 시간대(Asia/Seoul) 기준으로 변환하여 월별로 그룹화합니다.
+ */
+export function calculateMonthlyEarnedPoints(
+  pointActions: PointAction[],
+): Record<string, number> {
+  const monthlyPoints: Record<string, number> = {};
+
+  for (const action of pointActions) {
+    if (
+      POINT_ADD_TYPES.includes(
+        action.type as (typeof POINT_ADD_TYPES)[number],
+      ) &&
+      action.status === 'done'
+    ) {
+      const yearMonth = dayjs(action.created_at)
+        .tz('Asia/Seoul')
+        .format('YYYY-MM');
+
+      monthlyPoints[yearMonth] =
+        (monthlyPoints[yearMonth] || 0) + (action.point_amount || 0);
+    }
+  }
+
+  return monthlyPoints;
+}
+
+/**
+ * 포인트 액션 목록을 받아서 총 차감된 포인트를 계산합니다.
+ * point_amount가 음수로 저장되어 있으므로 절대값으로 변환하여 양수로 반환합니다.
+ */
+export function calculateTotalWithdrawnPoints(
+  pointActions: PointAction[],
+): number {
+  let totalWithdrawn = 0;
+
+  for (const action of pointActions) {
+    if (
+      action.type === 'EXCHANGE_POINT_TO_CASH' &&
+      (action.status === 'done' || action.status === 'pending')
+    ) {
+      totalWithdrawn += Math.abs(action.point_amount || 0);
+    } else if (action.type === 'POINT_EXPIRATION' && action.status === 'done') {
+      totalWithdrawn += Math.abs(action.point_amount || 0);
+    }
+  }
+
+  return totalWithdrawn;
+}
+
+/**
+ * 월별 적립 포인트와 총 차감 포인트를 받아서 FIFO 방식으로 계산하여
+ * 각 월별로 남은 포인트를 반환합니다.
+ */
+export function calculateMonthlyRemainingPoints(
+  monthlyEarnedPoints: Record<string, number>,
+  totalWithdrawn: number,
+): Record<string, number> {
+  const sortedMonths = Object.keys(monthlyEarnedPoints).sort();
+  const remainingPoints: Record<string, number> = {};
+  let remainingWithdrawn = totalWithdrawn;
+
+  for (const month of sortedMonths) {
+    const earnedAmount = monthlyEarnedPoints[month];
+
+    if (remainingWithdrawn <= 0) {
+      remainingPoints[month] = earnedAmount;
+    } else if (remainingWithdrawn >= earnedAmount) {
+      remainingPoints[month] = 0;
+      remainingWithdrawn -= earnedAmount;
+    } else {
+      remainingPoints[month] = earnedAmount - remainingWithdrawn;
+      remainingWithdrawn = 0;
+    }
+  }
+
+  return remainingPoints;
 }
