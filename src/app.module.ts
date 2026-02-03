@@ -21,6 +21,8 @@ import { MetricsModule } from './common/metrics';
 import { DebugModule } from './debug/debug.module';
 import { ExchangePointModule } from './exchange-point/exchange-point.module';
 import { PointBatchModule } from './point-batch/point-batch.module';
+import { InviteCodeModule } from './invite-code/invite-code.module';
+import { NotificationSettingsModule } from './notification-settings/notification-settings.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -58,6 +60,8 @@ import configuration from './config/configuration';
     DebugModule,
     ExchangePointModule,
     PointBatchModule,
+    InviteCodeModule,
+    NotificationSettingsModule,
   ],
   controllers: [AppController],
   providers: [
