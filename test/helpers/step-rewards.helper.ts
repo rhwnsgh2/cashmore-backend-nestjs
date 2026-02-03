@@ -6,6 +6,7 @@ export async function createStepLevelClaim(
     user_id: string;
     claim_date: string;
     level: number;
+    required_steps: number;
     current_step_count: number;
   },
 ) {

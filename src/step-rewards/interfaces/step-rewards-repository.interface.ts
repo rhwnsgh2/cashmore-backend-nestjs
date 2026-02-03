@@ -3,6 +3,7 @@ export interface StepLevelClaim {
   user_id: string;
   claim_date: string;
   level: number;
+  required_steps: number;
   current_step_count: number;
   created_at: string;
 }
@@ -19,10 +20,17 @@ export interface IStepRewardsRepository {
     level: number,
   ): Promise<StepLevelClaim | null>;
 
+  findClaimByUserDateAndRequiredSteps(
+    userId: string,
+    date: string,
+    requiredSteps: number,
+  ): Promise<StepLevelClaim | null>;
+
   insertClaim(data: {
     user_id: string;
     claim_date: string;
     level: number;
+    required_steps: number;
     current_step_count: number;
   }): Promise<StepLevelClaim>;
 }

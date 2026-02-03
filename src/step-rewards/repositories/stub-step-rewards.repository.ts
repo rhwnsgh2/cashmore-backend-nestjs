@@ -50,10 +50,26 @@ export class StubStepRewardsRepository implements IStepRewardsRepository {
     );
   }
 
+  findClaimByUserDateAndRequiredSteps(
+    userId: string,
+    date: string,
+    requiredSteps: number,
+  ): Promise<StepLevelClaim | null> {
+    return Promise.resolve(
+      this.claims.find(
+        (c) =>
+          c.user_id === userId &&
+          c.claim_date === date &&
+          c.required_steps === requiredSteps,
+      ) ?? null,
+    );
+  }
+
   insertClaim(data: {
     user_id: string;
     claim_date: string;
     level: number;
+    required_steps: number;
     current_step_count: number;
   }): Promise<StepLevelClaim> {
     const newClaim: StepLevelClaim = {

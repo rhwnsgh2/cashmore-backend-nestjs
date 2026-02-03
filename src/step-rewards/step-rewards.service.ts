@@ -61,11 +61,12 @@ export class StepRewardsService {
 
     const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
 
+    // required_steps 기준으로 중복 체크 (버전 간 호환성)
     const existingClaim =
-      await this.stepRewardsRepository.findClaimByUserDateAndLevel(
+      await this.stepRewardsRepository.findClaimByUserDateAndRequiredSteps(
         userId,
         today,
-        claimLevel,
+        rewardLevel.required_steps,
       );
 
     if (existingClaim) {
@@ -76,6 +77,7 @@ export class StepRewardsService {
       user_id: userId,
       claim_date: today,
       level: claimLevel,
+      required_steps: rewardLevel.required_steps,
       current_step_count: stepCount,
     });
 

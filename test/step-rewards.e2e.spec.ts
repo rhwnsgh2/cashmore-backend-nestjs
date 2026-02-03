@@ -52,12 +52,14 @@ describe('StepRewards API (e2e) - Real DB', () => {
         user_id: testUser.id,
         claim_date: today,
         level: 1,
+        required_steps: 0,
         current_step_count: 0,
       });
       await createStepLevelClaim(supabase, {
         user_id: testUser.id,
         claim_date: today,
         level: 2,
+        required_steps: 2000,
         current_step_count: 2500,
       });
 
@@ -151,7 +153,7 @@ describe('StepRewards API (e2e) - Real DB', () => {
       expect(response.body.message).toBe('INVALID_LEVEL');
     });
 
-    it('이미 수령한 레벨이면 409 에러를 반환한다', async () => {
+    it('이미 수령한 required_steps면 409 에러를 반환한다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
       const today = new Date().toISOString().split('T')[0];
@@ -160,6 +162,7 @@ describe('StepRewards API (e2e) - Real DB', () => {
         user_id: testUser.id,
         claim_date: today,
         level: 3,
+        required_steps: 4000,
         current_step_count: 5000,
       });
 

@@ -50,12 +50,14 @@ describe('StepRewardsService', () => {
         user_id: userId,
         claim_date: today,
         level: 1,
+        required_steps: 0,
         current_step_count: 0,
       });
       repository.addClaim({
         user_id: userId,
         claim_date: today,
         level: 2,
+        required_steps: 2000,
         current_step_count: 2500,
       });
 
@@ -81,6 +83,7 @@ describe('StepRewardsService', () => {
         user_id: userId,
         claim_date: yesterday,
         level: 1,
+        required_steps: 0,
         current_step_count: 0,
       });
 
@@ -137,12 +140,13 @@ describe('StepRewardsService', () => {
       ).rejects.toThrow('STEP_NOT_ENOUGH');
     });
 
-    it('이미 수령한 레벨이면 ALREADY_CLAIMED 에러를 던진다', async () => {
+    it('이미 수령한 required_steps면 ALREADY_CLAIMED 에러를 던진다', async () => {
       const today = new Date().toISOString().split('T')[0];
       repository.addClaim({
         user_id: userId,
         claim_date: today,
         level: 3,
+        required_steps: 4000,
         current_step_count: 5000,
       });
 
@@ -154,7 +158,7 @@ describe('StepRewardsService', () => {
       ).rejects.toThrow('ALREADY_CLAIMED');
     });
 
-    it('다른 날짜에 수령한 레벨은 오늘 다시 수령할 수 있다', async () => {
+    it('다른 날짜에 수령한 required_steps는 오늘 다시 수령할 수 있다', async () => {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
         .toISOString()
         .split('T')[0];
@@ -162,6 +166,7 @@ describe('StepRewardsService', () => {
         user_id: userId,
         claim_date: yesterday,
         level: 3,
+        required_steps: 4000,
         current_step_count: 5000,
       });
 
