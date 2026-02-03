@@ -24,7 +24,7 @@ export class SupabaseStepRewardsRepository implements IStepRewardsRepository {
       throw new Error(`Failed to fetch claims: ${error.message}`);
     }
 
-    return data ?? [];
+    return (data ?? []) as StepLevelClaim[];
   }
 
   async findClaimByUserDateAndLevel(
@@ -48,7 +48,7 @@ export class SupabaseStepRewardsRepository implements IStepRewardsRepository {
       throw new Error(`Failed to fetch claim: ${error.message}`);
     }
 
-    return data;
+    return data as StepLevelClaim;
   }
 
   async insertClaim(data: {
@@ -60,7 +60,7 @@ export class SupabaseStepRewardsRepository implements IStepRewardsRepository {
     const { data: inserted, error } = await this.supabaseService
       .getClient()
       .from('step_level_claims')
-      .insert(data)
+      .insert(data as any)
       .select()
       .single();
 
@@ -68,6 +68,6 @@ export class SupabaseStepRewardsRepository implements IStepRewardsRepository {
       throw new Error(`Failed to insert claim: ${error.message}`);
     }
 
-    return inserted;
+    return inserted as StepLevelClaim;
   }
 }
