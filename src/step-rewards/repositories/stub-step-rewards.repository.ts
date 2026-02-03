@@ -31,9 +31,7 @@ export class StubStepRewardsRepository implements IStepRewardsRepository {
     date: string,
   ): Promise<StepLevelClaim[]> {
     return Promise.resolve(
-      this.claims.filter(
-        (c) => c.user_id === userId && c.claim_date === date,
-      ),
+      this.claims.filter((c) => c.user_id === userId && c.claim_date === date),
     );
   }
 
