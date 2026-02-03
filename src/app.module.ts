@@ -23,6 +23,7 @@ import { ExchangePointModule } from './exchange-point/exchange-point.module';
 import { PointBatchModule } from './point-batch/point-batch.module';
 import { InviteCodeModule } from './invite-code/invite-code.module';
 import { NotificationSettingsModule } from './notification-settings/notification-settings.module';
+import { StepRewardsModule } from './step-rewards/step-rewards.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -62,6 +63,7 @@ import configuration from './config/configuration';
     PointBatchModule,
     InviteCodeModule,
     NotificationSettingsModule,
+    StepRewardsModule,
   ],
   controllers: [AppController],
   providers: [
