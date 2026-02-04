@@ -16,6 +16,11 @@ import {
   ClaimStepRewardResponseDto,
 } from './dto/claim-step-reward.dto';
 import { StepRewardsStatusResponseDto } from './dto/step-rewards-status.dto';
+import {
+  ClaimStepRewardV2RequestDto,
+  ClaimStepRewardV2ResponseDto,
+  StepRewardsStatusV2ResponseDto,
+} from './dto/step-rewards-v2.dto';
 
 @ApiTags('StepRewards')
 @Controller('step_rewards')
@@ -66,6 +71,55 @@ export class StepRewardsController {
       dto.step_count,
       dto.claim_level,
       dto.type,
+    );
+  }
+
+  // V2 Endpoints
+  @Get('v2/status')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '걸음 수 보상 상태 조회 (v2)',
+    description:
+      '오늘 수령한 required_steps 목록과 v2 보상 설정을 반환합니다. 1000걸음 단위로 세분화된 보상 구조.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '걸음 수 보상 상태 (v2)',
+    type: StepRewardsStatusV2ResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async getStatusV2(
+    @CurrentUser('userId') userId: string,
+  ): Promise<StepRewardsStatusV2ResponseDto> {
+    return await this.stepRewardsService.getStatusV2(userId);
+  }
+
+  @Post('v2/claim')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '걸음 수 보상 수령 (v2)',
+    description:
+      'required_steps 기반으로 보상을 수령합니다. 서버에서 lottery_type과 ad_type을 결정합니다.',
+  })
+  @ApiBody({ type: ClaimStepRewardV2RequestDto })
+  @ApiResponse({
+    status: 201,
+    description: '보상 수령 성공',
+    type: ClaimStepRewardV2ResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  @ApiConflictResponse({ description: '이미 수령한 required_steps' })
+  async claimRewardV2(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ClaimStepRewardV2RequestDto,
+  ): Promise<ClaimStepRewardV2ResponseDto> {
+    return await this.stepRewardsService.claimRewardV2(
+      userId,
+      dto.step_count,
+      dto.required_steps,
     );
   }
 }

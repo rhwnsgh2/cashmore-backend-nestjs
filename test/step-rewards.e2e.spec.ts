@@ -12,6 +12,7 @@ import {
   getStepLevelClaims,
 } from './helpers/step-rewards.helper';
 import { REWARD_CONFIG } from '../src/step-rewards/constants/reward-config';
+import { REWARD_CONFIG_V2 } from '../src/step-rewards/constants/reward-config-v2';
 
 describe('StepRewards API (e2e) - Real DB', () => {
   let app: INestApplication;
@@ -184,6 +185,147 @@ describe('StepRewards API (e2e) - Real DB', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ step_count: 5000, claim_level: 3, type: 'invalid' })
         .expect(400);
+    });
+  });
+
+  // V2 API Tests
+  describe('GET /step_rewards/v2/status', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .get('/step_rewards/v2/status')
+        .expect(401);
+    });
+
+    it('오늘 수령한 required_steps 목록과 v2 보상 설정을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+      const today = new Date().toISOString().split('T')[0];
+
+      await createStepLevelClaim(supabase, {
+        user_id: testUser.id,
+        claim_date: today,
+        level: 1,
+        required_steps: 0,
+        current_step_count: 0,
+      });
+      await createStepLevelClaim(supabase, {
+        user_id: testUser.id,
+        claim_date: today,
+        level: 2,
+        required_steps: 1000,
+        current_step_count: 1500,
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/step_rewards/v2/status')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.claimed_required_steps).toContain(0);
+      expect(response.body.claimed_required_steps).toContain(1000);
+      expect(response.body.reward_config).toEqual(REWARD_CONFIG_V2);
+    });
+
+    it('수령 기록이 없으면 빈 배열을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .get('/step_rewards/v2/status')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.claimed_required_steps).toEqual([]);
+      expect(response.body.reward_config).toEqual(REWARD_CONFIG_V2);
+    });
+  });
+
+  describe('POST /step_rewards/v2/claim', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/step_rewards/v2/claim')
+        .send({ step_count: 5000, required_steps: 5000 })
+        .expect(401);
+    });
+
+    it('보상을 정상적으로 수령하면 복권 ID를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/step_rewards/v2/claim')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ step_count: 5000, required_steps: 5000 })
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.lottery_id).toBeDefined();
+
+      const today = new Date().toISOString().split('T')[0];
+      const claims = await getStepLevelClaims(supabase, testUser.id, today);
+      expect(claims.length).toBe(1);
+      expect(claims[0].required_steps).toBe(5000);
+    });
+
+    it('첫걸음(0)은 걸음 수 0으로도 수령 가능하다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/step_rewards/v2/claim')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ step_count: 0, required_steps: 0 })
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+    });
+
+    it('걸음 수가 부족하면 400 에러를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/step_rewards/v2/claim')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ step_count: 500, required_steps: 1000 })
+        .expect(400);
+
+      expect(response.body.message).toBe('STEP_NOT_ENOUGH');
+    });
+
+    it('존재하지 않는 required_steps면 400 에러를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/step_rewards/v2/claim')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ step_count: 5000, required_steps: 5500 })
+        .expect(400);
+
+      expect(response.body.message).toBe('INVALID_REQUIRED_STEPS');
+    });
+
+    it('이미 수령한 required_steps면 409 에러를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+      const today = new Date().toISOString().split('T')[0];
+
+      await createStepLevelClaim(supabase, {
+        user_id: testUser.id,
+        claim_date: today,
+        level: 6,
+        required_steps: 5000,
+        current_step_count: 5000,
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/step_rewards/v2/claim')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ step_count: 5000, required_steps: 5000 })
+        .expect(409);
+
+      expect(response.body.message).toBe('ALREADY_CLAIMED');
     });
   });
 });

@@ -6,6 +6,7 @@ import { STEP_REWARDS_REPOSITORY } from './interfaces/step-rewards-repository.in
 import { StubStepRewardsRepository } from './repositories/stub-step-rewards.repository';
 import { LotteryService } from '../lottery/lottery.service';
 import { REWARD_CONFIG } from './constants/reward-config';
+import { REWARD_CONFIG_V2 } from './constants/reward-config-v2';
 
 describe('StepRewardsService', () => {
   let service: StepRewardsService;
@@ -173,6 +174,117 @@ describe('StepRewardsService', () => {
       const result = await service.claimReward(userId, 5000, 3, 'long');
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  // V2 Tests
+  describe('getStatusV2', () => {
+    it('오늘 수령한 required_steps 목록과 v2 보상 설정을 반환한다', async () => {
+      const today = new Date().toISOString().split('T')[0];
+      repository.addClaim({
+        user_id: userId,
+        claim_date: today,
+        level: 1,
+        required_steps: 0,
+        current_step_count: 0,
+      });
+      repository.addClaim({
+        user_id: userId,
+        claim_date: today,
+        level: 2,
+        required_steps: 1000,
+        current_step_count: 1500,
+      });
+
+      const result = await service.getStatusV2(userId);
+
+      expect(result.claimed_required_steps).toContain(0);
+      expect(result.claimed_required_steps).toContain(1000);
+      expect(result.reward_config).toEqual(REWARD_CONFIG_V2);
+    });
+
+    it('수령 기록이 없으면 빈 배열을 반환한다', async () => {
+      const result = await service.getStatusV2(userId);
+
+      expect(result.claimed_required_steps).toEqual([]);
+      expect(result.reward_config).toEqual(REWARD_CONFIG_V2);
+    });
+  });
+
+  describe('claimRewardV2', () => {
+    it('보상을 정상적으로 수령하면 복권 ID를 반환한다', async () => {
+      const result = await service.claimRewardV2(userId, 5000, 5000);
+
+      expect(result.success).toBe(true);
+      expect(result.lottery_id).toBe('lottery-id-123');
+      // 5000걸음은 MAX_500 복권
+      expect(lotteryService.issueLottery).toHaveBeenCalledWith(
+        userId,
+        'MAX_500',
+        'STEP_REWARD_5000',
+      );
+    });
+
+    it('10000걸음은 MAX_1000 복권을 발급한다', async () => {
+      await service.claimRewardV2(userId, 10000, 10000);
+
+      expect(lotteryService.issueLottery).toHaveBeenCalledWith(
+        userId,
+        'MAX_1000',
+        'STEP_REWARD_10000',
+      );
+    });
+
+    it('1000걸음은 MAX_100 복권을 발급한다', async () => {
+      await service.claimRewardV2(userId, 1000, 1000);
+
+      expect(lotteryService.issueLottery).toHaveBeenCalledWith(
+        userId,
+        'MAX_100',
+        'STEP_REWARD_1000',
+      );
+    });
+
+    it('첫걸음(0)은 걸음 수 0으로도 수령 가능하다', async () => {
+      const result = await service.claimRewardV2(userId, 0, 0);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('존재하지 않는 required_steps면 INVALID_REQUIRED_STEPS 에러를 던진다', async () => {
+      await expect(service.claimRewardV2(userId, 5000, 5500)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.claimRewardV2(userId, 5000, 5500)).rejects.toThrow(
+        'INVALID_REQUIRED_STEPS',
+      );
+    });
+
+    it('걸음 수가 부족하면 STEP_NOT_ENOUGH 에러를 던진다', async () => {
+      await expect(service.claimRewardV2(userId, 500, 1000)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.claimRewardV2(userId, 500, 1000)).rejects.toThrow(
+        'STEP_NOT_ENOUGH',
+      );
+    });
+
+    it('이미 수령한 required_steps면 ALREADY_CLAIMED 에러를 던진다', async () => {
+      const today = new Date().toISOString().split('T')[0];
+      repository.addClaim({
+        user_id: userId,
+        claim_date: today,
+        level: 6,
+        required_steps: 5000,
+        current_step_count: 5000,
+      });
+
+      await expect(service.claimRewardV2(userId, 5000, 5000)).rejects.toThrow(
+        ConflictException,
+      );
+      await expect(service.claimRewardV2(userId, 5000, 5000)).rejects.toThrow(
+        'ALREADY_CLAIMED',
+      );
     });
   });
 });

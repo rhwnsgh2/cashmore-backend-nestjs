@@ -14,6 +14,7 @@ import {
   REWARD_CONFIG,
   type ClaimType,
 } from './constants/reward-config';
+import { REWARD_CONFIG_V2 } from './constants/reward-config-v2';
 import { LotteryService } from '../lottery/lottery.service';
 import type { LotteryType } from '../lottery/interfaces/lottery-repository.interface';
 
@@ -86,6 +87,71 @@ export class StepRewardsService {
       userId,
       lotteryType,
       `STEP_REWARD_LEVEL_${claimLevel}`,
+    );
+
+    return {
+      success: true,
+      lottery_id: lottery.id,
+    };
+  }
+
+  // V2 Methods
+  async getStatusV2(userId: string) {
+    const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+
+    const claims = await this.stepRewardsRepository.findClaimsByUserAndDate(
+      userId,
+      today,
+    );
+
+    const claimedRequiredSteps = claims.map((c) => c.required_steps);
+
+    return {
+      claimed_required_steps: claimedRequiredSteps,
+      reward_config: REWARD_CONFIG_V2,
+    };
+  }
+
+  async claimRewardV2(userId: string, stepCount: number, requiredSteps: number) {
+    const rewardLevel = REWARD_CONFIG_V2.find(
+      (r) => r.required_steps === requiredSteps,
+    );
+    if (!rewardLevel) {
+      throw new BadRequestException('INVALID_REQUIRED_STEPS');
+    }
+
+    if (stepCount < rewardLevel.required_steps) {
+      throw new BadRequestException('STEP_NOT_ENOUGH');
+    }
+
+    const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+
+    const existingClaim =
+      await this.stepRewardsRepository.findClaimByUserDateAndRequiredSteps(
+        userId,
+        today,
+        requiredSteps,
+      );
+
+    if (existingClaim) {
+      throw new ConflictException('ALREADY_CLAIMED');
+    }
+
+    // v2에서는 level을 required_steps / 1000 + 1 로 계산 (호환성)
+    const level = requiredSteps === 0 ? 1 : Math.floor(requiredSteps / 1000) + 1;
+
+    await this.stepRewardsRepository.insertClaim({
+      user_id: userId,
+      claim_date: today,
+      level,
+      required_steps: requiredSteps,
+      current_step_count: stepCount,
+    });
+
+    const lottery = await this.lotteryService.issueLottery(
+      userId,
+      rewardLevel.lottery_type as LotteryType,
+      `STEP_REWARD_${requiredSteps}`,
     );
 
     return {
