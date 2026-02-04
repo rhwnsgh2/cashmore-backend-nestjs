@@ -16,12 +16,13 @@ export class StubWatchedAdRepository implements IWatchedAdRepository {
 
   async getWatchedAdStatus(userId: string): Promise<boolean> {
     const key = this.getWatchedAdKey(userId);
-    return this.watchedStatus.get(key) || false;
+    return Promise.resolve(this.watchedStatus.get(key) || false);
   }
 
   async setWatchedAdStatus(userId: string): Promise<void> {
     const key = this.getWatchedAdKey(userId);
     this.watchedStatus.set(key, true);
+    return Promise.resolve();
   }
 
   // 테스트용 헬퍼 메서드

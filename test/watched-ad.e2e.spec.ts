@@ -6,10 +6,7 @@ import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
 import { createTestUser } from './helpers/user.helper';
-import {
-  generateTestToken,
-  generateInvalidToken,
-} from './helpers/auth.helper';
+import { generateTestToken, generateInvalidToken } from './helpers/auth.helper';
 import { WATCHED_AD_REPOSITORY } from '../src/watched-ad/interfaces/watched-ad-repository.interface';
 import { StubWatchedAdRepository } from '../src/watched-ad/repositories/stub-watched-ad.repository';
 
@@ -78,9 +75,7 @@ describe('WatchedAd API (e2e)', () => {
 
   describe('POST /watched-ad-status', () => {
     it('토큰 없이 요청하면 401을 반환한다', async () => {
-      await request(app.getHttpServer())
-        .post('/watched-ad-status')
-        .expect(401);
+      await request(app.getHttpServer()).post('/watched-ad-status').expect(401);
     });
 
     it('광고 시청 완료를 기록하고 success: true를 반환한다', async () => {
