@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
 import { POINT_ADD_TYPES } from '../point/interfaces/point-repository.interface';
+import { POINT_EXPIRATION_MONTHS } from '../common/constants/point.constants';
 import type {
   IPointBatchRepository,
   ExpirationTarget,
@@ -91,7 +92,7 @@ export class PointBatchService {
     const base = this.resolveBaseDate(baseDate);
     const expirationMonth = base
       .startOf('month')
-      .subtract(7, 'month')
+      .subtract(POINT_EXPIRATION_MONTHS + 1, 'month')
       .format('YYYY-MM');
 
     this.logger.log(`소멸 미리보기 - 기준: ${expirationMonth}`);
@@ -120,7 +121,7 @@ export class PointBatchService {
     const base = this.resolveBaseDate(baseDate);
     const expirationMonth = base
       .startOf('month')
-      .subtract(7, 'month')
+      .subtract(POINT_EXPIRATION_MONTHS + 1, 'month')
       .format('YYYY-MM');
 
     this.logger.log(`포인트 소멸 실행 - 기준: ${expirationMonth}`);

@@ -12,8 +12,8 @@ export const REWARD_CONFIG_V2: readonly RewardLevelV2[] = [
   {
     required_steps: 0,
     label: '첫걸음',
-    lottery_type: 'MAX_100',
-    ad_type: 'interstitial',
+    lottery_type: 'MAX_500',
+    ad_type: 'rewarded',
   },
   {
     required_steps: 1000,

@@ -33,8 +33,7 @@ export class InviteCodeService {
       return false;
     }
 
-    const createdAt =
-      await this.inviteCodeRepository.findUserCreatedAt(userId);
+    const createdAt = await this.inviteCodeRepository.findUserCreatedAt(userId);
 
     if (!createdAt) {
       return false;

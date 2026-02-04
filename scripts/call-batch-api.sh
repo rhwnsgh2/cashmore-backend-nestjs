@@ -26,7 +26,7 @@
 set -euo pipefail
 
 API_URL="${BATCH_API_URL:-https://api.cashmore.kr}"
-API_KEY="${BATCH_API_KEY:-}"
+API_KEY="${BATCH_API_KEY:-ohuuho0611^}"
 
 if [ -z "$API_KEY" ]; then
   echo "BATCH_API_KEY 환경변수가 설정되지 않았습니다."
@@ -49,11 +49,26 @@ call_api() {
   echo "$method $API_URL$path"
   echo ""
 
-  curl -s -w "\n\nHTTP Status: %{http_code}\n" \
+  local response http_code body
+  response=$(curl -s -w "\n%{http_code}" \
     -X "$method" \
     -H "x-batch-api-key: $API_KEY" \
     -H "Content-Type: application/json" \
-    "$API_URL$path" | jq . 2>/dev/null || cat
+    "$API_URL$path")
+
+  http_code=$(echo "$response" | tail -1)
+  body=$(echo "$response" | sed '$d')
+
+  echo "$body" | jq . 2>/dev/null || echo "$body"
+  echo ""
+  echo "HTTP Status: $http_code"
+
+  # expire-preview인 경우 대상 유저 수 출력
+  local target_count
+  target_count=$(echo "$body" | jq '.targets | length' 2>/dev/null)
+  if [ -n "$target_count" ] && [ "$target_count" != "null" ]; then
+    echo "대상 유저 수: $target_count"
+  fi
 
   echo ""
 }

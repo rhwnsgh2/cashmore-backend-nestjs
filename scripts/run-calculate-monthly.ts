@@ -21,9 +21,7 @@ import { POINT_ADD_TYPES } from '../src/point/interfaces/point-repository.interf
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const DB_URL =
-  'postgresql://postgres:6SuD9n46O4bpl03e@db.lezbzutujqvtbttrliws.supabase.co:5432/postgres';
-console.log(DB_URL);
+const DB_URL = process.env.SUPABASE_DB_URL;
 if (!DB_URL) {
   console.error('SUPABASE_DB_URL is not set');
   process.exit(1);

@@ -112,7 +112,11 @@ export class StepRewardsService {
     };
   }
 
-  async claimRewardV2(userId: string, stepCount: number, requiredSteps: number) {
+  async claimRewardV2(
+    userId: string,
+    stepCount: number,
+    requiredSteps: number,
+  ) {
     const rewardLevel = REWARD_CONFIG_V2.find(
       (r) => r.required_steps === requiredSteps,
     );
@@ -138,7 +142,8 @@ export class StepRewardsService {
     }
 
     // v2에서는 level을 required_steps / 1000 + 1 로 계산 (호환성)
-    const level = requiredSteps === 0 ? 1 : Math.floor(requiredSteps / 1000) + 1;
+    const level =
+      requiredSteps === 0 ? 1 : Math.floor(requiredSteps / 1000) + 1;
 
     await this.stepRewardsRepository.insertClaim({
       user_id: userId,

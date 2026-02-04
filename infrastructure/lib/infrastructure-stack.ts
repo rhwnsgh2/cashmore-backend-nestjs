@@ -140,10 +140,7 @@ export class InfrastructureStack extends cdk.Stack {
           supabaseSecret,
           'jwtSecret',
         ),
-        SUPABASE_DB_URL: ecs.Secret.fromSecretsManager(
-          supabaseSecret,
-          'dbUrl',
-        ),
+        SUPABASE_DB_URL: ecs.Secret.fromSecretsManager(supabaseSecret, 'dbUrl'),
         BATCH_API_KEY: ecs.Secret.fromSecretsManager(
           supabaseSecret,
           'batchApiKey',

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { POINT_EXPIRATION_MONTHS } from '../common/constants/point.constants';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
@@ -87,13 +88,13 @@ export class PointService {
   private async calculateExpiringPoints(userId: string): Promise<number> {
     const baseDate = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
 
-    // 6개월 전 월 계산
+    // 소멸 기준월 계산
     const expirationMonth = dayjs(baseDate)
       .startOf('month')
-      .subtract(6, 'month')
+      .subtract(POINT_EXPIRATION_MONTHS, 'month')
       .format('YYYY-MM-DD');
 
-    // 6개월 전까지의 월별 적립 포인트 조회
+    // 소멸 기준월까지의 월별 적립 포인트 조회
     const monthlyPoints =
       await this.pointRepository.findMonthlyEarnedPointsUntil(
         userId,

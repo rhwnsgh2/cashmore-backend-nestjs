@@ -55,7 +55,7 @@ export function calculatePointAmountWithSnapshot(
 
 /**
  * 소멸 예정 포인트를 계산합니다.
- * 핵심 로직: 6개월전까지적립총합 - 전체출금총합 = 소멸포인트
+ * 핵심 로직: 소멸기준월 이전까지적립총합 - 전체출금총합 = 소멸포인트
  */
 export function calculateExpiringPoints(
   totalEarnedBeforeExpiration: number,
@@ -77,7 +77,7 @@ export function calculateExpiringPoints(
     }
   }
 
-  // 소멸 포인트 계산: 6개월전적립 - 전체출금 (음수 방지)
+  // 소멸 포인트 계산: 소멸기준월 이전적립 - 전체출금 (음수 방지)
   return Math.max(0, totalEarnedBeforeExpiration - totalWithdrawn);
 }
 
