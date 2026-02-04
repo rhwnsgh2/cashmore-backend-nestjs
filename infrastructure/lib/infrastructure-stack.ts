@@ -102,6 +102,13 @@ export class InfrastructureStack extends cdk.Stack {
       'cashmore/supabase',
     );
 
+    // Reference Upstash Redis secret
+    const upstashSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'UpstashSecret',
+      'cashmore/upstash',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 2048,
@@ -144,6 +151,14 @@ export class InfrastructureStack extends cdk.Stack {
         BATCH_API_KEY: ecs.Secret.fromSecretsManager(
           supabaseSecret,
           'batchApiKey',
+        ),
+        UPSTASH_REDIS_REST_URL: ecs.Secret.fromSecretsManager(
+          upstashSecret,
+          'restUrl',
+        ),
+        UPSTASH_REDIS_REST_TOKEN: ecs.Secret.fromSecretsManager(
+          upstashSecret,
+          'restToken',
         ),
       },
     });
