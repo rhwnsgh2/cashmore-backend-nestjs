@@ -47,11 +47,11 @@ export class LotteryService {
   ];
 
   private static readonly MAX_100_REWARDS = [
-    { amount: 3, probability: 75 },
-    { amount: 5, probability: 20 },
-    { amount: 10, probability: 4 },
-    { amount: 30, probability: 0.7 },
-    { amount: 100, probability: 0.3 },
+    { amount: 3, probability: 81 },
+    { amount: 5, probability: 15 },
+    { amount: 10, probability: 3 },
+    { amount: 30, probability: 0.8 },
+    { amount: 100, probability: 0.2 },
   ];
 
   private static readonly MAX_1000_REWARDS = [
