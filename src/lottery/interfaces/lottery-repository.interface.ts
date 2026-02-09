@@ -40,6 +40,14 @@ export interface InsertAdLotterySlotData {
   reward_metadata: Record<string, unknown>;
 }
 
+export interface MaxRewardLottery {
+  user_id: string;
+  reward_amount: number;
+  lottery_type_id: LotteryType;
+  used_at: string;
+  nickname: string | null;
+}
+
 // Repository 인터페이스
 export interface ILotteryRepository {
   findAvailableLotteries(userId: string): Promise<Lottery[]>;
@@ -52,6 +60,7 @@ export interface ILotteryRepository {
   ): Promise<void>;
   insertPointAction(data: InsertPointActionData): Promise<void>;
   insertAdLotterySlot(data: InsertAdLotterySlotData): Promise<void>;
+  findMaxRewardLotteries(limit: number): Promise<MaxRewardLottery[]>;
 }
 
 // DI 토큰

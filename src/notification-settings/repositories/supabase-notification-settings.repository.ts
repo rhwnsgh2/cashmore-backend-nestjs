@@ -7,9 +7,7 @@ import type {
 } from '../interfaces/notification-settings-repository.interface';
 
 @Injectable()
-export class SupabaseNotificationSettingsRepository
-  implements INotificationSettingsRepository
-{
+export class SupabaseNotificationSettingsRepository implements INotificationSettingsRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async findNotificationSetting(

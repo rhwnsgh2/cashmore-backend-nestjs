@@ -1,7 +1,16 @@
-import { Body, Controller, Get, Header, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -18,6 +27,7 @@ import {
   UseLotteryRequestDto,
   UseLotteryResponseDto,
 } from './dto/use-lottery.dto';
+import { MaxRewardUserDto } from './dto/max-reward-users.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { LotteryType } from './interfaces/lottery-repository.interface';
@@ -125,5 +135,30 @@ export class LotteryController {
     @Body() dto: UseLotteryRequestDto,
   ): Promise<UseLotteryResponseDto> {
     return this.lotteryService.useLottery(userId, dto.lotteryId);
+  }
+
+  @Get('max-reward-users')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary: '최대 당첨금 수령자 목록',
+    description:
+      '각 복권 타입별 최대 당첨금(100원, 500원, 1000원)을 받은 사용자 목록을 조회합니다.',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: '조회할 최대 개수 (기본값: 10)',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: '최대 당첨자 목록',
+    type: [MaxRewardUserDto],
+  })
+  async getMaxRewardUsers(
+    @Query('limit') limit?: string,
+  ): Promise<MaxRewardUserDto[]> {
+    const parsedLimit = limit ? parseInt(limit, 10) : 10;
+    return this.lotteryService.getMaxRewardUsers(parsedLimit);
   }
 }

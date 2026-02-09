@@ -8,6 +8,7 @@ import type {
   InsertAdLotterySlotData,
   Lottery,
   LotteryStatus,
+  MaxRewardLottery,
 } from '../interfaces/lottery-repository.interface';
 
 @Injectable()
@@ -107,5 +108,65 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
     if (error) {
       throw error;
     }
+  }
+
+  async findMaxRewardLotteries(limit: number): Promise<MaxRewardLottery[]> {
+    interface LotteryRow {
+      user_id: string;
+      reward_amount: number;
+      lottery_type_id: string;
+      used_at: string;
+    }
+
+    interface UserRow {
+      id: string;
+      nickname: string | null;
+    }
+
+    // 각 복권 타입별 최대 당첨금을 받은 유저만 조회
+    const { data: lotteries, error } = await this.supabaseService
+      .getClient()
+      .from('lotteries')
+      .select('user_id, reward_amount, lottery_type_id, used_at')
+      .eq('status', 'USED')
+      .not('used_at', 'is', null)
+      .or(
+        'and(lottery_type_id.eq.MAX_100,reward_amount.eq.100),and(lottery_type_id.eq.MAX_500,reward_amount.eq.500),and(lottery_type_id.eq.MAX_1000,reward_amount.eq.1000),and(lottery_type_id.eq.STANDARD_5,reward_amount.eq.500)',
+      )
+      .order('used_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw error;
+    }
+
+    const typedLotteries = lotteries as LotteryRow[] | null;
+
+    if (!typedLotteries || typedLotteries.length === 0) {
+      return [];
+    }
+
+    // user_id들로 닉네임 조회
+    const userIds = [...new Set(typedLotteries.map((l) => l.user_id))];
+    const { data: users, error: userError } = await this.supabaseService
+      .getClient()
+      .from('user')
+      .select('id, nickname')
+      .in('id', userIds);
+
+    if (userError) {
+      console.error('Failed to fetch users:', userError);
+    }
+
+    const typedUsers = users as UserRow[] | null;
+    const userMap = new Map(typedUsers?.map((u) => [u.id, u.nickname]) ?? []);
+
+    return typedLotteries.map((row) => ({
+      user_id: row.user_id,
+      reward_amount: row.reward_amount,
+      lottery_type_id: row.lottery_type_id,
+      used_at: row.used_at,
+      nickname: userMap.get(row.user_id) ?? null,
+    })) as MaxRewardLottery[];
   }
 }

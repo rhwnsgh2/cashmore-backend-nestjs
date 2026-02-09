@@ -11,6 +11,7 @@ import type {
   ILotteryRepository,
   Lottery,
   LotteryType,
+  MaxRewardLottery,
 } from './interfaces/lottery-repository.interface';
 import { LOTTERY_REPOSITORY } from './interfaces/lottery-repository.interface';
 import { FcmService } from '../fcm/fcm.service';
@@ -30,12 +31,26 @@ export interface LotteryResponse {
   usedAt?: string;
 }
 
+export interface MaxRewardUserResponse {
+  maskedNickname: string;
+  amount: number;
+  lotteryType: LotteryType;
+  usedAt: string;
+}
+
 // STANDARD_5는 MAX_500으로 변환
 function convertLotteryType(typeId: string): LotteryType {
   if (typeId === 'STANDARD_5') {
     return 'MAX_500';
   }
   return typeId as LotteryType;
+}
+
+// 닉네임을 마스킹하는 함수 (앞 3글자만 보이고 나머지는 ****)
+function maskNickname(nickname: string | null): string {
+  if (!nickname) return '익명****';
+  if (nickname.length <= 3) return nickname + '****';
+  return nickname.substring(0, 3) + '****';
 }
 
 @Injectable()
@@ -251,5 +266,17 @@ export class LotteryService {
       status: 'USED' as const,
       usedAt,
     };
+  }
+
+  async getMaxRewardUsers(limit: number): Promise<MaxRewardUserResponse[]> {
+    const lotteries: MaxRewardLottery[] =
+      await this.lotteryRepository.findMaxRewardLotteries(limit);
+
+    return lotteries.map((lottery: MaxRewardLottery) => ({
+      maskedNickname: maskNickname(lottery.nickname),
+      amount: lottery.reward_amount,
+      lotteryType: convertLotteryType(lottery.lottery_type_id),
+      usedAt: lottery.used_at,
+    }));
   }
 }

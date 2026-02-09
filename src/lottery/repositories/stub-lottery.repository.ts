@@ -7,6 +7,7 @@ import type {
   InsertAdLotterySlotData,
   Lottery,
   LotteryStatus,
+  MaxRewardLottery,
 } from '../interfaces/lottery-repository.interface';
 
 /**
@@ -93,5 +94,10 @@ export class StubLotteryRepository implements ILotteryRepository {
 
   insertAdLotterySlot(_data: InsertAdLotterySlotData): Promise<void> {
     return Promise.resolve();
+  }
+
+  findMaxRewardLotteries(_limit: number): Promise<MaxRewardLottery[]> {
+    // Stub: 빈 배열 반환
+    return Promise.resolve([]);
   }
 }
