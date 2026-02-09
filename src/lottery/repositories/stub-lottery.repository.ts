@@ -42,6 +42,16 @@ export class StubLotteryRepository implements ILotteryRepository {
     return Promise.resolve(available);
   }
 
+  findLotteryById(lotteryId: string): Promise<Lottery | null> {
+    for (const userLotteries of this.lotteries.values()) {
+      const lottery = userLotteries.find((l) => l.id === lotteryId);
+      if (lottery) {
+        return Promise.resolve(lottery);
+      }
+    }
+    return Promise.resolve(null);
+  }
+
   insertLottery(data: InsertLotteryData): Promise<Lottery> {
     const lottery: Lottery = {
       id: randomUUID(),

@@ -109,6 +109,13 @@ export class InfrastructureStack extends cdk.Stack {
       'cashmore/upstash',
     );
 
+    // Reference Firebase secret (FCM)
+    const firebaseSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'FirebaseSecret',
+      'cashmore/firebase',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 2048,
@@ -159,6 +166,18 @@ export class InfrastructureStack extends cdk.Stack {
         UPSTASH_REDIS_REST_TOKEN: ecs.Secret.fromSecretsManager(
           upstashSecret,
           'restToken',
+        ),
+        FIREBASE_PROJECT_ID: ecs.Secret.fromSecretsManager(
+          firebaseSecret,
+          'projectId',
+        ),
+        FIREBASE_CLIENT_EMAIL: ecs.Secret.fromSecretsManager(
+          firebaseSecret,
+          'clientEmail',
+        ),
+        FIREBASE_PRIVATE_KEY: ecs.Secret.fromSecretsManager(
+          firebaseSecret,
+          'privateKey',
         ),
       },
     });

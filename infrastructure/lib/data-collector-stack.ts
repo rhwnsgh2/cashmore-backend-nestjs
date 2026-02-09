@@ -42,7 +42,7 @@ export class DataCollectorStack extends cdk.Stack {
         runtime: lambda.Runtime.NODEJS_20_X,
         handler: 'handler',
         entry: path.join(__dirname, '../../data-collector/src/handlers/applovin.ts'),
-        timeout: cdk.Duration.minutes(10),
+        timeout: cdk.Duration.minutes(15),
         memorySize: 3008,  // 1.87M rows 처리를 위해 메모리 증가
         environment: {
           ANDROID_PACKAGE_NAME: 'com.bridgeworks.cashmore',

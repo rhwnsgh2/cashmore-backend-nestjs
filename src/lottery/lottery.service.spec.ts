@@ -4,6 +4,11 @@ import dayjs from 'dayjs';
 import { LotteryService } from './lottery.service';
 import { LOTTERY_REPOSITORY } from './interfaces/lottery-repository.interface';
 import { StubLotteryRepository } from './repositories/stub-lottery.repository';
+import { FcmService } from '../fcm/fcm.service';
+
+const mockFcmService = {
+  sendRefreshMessage: async () => {},
+};
 
 describe('LotteryService', () => {
   let service: LotteryService;
@@ -18,6 +23,10 @@ describe('LotteryService', () => {
         {
           provide: LOTTERY_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: FcmService,
+          useValue: mockFcmService,
         },
       ],
     }).compile();
@@ -227,6 +236,131 @@ describe('LotteryService', () => {
 
       expect(result.success).toBe(true);
       expect(result.lottery.status).toBe('USED');
+    });
+  });
+
+  describe('useLottery', () => {
+    const userId = 'test-user-id';
+
+    beforeEach(() => {
+      repository.clear();
+    });
+
+    it('ISSUED 상태의 복권을 사용한다', async () => {
+      const futureDate = dayjs().add(7, 'day').toISOString();
+
+      repository.setLotteries(userId, [
+        {
+          id: 'lottery-1',
+          user_id: userId,
+          lottery_type_id: 'MAX_500',
+          status: 'ISSUED',
+          issued_at: dayjs().toISOString(),
+          expires_at: futureDate,
+          reward_amount: 100,
+          used_at: null,
+        },
+      ]);
+
+      const result = await service.useLottery(userId, 'lottery-1');
+
+      expect(result.id).toBe('lottery-1');
+      expect(result.userId).toBe(userId);
+      expect(result.rewardAmount).toBe(100);
+      expect(result.status).toBe('USED');
+      expect(result.usedAt).toBeDefined();
+    });
+
+    it('사용 후 복권이 목록에서 조회되지 않는다', async () => {
+      const futureDate = dayjs().add(7, 'day').toISOString();
+
+      repository.setLotteries(userId, [
+        {
+          id: 'lottery-1',
+          user_id: userId,
+          lottery_type_id: 'MAX_500',
+          status: 'ISSUED',
+          issued_at: dayjs().toISOString(),
+          expires_at: futureDate,
+          reward_amount: 50,
+          used_at: null,
+        },
+      ]);
+
+      await service.useLottery(userId, 'lottery-1');
+
+      const lotteries = await service.getMyLotteries(userId);
+      expect(lotteries).toHaveLength(0);
+    });
+
+    it('존재하지 않는 복권이면 NotFoundException을 던진다', async () => {
+      await expect(
+        service.useLottery(userId, 'non-existent-lottery'),
+      ).rejects.toThrow('복권을 찾을 수 없습니다.');
+    });
+
+    it('다른 사용자의 복권이면 BadRequestException을 던진다', async () => {
+      const otherUserId = 'other-user-id';
+      const futureDate = dayjs().add(7, 'day').toISOString();
+
+      repository.setLotteries(otherUserId, [
+        {
+          id: 'lottery-other',
+          user_id: otherUserId,
+          lottery_type_id: 'MAX_500',
+          status: 'ISSUED',
+          issued_at: dayjs().toISOString(),
+          expires_at: futureDate,
+          reward_amount: 100,
+          used_at: null,
+        },
+      ]);
+
+      await expect(
+        service.useLottery(userId, 'lottery-other'),
+      ).rejects.toThrow('본인의 복권만 사용할 수 있습니다.');
+    });
+
+    it('USED 상태의 복권이면 BadRequestException을 던진다', async () => {
+      const futureDate = dayjs().add(7, 'day').toISOString();
+
+      repository.setLotteries(userId, [
+        {
+          id: 'lottery-used',
+          user_id: userId,
+          lottery_type_id: 'MAX_500',
+          status: 'USED',
+          issued_at: dayjs().subtract(1, 'day').toISOString(),
+          expires_at: futureDate,
+          reward_amount: 100,
+          used_at: dayjs().toISOString(),
+        },
+      ]);
+
+      await expect(
+        service.useLottery(userId, 'lottery-used'),
+      ).rejects.toThrow('복권 상태가 올바르지 않습니다.');
+    });
+
+    it('EXPIRED 상태의 복권이면 BadRequestException을 던진다', async () => {
+      const futureDate = dayjs().add(7, 'day').toISOString();
+
+      repository.setLotteries(userId, [
+        {
+          id: 'lottery-expired',
+          user_id: userId,
+          lottery_type_id: 'MAX_500',
+          status: 'EXPIRED',
+          issued_at: dayjs().subtract(10, 'day').toISOString(),
+          expires_at: futureDate,
+          reward_amount: 100,
+          used_at: null,
+        },
+      ]);
+
+      await expect(
+        service.useLottery(userId, 'lottery-expired'),
+      ).rejects.toThrow('복권 상태가 올바르지 않습니다.');
     });
   });
 });

@@ -1,4 +1,9 @@
-import { Inject, Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -8,6 +13,7 @@ import type {
   LotteryType,
 } from './interfaces/lottery-repository.interface';
 import { LOTTERY_REPOSITORY } from './interfaces/lottery-repository.interface';
+import { FcmService } from '../fcm/fcm.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -37,6 +43,7 @@ export class LotteryService {
   constructor(
     @Inject(LOTTERY_REPOSITORY)
     private lotteryRepository: ILotteryRepository,
+    private fcmService: FcmService,
   ) {}
 
   private static readonly MAX_500_REWARDS = [
@@ -198,5 +205,51 @@ export class LotteryService {
         usedAt: lottery.used_at ?? undefined,
       };
     });
+  }
+
+  async useLottery(userId: string, lotteryId: string) {
+    const lottery = await this.lotteryRepository.findLotteryById(lotteryId);
+
+    if (!lottery) {
+      throw new NotFoundException('복권을 찾을 수 없습니다.');
+    }
+
+    if (lottery.user_id !== userId) {
+      throw new BadRequestException('본인의 복권만 사용할 수 있습니다.');
+    }
+
+    if (lottery.status !== 'ISSUED') {
+      throw new BadRequestException('복권 상태가 올바르지 않습니다.');
+    }
+
+    const usedAt = dayjs().toISOString();
+
+    await this.lotteryRepository.updateLotteryStatus(lotteryId, 'USED', usedAt);
+
+    await this.lotteryRepository.insertPointAction({
+      user_id: userId,
+      type: 'LOTTERY',
+      point_amount: lottery.reward_amount,
+      additional_data: {
+        description: `복권 당첨금 ${lottery.reward_amount}원`,
+        reference_id: lotteryId,
+      },
+      status: 'done',
+    });
+
+    // 클라이언트에게 복권 업데이트 알림
+    this.fcmService
+      .sendRefreshMessage(userId, 'lottery_update')
+      .catch((err) => {
+        console.error('[Lottery] Failed to send FCM notification:', err);
+      });
+
+    return {
+      id: lotteryId,
+      userId,
+      rewardAmount: lottery.reward_amount,
+      status: 'USED' as const,
+      usedAt,
+    };
   }
 }

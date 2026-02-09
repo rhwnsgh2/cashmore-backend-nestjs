@@ -127,12 +127,14 @@ export class ApplovinClient {
   }
 
   /**
-   * User-Level Ad Revenue API - 노출별 상세 데이터 조회
+   * User-Level Ad Revenue API - 스트리밍 방식으로 노출별 상세 데이터 조회
+   * CSV를 전체 문자열로 로드하지 않고, chunk 단위로 읽으며 배치 yield
    */
-  async fetchUserLevelImpressions(
+  async *fetchUserLevelImpressionsStream(
     date: string,
-    platform: 'android' | 'ios'
-  ): Promise<NormalizedImpression[]> {
+    platform: 'android' | 'ios',
+    batchSize: number = 5000
+  ): AsyncGenerator<NormalizedImpression[]> {
     const packageName = this.packageNames[platform];
 
     const params = new URLSearchParams({
@@ -156,72 +158,109 @@ export class ApplovinClient {
       throw new Error(`User-Level API returned status: ${data.status}`);
     }
 
-    // ad_revenue_report_url이 있으면 네트워크 정보 포함
     const csvUrl = data.ad_revenue_report_url || data.url;
 
     if (!csvUrl) {
       console.log(`No data available for ${platform} on ${date}`);
-      return [];
+      return;
     }
 
-    const csvData = await this.downloadCsv(csvUrl);
-    return this.parseUserLevelCsv(csvData, platform, date);
-  }
-
-  private async downloadCsv(url: string): Promise<string> {
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`CSV download error: ${response.status}`);
+    const csvResponse = await fetch(csvUrl);
+    if (!csvResponse.ok) {
+      throw new Error(`CSV download error: ${csvResponse.status}`);
     }
 
-    return response.text();
+    if (!csvResponse.body) {
+      throw new Error('CSV response body is null');
+    }
+
+    const reader = csvResponse.body.getReader();
+    const decoder = new TextDecoder();
+
+    let headers: string[] | null = null;
+    let buffer = '';
+    let batch: NormalizedImpression[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        if (buffer.trim() && headers) {
+          batch.push(this.normalizeImpressionRow(
+            this.parseCsvLineToRecord(buffer, headers),
+            platform,
+            date,
+          ));
+        }
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop()!;
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+
+        if (!headers) {
+          headers = this.parseCsvLine(line);
+          continue;
+        }
+
+        batch.push(this.normalizeImpressionRow(
+          this.parseCsvLineToRecord(line, headers),
+          platform,
+          date,
+        ));
+
+        if (batch.length >= batchSize) {
+          yield batch;
+          batch = [];
+        }
+      }
+    }
+
+    if (batch.length > 0) {
+      yield batch;
+    }
   }
 
-  private parseUserLevelCsv(
-    csvData: string,
+  private parseCsvLineToRecord(
+    line: string,
+    headers: string[],
+  ): Record<string, string> {
+    const values = this.parseCsvLine(line);
+    const row: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] || '';
+    });
+    return row;
+  }
+
+  private normalizeImpressionRow(
+    row: Record<string, string>,
     platform: string,
-    collectedDate: string
-  ): NormalizedImpression[] {
-    const lines = csvData.trim().split('\n');
-
-    if (lines.length < 2) {
-      return [];
-    }
-
-    const headers = this.parseCsvLine(lines[0]);
-    const results: NormalizedImpression[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = this.parseCsvLine(lines[i]);
-      const row: Record<string, string> = {};
-
-      headers.forEach((header, index) => {
-        row[header] = values[index] || '';
-      });
-
-      results.push({
-        impression_at: row['Date'] || collectedDate,
-        ad_unit_id: row['Ad Unit ID'] || null,
-        ad_unit_name: row['Ad Unit Name'] || null,
-        waterfall: row['Waterfall'] || null,
-        ad_format: row['Ad Format'] || null,
-        placement: row['Placement'] || null,
-        country: row['Country'] || null,
-        device_type: row['Device Type'] || null,
-        idfa: row['IDFA'] || null,
-        idfv: row['IDFV'] || null,
-        user_id: row['User ID'] || null,
-        revenue: parseFloat(row['Revenue']) || 0,
-        network: row['Network'] || null,
-        ad_placement: row['Ad Placement'] || null,
-        custom_data: row['Custom Data'] || null,
-        platform,
-        collected_date: collectedDate,
-      });
-    }
-
-    return results;
+    collectedDate: string,
+  ): NormalizedImpression {
+    return {
+      impression_at: row['Date'] || collectedDate,
+      ad_unit_id: row['Ad Unit ID'] || null,
+      ad_unit_name: row['Ad Unit Name'] || null,
+      waterfall: row['Waterfall'] || null,
+      ad_format: row['Ad Format'] || null,
+      placement: row['Placement'] || null,
+      country: row['Country'] || null,
+      device_type: row['Device Type'] || null,
+      idfa: row['IDFA'] || null,
+      idfv: row['IDFV'] || null,
+      user_id: row['User ID'] || null,
+      revenue: parseFloat(row['Revenue']) || 0,
+      network: row['Network'] || null,
+      ad_placement: row['Ad Placement'] || null,
+      custom_data: row['Custom Data'] || null,
+      platform,
+      collected_date: collectedDate,
+    };
   }
 
   private parseCsvLine(line: string): string[] {

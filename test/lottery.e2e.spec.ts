@@ -435,4 +435,153 @@ describe('Lottery API (e2e) - Real DB', () => {
       expect(response.body).toHaveLength(0);
     });
   });
+
+  describe('POST /lottery/use', () => {
+    let testUser: TestUser;
+    let token: string;
+
+    beforeEach(async () => {
+      testUser = await createTestUser(supabase);
+      token = generateTestToken(testUser.auth_id);
+    });
+
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/lottery/use')
+        .send({ lotteryId: 'some-lottery-id' })
+        .expect(401);
+    });
+
+    it('ISSUED 상태의 복권을 사용한다', async () => {
+      const lottery = await createLottery(supabase, {
+        user_id: testUser.id,
+        lottery_type_id: 'MAX_500',
+        status: 'ISSUED',
+        reward_amount: 100,
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/lottery/use')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryId: lottery.id })
+        .expect(201);
+
+      expect(response.body.id).toBe(lottery.id);
+      expect(response.body.userId).toBe(testUser.id);
+      expect(response.body.rewardAmount).toBe(100);
+      expect(response.body.status).toBe('USED');
+      expect(response.body.usedAt).toBeDefined();
+    });
+
+    it('사용 후 복권이 /lottery/my에서 조회되지 않는다', async () => {
+      const lottery = await createLottery(supabase, {
+        user_id: testUser.id,
+        lottery_type_id: 'MAX_500',
+        status: 'ISSUED',
+        reward_amount: 50,
+      });
+
+      await request(app.getHttpServer())
+        .post('/lottery/use')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryId: lottery.id })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get('/lottery/my')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(0);
+    });
+
+    it('포인트가 지급된다', async () => {
+      const lottery = await createLottery(supabase, {
+        user_id: testUser.id,
+        lottery_type_id: 'MAX_500',
+        status: 'ISSUED',
+        reward_amount: 100,
+      });
+
+      await request(app.getHttpServer())
+        .post('/lottery/use')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryId: lottery.id })
+        .expect(201);
+
+      // point_actions 테이블에서 확인
+      const { data: pointActions } = await supabase
+        .from('point_actions')
+        .select('*')
+        .eq('user_id', testUser.id)
+        .eq('type', 'LOTTERY');
+
+      expect(pointActions).toHaveLength(1);
+      expect(pointActions![0].point_amount).toBe(100);
+      expect(pointActions![0].additional_data.reference_id).toBe(lottery.id);
+    });
+
+    it('존재하지 않는 복권이면 404를 반환한다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/lottery/use')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryId: '00000000-0000-0000-0000-000000000000' })
+        .expect(404);
+
+      expect(response.body.message).toBe('복권을 찾을 수 없습니다.');
+    });
+
+    it('다른 사용자의 복권이면 400을 반환한다', async () => {
+      const otherUser = await createTestUser(supabase);
+      const lottery = await createLottery(supabase, {
+        user_id: otherUser.id,
+        lottery_type_id: 'MAX_500',
+        status: 'ISSUED',
+        reward_amount: 100,
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/lottery/use')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryId: lottery.id })
+        .expect(400);
+
+      expect(response.body.message).toBe('본인의 복권만 사용할 수 있습니다.');
+    });
+
+    it('USED 상태의 복권이면 400을 반환한다', async () => {
+      const lottery = await createLottery(supabase, {
+        user_id: testUser.id,
+        lottery_type_id: 'MAX_500',
+        status: 'USED',
+        reward_amount: 100,
+        used_at: dayjs().toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/lottery/use')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryId: lottery.id })
+        .expect(400);
+
+      expect(response.body.message).toBe('복권 상태가 올바르지 않습니다.');
+    });
+
+    it('EXPIRED 상태의 복권이면 400을 반환한다', async () => {
+      const lottery = await createLottery(supabase, {
+        user_id: testUser.id,
+        lottery_type_id: 'MAX_500',
+        status: 'EXPIRED',
+        reward_amount: 100,
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/lottery/use')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lotteryId: lottery.id })
+        .expect(400);
+
+      expect(response.body.message).toBe('복권 상태가 올바르지 않습니다.');
+    });
+  });
 });

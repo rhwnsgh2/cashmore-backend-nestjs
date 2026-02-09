@@ -52,16 +52,24 @@ async function main() {
 
   console.log('');
 
-  // 3. User-Level API 테스트 (Android)
+  // 3. User-Level API 테스트 (Android) - 스트리밍
   console.log(`3. User-Level API - Android (${userLevelDate})`);
   try {
-    const androidData = await client.fetchUserLevelImpressions(
+    let androidCount = 0;
+    let androidSample: unknown = null;
+    for await (const batch of client.fetchUserLevelImpressionsStream(
       userLevelDate,
       'android'
-    );
-    console.log(`   ✅ Success: ${androidData.length} rows`);
-    if (androidData.length > 0) {
-      console.log('   Sample row:', JSON.stringify(androidData[0], null, 2));
+    )) {
+      if (!androidSample && batch.length > 0) {
+        androidSample = batch[0];
+      }
+      androidCount += batch.length;
+      console.log(`   Batch: ${batch.length} rows (total: ${androidCount})`);
+    }
+    console.log(`   ✅ Success: ${androidCount} rows`);
+    if (androidSample) {
+      console.log('   Sample row:', JSON.stringify(androidSample, null, 2));
     }
   } catch (error) {
     console.log(`   ❌ Error: ${error}`);
@@ -69,13 +77,24 @@ async function main() {
 
   console.log('');
 
-  // 4. User-Level API 테스트 (iOS)
+  // 4. User-Level API 테스트 (iOS) - 스트리밍
   console.log(`4. User-Level API - iOS (${userLevelDate})`);
   try {
-    const iosData = await client.fetchUserLevelImpressions(userLevelDate, 'ios');
-    console.log(`   ✅ Success: ${iosData.length} rows`);
-    if (iosData.length > 0) {
-      console.log('   Sample row:', JSON.stringify(iosData[0], null, 2));
+    let iosCount = 0;
+    let iosSample: unknown = null;
+    for await (const batch of client.fetchUserLevelImpressionsStream(
+      userLevelDate,
+      'ios'
+    )) {
+      if (!iosSample && batch.length > 0) {
+        iosSample = batch[0];
+      }
+      iosCount += batch.length;
+      console.log(`   Batch: ${batch.length} rows (total: ${iosCount})`);
+    }
+    console.log(`   ✅ Success: ${iosCount} rows`);
+    if (iosSample) {
+      console.log('   Sample row:', JSON.stringify(iosSample, null, 2));
     }
   } catch (error) {
     console.log(`   ❌ Error: ${error}`);

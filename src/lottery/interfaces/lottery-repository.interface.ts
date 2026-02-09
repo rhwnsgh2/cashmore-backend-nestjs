@@ -43,6 +43,7 @@ export interface InsertAdLotterySlotData {
 // Repository 인터페이스
 export interface ILotteryRepository {
   findAvailableLotteries(userId: string): Promise<Lottery[]>;
+  findLotteryById(lotteryId: string): Promise<Lottery | null>;
   insertLottery(data: InsertLotteryData): Promise<Lottery>;
   updateLotteryStatus(
     lotteryId: string,

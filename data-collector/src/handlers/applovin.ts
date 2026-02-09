@@ -134,16 +134,20 @@ export const handler: Handler<ScheduledEvent> = async (event) => {
   try {
     console.log(`Fetching revenue hourly data for ${revenueDate}`);
 
-    // 기존 데이터 삭제 (중복 방지)
-    await bigqueryClient.deleteExistingData('revenue_hourly', revenueDate);
+    // 기존 데이터 삭제 (중복 방지) - streaming buffer 에러 시 skip
+    const deleted = await bigqueryClient.deleteExistingData('revenue_hourly', revenueDate);
+    if (!deleted) {
+      console.log('Skipping revenue hourly collection - data in streaming buffer');
+      results.revenueHourly.error = 'Skipped - data in streaming buffer';
+    } else {
+      const revenueData = await applovinClient.fetchRevenueHourly(revenueDate);
+      await bigqueryClient.insertRevenueHourly(revenueData);
 
-    const revenueData = await applovinClient.fetchRevenueHourly(revenueDate);
-    await bigqueryClient.insertRevenueHourly(revenueData);
+      results.revenueHourly.success = true;
+      results.revenueHourly.count = revenueData.length;
 
-    results.revenueHourly.success = true;
-    results.revenueHourly.count = revenueData.length;
-
-    console.log(`Revenue hourly: ${revenueData.length} rows inserted`);
+      console.log(`Revenue hourly: ${revenueData.length} rows inserted`);
+    }
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
@@ -155,19 +159,23 @@ export const handler: Handler<ScheduledEvent> = async (event) => {
   try {
     console.log(`Fetching revenue fill rate data for ${revenueDate}`);
 
-    // 기존 데이터 삭제 (중복 방지)
-    await bigqueryClient.deleteExistingData(
+    // 기존 데이터 삭제 (중복 방지) - streaming buffer 에러 시 skip
+    const deleted = await bigqueryClient.deleteExistingData(
       'revenue_hourly_fill_rate',
       revenueDate
     );
+    if (!deleted) {
+      console.log('Skipping revenue fill rate collection - data in streaming buffer');
+      results.revenueFillRate.error = 'Skipped - data in streaming buffer';
+    } else {
+      const fillRateData = await applovinClient.fetchRevenueFillRate(revenueDate);
+      await bigqueryClient.insertRevenueFillRate(fillRateData);
 
-    const fillRateData = await applovinClient.fetchRevenueFillRate(revenueDate);
-    await bigqueryClient.insertRevenueFillRate(fillRateData);
+      results.revenueFillRate.success = true;
+      results.revenueFillRate.count = fillRateData.length;
 
-    results.revenueFillRate.success = true;
-    results.revenueFillRate.count = fillRateData.length;
-
-    console.log(`Revenue fill rate: ${fillRateData.length} rows inserted`);
+      console.log(`Revenue fill rate: ${fillRateData.length} rows inserted`);
+    }
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
@@ -175,25 +183,30 @@ export const handler: Handler<ScheduledEvent> = async (event) => {
     console.error('Revenue fill rate collection failed:', errorMessage);
   }
 
-  // 3. User-Level API 데이터 수집 (Android)
+  // 3. User-Level API 데이터 수집 (Android) - 스트리밍 처리
   try {
     console.log(`Fetching Android impressions for ${userLevelDate}`);
 
-    // 기존 데이터 삭제 (플랫폼별로 중복 방지)
-    await bigqueryClient.deleteExistingData('impressions', userLevelDate, 'android');
+    // 기존 데이터 삭제 (플랫폼별로 중복 방지) - streaming buffer 에러 시 skip
+    const deleted = await bigqueryClient.deleteExistingData('impressions', userLevelDate, 'android');
+    if (!deleted) {
+      console.log('Skipping Android impressions collection - data in streaming buffer');
+      results.impressions.android.error = 'Skipped - data in streaming buffer';
+    } else {
+      let androidTotal = 0;
+      for await (const batch of applovinClient.fetchUserLevelImpressionsStream(
+        userLevelDate,
+        'android'
+      )) {
+        await bigqueryClient.insertImpressions(batch);
+        androidTotal += batch.length;
+      }
 
-    const androidImpressions = await applovinClient.fetchUserLevelImpressions(
-      userLevelDate,
-      'android'
-    );
-    await bigqueryClient.insertImpressions(androidImpressions);
+      results.impressions.android.success = true;
+      results.impressions.android.count = androidTotal;
 
-    results.impressions.android.success = true;
-    results.impressions.android.count = androidImpressions.length;
-
-    console.log(
-      `Android impressions: ${androidImpressions.length} rows inserted`
-    );
+      console.log(`Android impressions: ${androidTotal} rows inserted`);
+    }
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
@@ -201,23 +214,30 @@ export const handler: Handler<ScheduledEvent> = async (event) => {
     console.error('Android impressions collection failed:', errorMessage);
   }
 
-  // 4. User-Level API 데이터 수집 (iOS)
+  // 4. User-Level API 데이터 수집 (iOS) - 스트리밍 처리
   try {
     console.log(`Fetching iOS impressions for ${userLevelDate}`);
 
-    // 기존 데이터 삭제 (플랫폼별로 중복 방지)
-    await bigqueryClient.deleteExistingData('impressions', userLevelDate, 'ios');
+    // 기존 데이터 삭제 (플랫폼별로 중복 방지) - streaming buffer 에러 시 skip
+    const deleted = await bigqueryClient.deleteExistingData('impressions', userLevelDate, 'ios');
+    if (!deleted) {
+      console.log('Skipping iOS impressions collection - data in streaming buffer');
+      results.impressions.ios.error = 'Skipped - data in streaming buffer';
+    } else {
+      let iosTotal = 0;
+      for await (const batch of applovinClient.fetchUserLevelImpressionsStream(
+        userLevelDate,
+        'ios'
+      )) {
+        await bigqueryClient.insertImpressions(batch);
+        iosTotal += batch.length;
+      }
 
-    const iosImpressions = await applovinClient.fetchUserLevelImpressions(
-      userLevelDate,
-      'ios'
-    );
-    await bigqueryClient.insertImpressions(iosImpressions);
+      results.impressions.ios.success = true;
+      results.impressions.ios.count = iosTotal;
 
-    results.impressions.ios.success = true;
-    results.impressions.ios.count = iosImpressions.length;
-
-    console.log(`iOS impressions: ${iosImpressions.length} rows inserted`);
+      console.log(`iOS impressions: ${iosTotal} rows inserted`);
+    }
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';

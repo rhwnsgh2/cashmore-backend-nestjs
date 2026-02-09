@@ -203,12 +203,14 @@ export class BigQueryClient {
 
   /**
    * 중복 데이터 삭제 (재수집 시)
+   * BigQuery streaming buffer에 데이터가 있으면 DELETE 불가 - 이 경우 skip
+   * @returns true if deleted or no data, false if skipped due to streaming buffer
    */
   async deleteExistingData(
     tableName: 'revenue_hourly' | 'revenue_hourly_fill_rate' | 'impressions',
     date: string,
     platform?: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     const dateColumn = tableName === 'impressions' ? 'collected_date' : 'date';
 
     let query = `
@@ -220,9 +222,21 @@ export class BigQueryClient {
       query += ` AND platform = '${platform}'`;
     }
 
-    await this.client.query(query);
-    console.log(
-      `Deleted existing data for ${date}${platform ? ` (${platform})` : ''} from ${tableName}`
-    );
+    try {
+      await this.client.query(query);
+      console.log(
+        `Deleted existing data for ${date}${platform ? ` (${platform})` : ''} from ${tableName}`
+      );
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('streaming buffer')) {
+        console.log(
+          `Skipping delete for ${date}${platform ? ` (${platform})` : ''} from ${tableName} - data in streaming buffer (will result in duplicates)`
+        );
+        return false;
+      }
+      throw error;
+    }
   }
 }

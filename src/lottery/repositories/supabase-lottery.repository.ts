@@ -36,6 +36,26 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
     return (data as Lottery[]) || [];
   }
 
+  async findLotteryById(lotteryId: string): Promise<Lottery | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('lotteries')
+      .select(
+        'id, user_id, lottery_type_id, status, issued_at, expires_at, reward_amount, used_at',
+      )
+      .eq('id', lotteryId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw error;
+    }
+
+    return data as Lottery;
+  }
+
   async insertLottery(data: InsertLotteryData): Promise<Lottery> {
     const { data: result, error } = await this.supabaseService
       .getClient()

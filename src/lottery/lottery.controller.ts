@@ -14,6 +14,10 @@ import {
   ShowAdAndClaimRequestDto,
   ShowAdAndClaimResponseDto,
 } from './dto/issue-lottery.dto';
+import {
+  UseLotteryRequestDto,
+  UseLotteryResponseDto,
+} from './dto/use-lottery.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { LotteryType } from './interfaces/lottery-repository.interface';
@@ -104,5 +108,22 @@ export class LotteryController {
         usedAt: lottery.usedAt,
       },
     };
+  }
+
+  @Post('use')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '복권 사용',
+    description:
+      '발급된 복권을 사용하여 포인트를 지급받습니다. ISSUED 상태의 복권만 사용 가능합니다.',
+  })
+  @ApiResponse({ status: 201, type: UseLotteryResponseDto })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async useLottery(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: UseLotteryRequestDto,
+  ): Promise<UseLotteryResponseDto> {
+    return this.lotteryService.useLottery(userId, dto.lotteryId);
   }
 }
