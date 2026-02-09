@@ -25,6 +25,7 @@ import { InviteCodeModule } from './invite-code/invite-code.module';
 import { NotificationSettingsModule } from './notification-settings/notification-settings.module';
 import { StepRewardsModule } from './step-rewards/step-rewards.module';
 import { WatchedAdModule } from './watched-ad/watched-ad.module';
+import { LocalPromotionModule } from './local-promotion/local-promotion.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -66,6 +67,7 @@ import configuration from './config/configuration';
     NotificationSettingsModule,
     StepRewardsModule,
     WatchedAdModule,
+    LocalPromotionModule,
   ],
   controllers: [AppController],
   providers: [

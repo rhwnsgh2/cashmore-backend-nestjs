@@ -35,6 +35,14 @@ export class StubNotificationSettingsRepository implements INotificationSettings
     this.userMarketingInfo.clear();
   }
 
+  findNotificationSetting(
+    userId: string,
+    type: NotificationType,
+  ): Promise<NotificationSetting | null> {
+    const setting = this.settings.get(this.makeKey(userId, type));
+    return Promise.resolve(setting ?? null);
+  }
+
   upsertNotificationSetting(
     userId: string,
     type: NotificationType,

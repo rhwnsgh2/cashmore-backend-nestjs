@@ -2,12 +2,34 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
 import type {
   INotificationSettingsRepository,
+  NotificationSetting,
   NotificationType,
 } from '../interfaces/notification-settings-repository.interface';
 
 @Injectable()
-export class SupabaseNotificationSettingsRepository implements INotificationSettingsRepository {
+export class SupabaseNotificationSettingsRepository
+  implements INotificationSettingsRepository
+{
   constructor(private supabaseService: SupabaseService) {}
+
+  async findNotificationSetting(
+    userId: string,
+    type: NotificationType,
+  ): Promise<NotificationSetting | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('notification_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('type', type)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data as NotificationSetting | null;
+  }
 
   async upsertNotificationSetting(
     userId: string,

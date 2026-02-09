@@ -11,6 +11,11 @@ export interface NotificationSetting {
 }
 
 export interface INotificationSettingsRepository {
+  findNotificationSetting(
+    userId: string,
+    type: NotificationType,
+  ): Promise<NotificationSetting | null>;
+
   upsertNotificationSetting(
     userId: string,
     type: NotificationType,

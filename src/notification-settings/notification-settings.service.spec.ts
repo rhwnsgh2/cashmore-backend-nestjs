@@ -79,4 +79,76 @@ describe('NotificationSettingsService', () => {
       ).toBeGreaterThanOrEqual(new Date(firstUpdatedAt!).getTime());
     });
   });
+
+  describe('getNotificationSetting', () => {
+    it('설정이 없으면 기본값 (enabled: false)을 반환한다', async () => {
+      const result = await service.getNotificationSetting(userId, 'AD_LOTTERY');
+
+      expect(result).toEqual({
+        userId,
+        type: 'AD_LOTTERY',
+        enabled: false,
+      });
+    });
+
+    it('설정이 있으면 해당 값을 반환한다', async () => {
+      await repository.upsertNotificationSetting(userId, 'AD_LOTTERY', true);
+
+      const result = await service.getNotificationSetting(userId, 'AD_LOTTERY');
+
+      expect(result).toEqual({
+        userId,
+        type: 'AD_LOTTERY',
+        enabled: true,
+      });
+    });
+
+    it('잘못된 타입이면 BadRequestException을 던진다', async () => {
+      await expect(
+        service.getNotificationSetting(userId, 'INVALID_TYPE'),
+      ).rejects.toThrow('Invalid notification type');
+    });
+  });
+
+  describe('updateNotificationSetting', () => {
+    it('알림 설정을 활성화한다', async () => {
+      const result = await service.updateNotificationSetting(
+        userId,
+        'AD_LOTTERY',
+        true,
+      );
+
+      expect(result).toEqual({
+        success: true,
+        message: '알림 설정이 업데이트되었습니다.',
+      });
+
+      const setting = repository.getSettings(userId, 'AD_LOTTERY');
+      expect(setting?.is_enabled).toBe(true);
+    });
+
+    it('알림 설정을 비활성화한다', async () => {
+      await repository.upsertNotificationSetting(userId, 'AD_LOTTERY', true);
+
+      const result = await service.updateNotificationSetting(
+        userId,
+        'AD_LOTTERY',
+        false,
+      );
+
+      expect(result).toEqual({
+        success: true,
+        message: '알림 설정이 업데이트되었습니다.',
+      });
+
+      const setting = repository.getSettings(userId, 'AD_LOTTERY');
+      expect(setting?.is_enabled).toBe(false);
+    });
+
+    it('잘못된 타입이면 BadRequestException을 던진다', async () => {
+      await expect(
+        service.updateNotificationSetting(userId, 'INVALID_TYPE', true),
+      ).rejects.toThrow('Invalid notification type');
+    });
+  });
 });
