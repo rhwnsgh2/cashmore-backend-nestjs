@@ -316,9 +316,9 @@ describe('LotteryService', () => {
         },
       ]);
 
-      await expect(
-        service.useLottery(userId, 'lottery-other'),
-      ).rejects.toThrow('본인의 복권만 사용할 수 있습니다.');
+      await expect(service.useLottery(userId, 'lottery-other')).rejects.toThrow(
+        '본인의 복권만 사용할 수 있습니다.',
+      );
     });
 
     it('USED 상태의 복권이면 BadRequestException을 던진다', async () => {
@@ -337,9 +337,9 @@ describe('LotteryService', () => {
         },
       ]);
 
-      await expect(
-        service.useLottery(userId, 'lottery-used'),
-      ).rejects.toThrow('복권 상태가 올바르지 않습니다.');
+      await expect(service.useLottery(userId, 'lottery-used')).rejects.toThrow(
+        '복권 상태가 올바르지 않습니다.',
+      );
     });
 
     it('EXPIRED 상태의 복권이면 BadRequestException을 던진다', async () => {

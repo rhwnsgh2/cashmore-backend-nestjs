@@ -12,6 +12,6 @@ export class StubFcmRepository implements IFcmRepository {
   }
 
   async findFcmToken(userId: string): Promise<string | null> {
-    return this.tokens.get(userId) ?? null;
+    return Promise.resolve(this.tokens.get(userId) ?? null);
   }
 }
