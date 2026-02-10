@@ -71,6 +71,45 @@ describe('WatchedAd API (e2e)', () => {
 
       expect(typeof response.body).toBe('boolean');
     });
+
+    it('새 유저는 광고 시청 여부가 false이다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .get('/watched-ad-status')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toBe(false);
+    });
+
+    it('다른 유저가 광고를 시청해도 내 상태는 영향받지 않는다', async () => {
+      const userA = await createTestUser(supabase);
+      const userB = await createTestUser(supabase);
+      const tokenA = generateTestToken(userA.auth_id);
+      const tokenB = generateTestToken(userB.auth_id);
+
+      // User A가 광고 시청
+      await request(app.getHttpServer())
+        .post('/watched-ad-status')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(201);
+
+      // User A는 true
+      const responseA = await request(app.getHttpServer())
+        .get('/watched-ad-status')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+      expect(responseA.body).toBe(true);
+
+      // User B는 여전히 false
+      const responseB = await request(app.getHttpServer())
+        .get('/watched-ad-status')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200);
+      expect(responseB.body).toBe(false);
+    });
   });
 
   describe('POST /watched-ad-status', () => {

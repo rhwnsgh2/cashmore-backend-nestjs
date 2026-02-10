@@ -26,7 +26,7 @@ export class WatchedAdController {
     schema: { type: 'boolean' },
   })
   async getWatchedAdStatus(
-    @CurrentUser() userId: string,
+    @CurrentUser('userId') userId: string,
     @Res() res: Response,
   ): Promise<void> {
     const watched = await this.watchedAdService.getWatchedAdStatus(userId);
@@ -43,7 +43,7 @@ export class WatchedAdController {
     type: WatchedAdSetResponseDto,
   })
   async setWatchedAdStatus(
-    @CurrentUser() userId: string,
+    @CurrentUser('userId') userId: string,
   ): Promise<WatchedAdSetResponseDto> {
     return this.watchedAdService.setWatchedAdStatus(userId);
   }
