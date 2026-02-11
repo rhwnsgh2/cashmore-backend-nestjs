@@ -18,6 +18,7 @@ export interface PointTotalResult {
   totalPoint: number;
   expiringPoints: number;
   expiringDate: string;
+  todayPoint: number;
   lastWeekPoint: number;
   weeklyPoint: number;
 }
@@ -36,31 +37,50 @@ export class PointService {
     const expiringPoints = await this.calculateExpiringPoints(userId);
     const expiringDate = now.endOf('month').format('YYYY-MM-DD');
 
+    // 오늘
+    const todayStart = now.startOf('day');
+
     // 이번주 월요일 ~ 다음주 월요일
     const thisWeekStart = now.startOf('week').add(1, 'day'); // 월요일
-    const thisWeekEnd = thisWeekStart.add(7, 'day');
 
-    // 지난주 월요일 ~ 이번주 월요일
+    // 지난주 월요일
     const lastWeekStart = thisWeekStart.subtract(7, 'day');
-    const lastWeekEnd = thisWeekStart;
 
-    const [lastWeekPoint, weeklyPoint] = await Promise.all([
-      this.pointRepository.findEarnedPointsBetween(
+    // 지난주 월요일 ~ 현재까지 범위로 한 번에 조회
+    const earnedActions =
+      await this.pointRepository.findEarnedPointActionsInRange(
         userId,
         lastWeekStart.toISOString(),
-        lastWeekEnd.toISOString(),
-      ),
-      this.pointRepository.findEarnedPointsBetween(
-        userId,
-        thisWeekStart.toISOString(),
-        thisWeekEnd.toISOString(),
-      ),
-    ]);
+        now.toISOString(),
+      );
+
+    // JS에서 기간별로 필터링하여 합산
+    const todayStartMs = todayStart.valueOf();
+    const thisWeekStartMs = thisWeekStart.valueOf();
+    const lastWeekStartMs = lastWeekStart.valueOf();
+
+    let todayPoint = 0;
+    let weeklyPoint = 0;
+    let lastWeekPoint = 0;
+
+    for (const action of earnedActions) {
+      const createdAtMs = dayjs(action.created_at).valueOf();
+
+      if (createdAtMs >= todayStartMs) {
+        todayPoint += action.point_amount;
+      }
+      if (createdAtMs >= thisWeekStartMs) {
+        weeklyPoint += action.point_amount;
+      } else if (createdAtMs >= lastWeekStartMs) {
+        lastWeekPoint += action.point_amount;
+      }
+    }
 
     return {
       totalPoint,
       expiringPoints,
       expiringDate,
+      todayPoint,
       lastWeekPoint,
       weeklyPoint,
     };

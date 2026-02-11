@@ -49,6 +49,11 @@ export interface WithdrawalAction {
   type: string;
 }
 
+export interface EarnedPointAction {
+  point_amount: number;
+  created_at: string;
+}
+
 // Repository 인터페이스
 export interface IPointRepository {
   findLatestSnapshot(userId: string): Promise<PointSnapshot | null>;
@@ -64,6 +69,11 @@ export interface IPointRepository {
     startDate: string,
     endDate: string,
   ): Promise<number>;
+  findEarnedPointActionsInRange(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<EarnedPointAction[]>;
 }
 
 // DI 토큰

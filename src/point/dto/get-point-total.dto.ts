@@ -20,6 +20,12 @@ export class PointTotalResponseDto {
   expiringDate: string;
 
   @ApiProperty({
+    description: '오늘 적립 포인트',
+    example: 50,
+  })
+  todayPoint: number;
+
+  @ApiProperty({
     description: '지난주 적립 포인트 (월~일 기준)',
     example: 500,
   })
