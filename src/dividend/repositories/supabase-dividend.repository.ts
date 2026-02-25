@@ -13,12 +13,12 @@ export class SupabaseDividendRepository implements IDividendRepository {
     startDate: string,
     endDate: string,
   ): Promise<SimulateResult> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = (await this.supabaseService
       .getClient()
       .rpc('get_receipt_user_distribution', {
         start_date: startDate,
         end_date: endDate,
-      });
+      } as any)) as { data: any; error: any };
 
     if (error) {
       throw error;
