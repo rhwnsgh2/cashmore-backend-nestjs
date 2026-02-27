@@ -27,7 +27,9 @@ export class PostbackBodyDto {
   @IsString()
   title?: string;
 
-  @ApiPropertyOptional({ description: '포인트 지급 시점 (UNIX Timestamp 초단위)' })
+  @ApiPropertyOptional({
+    description: '포인트 지급 시점 (UNIX Timestamp 초단위)',
+  })
   @IsOptional()
   @IsString()
   event_at?: string;

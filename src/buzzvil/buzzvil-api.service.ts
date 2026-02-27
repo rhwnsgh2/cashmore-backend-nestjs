@@ -21,21 +21,7 @@ export class BuzzvilApiService {
     userAgent?: string;
     cursor?: string;
   }) {
-    const revenueTypes = JSON.stringify([
-      'cpa',
-      'cpq',
-      'cpqlite',
-      'cpk',
-      'cpl',
-      'cpyoutube',
-      'cpylike',
-      'cpinsta',
-      'cps',
-      'cptiktok',
-      'cpnstore',
-      'cpe',
-      'cpcquiz',
-    ]);
+    const revenueTypes = JSON.stringify(['cpa']);
 
     const appConfig =
       params.platform === 'A' ? BUZZVIL_CONFIG.aos : BUZZVIL_CONFIG.ios;
