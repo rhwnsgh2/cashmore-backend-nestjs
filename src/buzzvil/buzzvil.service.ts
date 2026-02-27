@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { BuzzvilApiService } from './buzzvil-api.service';
 import { AuthService } from '../auth/auth.service';
 import { GetAdsQueryDto } from './dto/get-ads.dto';

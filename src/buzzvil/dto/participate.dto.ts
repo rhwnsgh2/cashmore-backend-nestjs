@@ -14,7 +14,8 @@ export class ParticipateRequestDto {
   payload: string;
 
   @ApiPropertyOptional({
-    description: '광고식별자 (GAID/IDFA). 없으면 00000000-0000-0000-0000-000000000000 사용',
+    description:
+      '광고식별자 (GAID/IDFA). 없으면 00000000-0000-0000-0000-000000000000 사용',
     example: 'ab4ade35-1c8a-4405-acda-10ca1ad1abe1',
   })
   @IsOptional()

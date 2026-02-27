@@ -10,9 +10,7 @@ import { BUZZVIL_POSTBACK_WHITELIST_IPS } from '../buzzvil.constants';
 @Injectable()
 export class IpWhitelistGuard implements CanActivate {
   private readonly logger = new Logger(IpWhitelistGuard.name);
-  private readonly allowedIps = new Set<string>(
-    BUZZVIL_POSTBACK_WHITELIST_IPS,
-  );
+  private readonly allowedIps = new Set<string>(BUZZVIL_POSTBACK_WHITELIST_IPS);
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();

@@ -82,9 +82,9 @@ describe('BuzzvilService', () => {
     it('중복 transaction_id → ConflictException', async () => {
       await service.handlePostback(buildPostbackDto());
 
-      await expect(
-        service.handlePostback(buildPostbackDto()),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.handlePostback(buildPostbackDto())).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('탈퇴 유저 (매핑 실패) → 200 반환, 저장 안 함', async () => {
@@ -101,18 +101,12 @@ describe('BuzzvilService', () => {
     it('적립됨 → { credited: true, point }', async () => {
       await service.handlePostback(buildPostbackDto());
 
-      const result = await service.getRewardStatus(
-        'user-uuid-123',
-        10075328,
-      );
+      const result = await service.getRewardStatus('user-uuid-123', 10075328);
       expect(result).toEqual({ credited: true, point: 100 });
     });
 
     it('미적립 → { credited: false }', async () => {
-      const result = await service.getRewardStatus(
-        'user-uuid-123',
-        99999,
-      );
+      const result = await service.getRewardStatus('user-uuid-123', 99999);
       expect(result).toEqual({ credited: false });
     });
   });

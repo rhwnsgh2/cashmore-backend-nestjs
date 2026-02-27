@@ -11,11 +11,13 @@ describe('BuzzvilApiService', () => {
   let httpPost: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    httpGet = vi.fn().mockReturnValue(
-      of({ data: { code: 200, ads: [], cursor: '' } }),
-    );
+    httpGet = vi
+      .fn()
+      .mockReturnValue(of({ data: { code: 200, ads: [], cursor: '' } }));
     httpPost = vi.fn().mockReturnValue(
-      of({ data: { code: 200, msg: 'ok', landing_url: 'https://example.com' } }),
+      of({
+        data: { code: 200, msg: 'ok', landing_url: 'https://example.com' },
+      }),
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -127,9 +129,11 @@ describe('BuzzvilApiService', () => {
       await service.participate(requiredParams);
 
       expect(httpPost).toHaveBeenCalledOnce();
-      const [url, body, config] = httpPost.mock.calls[0];
+      const [url, _body, config] = httpPost.mock.calls[0];
       expect(url).toContain('/api/participate');
-      expect(config.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+      expect(config.headers['Content-Type']).toBe(
+        'application/x-www-form-urlencoded',
+      );
       expect(config.headers['Buzz-App-ID']).toBe(BUZZVIL_CONFIG.aos.appId);
       expect(config.headers['Buzz-Publisher-User-ID']).toBe('auth-123');
       expect(config.headers['Buzz-IFA']).toBe('ifa-uuid');
