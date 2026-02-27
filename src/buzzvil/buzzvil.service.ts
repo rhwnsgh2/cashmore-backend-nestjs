@@ -83,11 +83,11 @@ export class BuzzvilService {
       additional_data: {
         transaction_id: dto.transaction_id,
         campaign_id: Number(dto.campaign_id),
-        action_type: dto.action_type,
-        revenue_type: dto.revenue_type,
+        action_type: dto.action_type || '',
+        revenue_type: dto.revenue_type || '',
         title: dto.title || '',
-        unit_id: dto.unit_id,
-        event_at: Number(dto.event_at),
+        unit_id: dto.unit_id || '',
+        event_at: Number(dto.event_at) || 0,
       },
     });
 

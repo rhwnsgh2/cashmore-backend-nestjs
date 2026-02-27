@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Logger,
   Post,
   Query,
   Req,
@@ -26,6 +27,8 @@ import type { Request } from 'express';
 @ApiTags('Buzzvil')
 @Controller('buzzvil')
 export class BuzzvilController {
+  private readonly logger = new Logger(BuzzvilController.name);
+
   constructor(private buzzvilService: BuzzvilService) {}
 
   @Get('ads')
@@ -65,7 +68,10 @@ export class BuzzvilController {
   @ApiOperation({ summary: '포스트백 수신 (Buzzvil → 서버)' })
   @ApiResponse({ status: 200, description: '적립 성공' })
   @ApiResponse({ status: 409, description: '이미 처리된 건' })
-  async postback(@Body() dto: PostbackBodyDto) {
+  async postback(@Body() dto: PostbackBodyDto, @Req() req: Request) {
+    this.logger.log(
+      `Postback received: content-type=${req.headers['content-type']}, body=${JSON.stringify(req.body)}`,
+    );
     return this.buzzvilService.handlePostback(dto);
   }
 

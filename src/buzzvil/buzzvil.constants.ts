@@ -1,5 +1,5 @@
 type BuzzvilEnv = 'dev' | 'op';
-const ENV: BuzzvilEnv = 'dev'; // 환경 전환 시 수동 변경
+const ENV: BuzzvilEnv = 'op'; // 환경 전환 시 수동 변경
 
 const API_BASE_URLS: Record<BuzzvilEnv, string> = {
   dev: 'https://screen-api-staging.buzzvil.com',

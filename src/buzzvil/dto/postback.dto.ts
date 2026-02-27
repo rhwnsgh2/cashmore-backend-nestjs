@@ -17,30 +17,30 @@ export class PostbackBodyDto {
   @IsNotEmpty()
   point: string;
 
-  @ApiProperty({ description: '광고 지면 ID' })
+  @ApiPropertyOptional({ description: '광고 지면 ID' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  unit_id: string;
+  unit_id?: string;
 
   @ApiPropertyOptional({ description: '광고 이름' })
   @IsOptional()
   @IsString()
   title?: string;
 
-  @ApiProperty({ description: '포인트 지급 시점 (UNIX Timestamp 초단위)' })
+  @ApiPropertyOptional({ description: '포인트 지급 시점 (UNIX Timestamp 초단위)' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  event_at: string;
+  event_at?: string;
 
-  @ApiProperty({ description: '유저 액션 타입' })
+  @ApiPropertyOptional({ description: '유저 액션 타입' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  action_type: string;
+  action_type?: string;
 
-  @ApiProperty({ description: '광고 유형 (cpc, cpm, cpa 등)' })
+  @ApiPropertyOptional({ description: '광고 유형 (cpc, cpm, cpa 등)' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  revenue_type: string;
+  revenue_type?: string;
 
   @ApiProperty({ description: '캠페인 ID' })
   @IsString()
