@@ -26,7 +26,7 @@ import { NotificationSettingsModule } from './notification-settings/notification
 import { StepRewardsModule } from './step-rewards/step-rewards.module';
 import { WatchedAdModule } from './watched-ad/watched-ad.module';
 import { LocalPromotionModule } from './local-promotion/local-promotion.module';
-import { DividendModule } from './dividend/dividend.module';
+import { BuzzvilModule } from './buzzvil/buzzvil.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -69,7 +69,7 @@ import configuration from './config/configuration';
     StepRewardsModule,
     WatchedAdModule,
     LocalPromotionModule,
-    DividendModule,
+    BuzzvilModule,
   ],
   controllers: [AppController],
   providers: [

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import compression from 'compression';
 import morgan from 'morgan';
 import { AppModule } from './app.module';
 
@@ -17,6 +18,7 @@ async function bootstrap() {
   expressApp.set('trust proxy', true);
 
   app.use(helmet());
+  app.use(compression());
   app.enableCors();
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
 

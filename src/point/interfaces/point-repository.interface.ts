@@ -17,6 +17,8 @@ export const POINT_ADD_TYPES = [
   'LOTTERY',
   'STEP_REWARD_3000',
   'STEP_REWARD_5000',
+  'DIVIDEND',
+  'BUZZVIL_REWARD',
 ] as const;
 
 // 포인트 차감 타입 (status가 "done" 또는 "pending"일 때)

@@ -42,4 +42,20 @@ export class AuthService {
     this.userIdCache.set(token, data.id);
     return data.id;
   }
+
+  async getUserIdByAuthId(authId: string): Promise<string | null> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('user')
+      .select('id')
+      .eq('auth_id', authId)
+      .single<UserIdResult>();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data.id;
+  }
 }

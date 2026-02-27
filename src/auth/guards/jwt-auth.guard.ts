@@ -31,13 +31,13 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
 
-    // if (process.env.NODE_ENV === 'development') {
-    //   request.user = {
-    //     userId: '1ac5ab80-1dc4-4eb7-9c6c-675a497b87db',
-    //     authId: 'b9576661-787e-4631-8395-51917044997d',
-    //   };
-    //   return true;
-    // }
+    if (process.env.NODE_ENV === 'development') {
+      request.user = {
+        userId: 'f557fdba-0c63-4a6e-a9fd-8ccc7a5dc460',
+        authId: 'df508abd-13bd-4a21-a53c-335acf21f24d',
+      };
+      return true;
+    }
     if (!token) {
       this.logger.warn('No token provided in request');
       throw new UnauthorizedException('No token provided');
