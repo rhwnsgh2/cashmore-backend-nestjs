@@ -3,6 +3,7 @@ export interface BuzzvilReward {
   point_amount: number;
   campaign_id: number;
   transaction_id: string;
+  title: string;
 }
 
 export interface InsertBuzzvilPointAction {
@@ -28,6 +29,7 @@ export interface IBuzzvilRepository {
     userId: string,
     campaignId: number,
   ): Promise<BuzzvilReward | null>;
+  findRewardsSince(userId: string, since: string): Promise<BuzzvilReward[]>;
 }
 
 export const BUZZVIL_REPOSITORY = Symbol('BUZZVIL_REPOSITORY');

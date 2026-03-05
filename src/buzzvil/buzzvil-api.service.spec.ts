@@ -55,7 +55,7 @@ describe('BuzzvilApiService', () => {
         ifa: 'ifa-uuid',
         platform: 'A',
         country: 'KR',
-        target_fill: 5,
+        target_fill: 1,
       });
     });
 

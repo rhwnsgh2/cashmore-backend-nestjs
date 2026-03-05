@@ -34,7 +34,21 @@ export class StubBuzzvilRepository implements IBuzzvilRepository {
       point_amount: found.point_amount,
       campaign_id: found.additional_data.campaign_id,
       transaction_id: found.additional_data.transaction_id,
+      title: found.additional_data.title,
     });
+  }
+
+  findRewardsSince(userId: string, _since: string): Promise<BuzzvilReward[]> {
+    const rewards = this.pointActions
+      .filter((a) => a.user_id === userId)
+      .map((a) => ({
+        user_id: a.user_id,
+        point_amount: a.point_amount,
+        campaign_id: a.additional_data.campaign_id,
+        transaction_id: a.additional_data.transaction_id,
+        title: a.additional_data.title,
+      }));
+    return Promise.resolve(rewards);
   }
 
   getAll(): InsertBuzzvilPointAction[] {

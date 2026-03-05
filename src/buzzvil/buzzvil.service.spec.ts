@@ -98,16 +98,47 @@ describe('BuzzvilService', () => {
   });
 
   describe('getRewardStatus', () => {
-    it('적립됨 → { credited: true, point }', async () => {
+    it('적립됨 → rewards 배열 + total_point 반환', async () => {
       await service.handlePostback(buildPostbackDto());
 
-      const result = await service.getRewardStatus('user-uuid-123', 10075328);
-      expect(result).toEqual({ credited: true, point: 100 });
+      const result = await service.getRewardStatus(
+        'user-uuid-123',
+        '2020-01-01T00:00:00.000Z',
+      );
+      expect(result.rewards).toHaveLength(1);
+      expect(result.rewards[0]).toEqual({
+        campaign_id: 10075328,
+        point: 100,
+        title: '11번가 신선밥상',
+      });
+      expect(result.total_point).toBe(100);
     });
 
-    it('미적립 → { credited: false }', async () => {
-      const result = await service.getRewardStatus('user-uuid-123', 99999);
-      expect(result).toEqual({ credited: false });
+    it('여러 건 적립 → 모두 반환 + total_point 합산', async () => {
+      await service.handlePostback(buildPostbackDto());
+      await service.handlePostback(
+        buildPostbackDto({
+          transaction_id: 'txn-002',
+          campaign_id: '99999',
+          point: '50',
+          title: '보너스 리워드',
+        }),
+      );
+
+      const result = await service.getRewardStatus(
+        'user-uuid-123',
+        '2020-01-01T00:00:00.000Z',
+      );
+      expect(result.rewards).toHaveLength(2);
+      expect(result.total_point).toBe(150);
+    });
+
+    it('미적립 → 빈 배열 + total_point 0', async () => {
+      const result = await service.getRewardStatus(
+        'user-uuid-123',
+        '2020-01-01T00:00:00.000Z',
+      );
+      expect(result).toEqual({ rewards: [], total_point: 0 });
     });
   });
 });

@@ -69,6 +69,40 @@ export class SupabaseBuzzvilRepository implements IBuzzvilRepository {
       point_amount: data.point_amount,
       campaign_id: data.additional_data.campaign_id as number,
       transaction_id: data.additional_data.transaction_id as string,
+      title: (data.additional_data.title as string) || '',
     };
+  }
+
+  async findRewardsSince(
+    userId: string,
+    since: string,
+  ): Promise<BuzzvilReward[]> {
+    interface PointActionRow {
+      user_id: string;
+      point_amount: number;
+      additional_data: Record<string, unknown>;
+    }
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .select('user_id, point_amount, additional_data')
+      .eq('user_id', userId)
+      .eq('type', 'BUZZVIL_REWARD')
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .returns<PointActionRow[]>();
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map((row) => ({
+      user_id: row.user_id,
+      point_amount: row.point_amount,
+      campaign_id: row.additional_data.campaign_id as number,
+      transaction_id: row.additional_data.transaction_id as string,
+      title: (row.additional_data.title as string) || '',
+    }));
   }
 }

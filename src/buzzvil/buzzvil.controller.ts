@@ -78,12 +78,12 @@ export class BuzzvilController {
   @Get('reward-status')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '포인트 적립 확인 (폴링)' })
-  @ApiResponse({ status: 200, description: '적립 상태' })
+  @ApiOperation({ summary: '최근 적립 내역 조회 (폴링)' })
+  @ApiResponse({ status: 200, description: '적립 내역' })
   async getRewardStatus(
     @CurrentUser('userId') userId: string,
-    @Query('campaign_id') campaignId: string,
+    @Query('since') since: string,
   ) {
-    return this.buzzvilService.getRewardStatus(userId, Number(campaignId));
+    return this.buzzvilService.getRewardStatus(userId, since);
   }
 }

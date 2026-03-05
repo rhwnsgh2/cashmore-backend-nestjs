@@ -96,25 +96,26 @@ describe('Buzzvil API (e2e) - Real DB', () => {
   describe('GET /buzzvil/reward-status', () => {
     let testUser: TestUser;
     let token: string;
+    let sinceTimestamp: string;
 
     beforeEach(async () => {
       await truncateAllTables();
       testUser = await createTestUser(supabase);
       token = generateTestToken(testUser.auth_id);
+      sinceTimestamp = new Date().toISOString();
     });
 
-    it('미적립 → { credited: false }', async () => {
+    it('미적립 → 빈 배열 + total_point 0', async () => {
       const response = await request(app.getHttpServer())
         .get('/buzzvil/reward-status')
-        .query({ campaign_id: '99999' })
+        .query({ since: sinceTimestamp })
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body).toEqual({ credited: false });
+      expect(response.body).toEqual({ rewards: [], total_point: 0 });
     });
 
-    it('적립 완료 → { credited: true, point }', async () => {
-      // 포스트백으로 적립
+    it('적립 완료 → rewards 배열 + total_point', async () => {
       const body = buildPostbackBody({
         user_id: testUser.auth_id,
         campaign_id: '10075328',
@@ -126,39 +127,67 @@ describe('Buzzvil API (e2e) - Real DB', () => {
         .send(body)
         .expect(200);
 
-      // 적립 확인
       const response = await request(app.getHttpServer())
         .get('/buzzvil/reward-status')
-        .query({ campaign_id: '10075328' })
+        .query({ since: sinceTimestamp })
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body).toEqual({ credited: true, point: 200 });
+      expect(response.body.rewards).toHaveLength(1);
+      expect(response.body.rewards[0].campaign_id).toBe(10075328);
+      expect(response.body.rewards[0].point).toBe(200);
+      expect(response.body.total_point).toBe(200);
+    });
+
+    it('여러 건 적립 → 모두 반환 + total_point 합산', async () => {
+      await request(app.getHttpServer())
+        .post('/buzzvil/postback')
+        .send(buildPostbackBody({
+          user_id: testUser.auth_id,
+          campaign_id: '10075328',
+          point: '100',
+        }))
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post('/buzzvil/postback')
+        .send(buildPostbackBody({
+          user_id: testUser.auth_id,
+          campaign_id: '99999',
+          point: '50',
+          title: '보너스',
+        }))
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get('/buzzvil/reward-status')
+        .query({ since: sinceTimestamp })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.rewards).toHaveLength(2);
+      expect(response.body.total_point).toBe(150);
     });
 
     it('다른 유저의 적립은 조회 불가', async () => {
       const otherUser = await createTestUser(supabase);
 
-      // 다른 유저에게 포스트백 적립
-      const body = buildPostbackBody({
-        user_id: otherUser.auth_id,
-        campaign_id: '10075328',
-        point: '100',
-      });
-
       await request(app.getHttpServer())
         .post('/buzzvil/postback')
-        .send(body)
+        .send(buildPostbackBody({
+          user_id: otherUser.auth_id,
+          campaign_id: '10075328',
+          point: '100',
+        }))
         .expect(200);
 
-      // 현재 유저로 조회 → 미적립
       const response = await request(app.getHttpServer())
         .get('/buzzvil/reward-status')
-        .query({ campaign_id: '10075328' })
+        .query({ since: sinceTimestamp })
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body).toEqual({ credited: false });
+      expect(response.body).toEqual({ rewards: [], total_point: 0 });
     });
   });
 

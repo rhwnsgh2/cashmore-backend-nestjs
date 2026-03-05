@@ -98,14 +98,19 @@ export class BuzzvilService {
     return { message: 'OK' };
   }
 
-  async getRewardStatus(userId: string, campaignId: number) {
-    const reward = await this.buzzvilRepository.findRewardByCampaignId(
+  async getRewardStatus(userId: string, since: string) {
+    const rewards = await this.buzzvilRepository.findRewardsSince(
       userId,
-      campaignId,
+      since,
     );
-    if (!reward) {
-      return { credited: false };
-    }
-    return { credited: true, point: reward.point_amount };
+
+    return {
+      rewards: rewards.map((r) => ({
+        campaign_id: r.campaign_id,
+        point: r.point_amount,
+        title: r.title,
+      })),
+      total_point: rewards.reduce((sum, r) => sum + r.point_amount, 0),
+    };
   }
 }
