@@ -72,10 +72,7 @@ describe('BuzzvilApiService', () => {
 
       const params = httpGet.mock.calls[0][1].params;
       const revenueTypes = JSON.parse(params.revenue_types);
-      expect(revenueTypes).not.toContain('cpc');
-      expect(revenueTypes).not.toContain('cpm');
-      expect(revenueTypes).toContain('cpa');
-      expect(revenueTypes).toContain('cps');
+      expect(revenueTypes).toEqual(['cpa']);
     });
 
     it('선택 파라미터가 없으면 포함하지 않는다', async () => {
