@@ -1,20 +1,20 @@
 import {
   IStreakRepository,
-  ReceiptSubmission,
+  Streak,
 } from '../interfaces/streak-repository.interface';
 
 export class StubStreakRepository implements IStreakRepository {
-  private submissions = new Map<string, ReceiptSubmission[]>();
+  private streaks = new Map<string, Streak[]>();
 
-  setSubmissions(userId: string, submissions: ReceiptSubmission[]): void {
-    this.submissions.set(userId, submissions);
+  setStreaks(userId: string, streaks: Streak[]): void {
+    this.streaks.set(userId, streaks);
   }
 
   clear(): void {
-    this.submissions.clear();
+    this.streaks.clear();
   }
 
-  findReceiptSubmissions(userId: string): Promise<ReceiptSubmission[]> {
-    return Promise.resolve(this.submissions.get(userId) || []);
+  findStreaks(userId: string): Promise<Streak[]> {
+    return Promise.resolve(this.streaks.get(userId) || []);
   }
 }

@@ -33,13 +33,13 @@ describe('SupabaseStreakRepository (integration)', () => {
     testUser = await createTestUser(supabase);
   });
 
-  describe('findReceiptSubmissions', () => {
+  describe('findStreaks', () => {
     it('영수증 제출 기록이 없으면 빈 배열을 반환한다', async () => {
-      const submissions = await repository.findReceiptSubmissions(testUser.id);
-      expect(submissions).toEqual([]);
+      const streaks = await repository.findStreaks(testUser.id);
+      expect(streaks).toEqual([]);
     });
 
-    it('해당 유저의 영수증 제출 기록만 반환한다', async () => {
+    it('다른 유저의 영수증은 포함하지 않는다', async () => {
       const otherUser = await createTestUser(supabase);
 
       await createReceiptSubmissions(supabase, [
@@ -48,58 +48,17 @@ describe('SupabaseStreakRepository (integration)', () => {
         { user_id: otherUser.id, created_at: '2026-01-15T12:00:00+09:00' },
       ]);
 
-      const submissions = await repository.findReceiptSubmissions(testUser.id);
+      const streaks = await repository.findStreaks(testUser.id);
 
-      expect(submissions).toHaveLength(2);
-      expect(submissions.every((s) => s.user_id === testUser.id)).toBe(true);
-    });
-
-    it('id, user_id, created_at 필드를 반환한다', async () => {
-      await createReceiptSubmissions(supabase, [
-        { user_id: testUser.id, created_at: '2026-01-15T12:00:00+09:00' },
-      ]);
-
-      const submissions = await repository.findReceiptSubmissions(testUser.id);
-
-      expect(submissions).toHaveLength(1);
-      expect(submissions[0]).toHaveProperty('id');
-      expect(submissions[0]).toHaveProperty('user_id', testUser.id);
-      expect(submissions[0]).toHaveProperty('created_at');
-    });
-
-    it('대량의 영수증 제출 기록(1500개)을 정상적으로 조회한다', async () => {
-      // 2025-01-01부터 약 2년간, 하루에 1~2개씩 제출 (총 1500개)
-      const startDate = new Date('2025-01-01T12:00:00+09:00');
-      const submissions = Array.from({ length: 1500 }, (_, i) => {
-        const date = new Date(startDate);
-        const dayOffset = Math.floor(i / 2); // 하루에 2개씩
-        const hour = i % 2 === 0 ? 10 : 18; // 오전/오후
-        date.setDate(date.getDate() + dayOffset);
-        date.setHours(hour);
-        return {
-          user_id: testUser.id,
-          created_at: date.toISOString(),
-        };
+      expect(streaks).toHaveLength(1);
+      expect(streaks[0]).toEqual({
+        start_date: '2026-01-15',
+        end_date: '2026-01-16',
+        continuous_count: 2,
       });
-
-      await createReceiptSubmissions(supabase, submissions);
-
-      // DB에 실제로 들어간 개수 확인
-      const { count } = await supabase
-        .from('every_receipt')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUser.id)
-        .eq('status', 'completed');
-
-      expect(count).toBe(1500);
-
-      const result = await repository.findReceiptSubmissions(testUser.id);
-
-      expect(result).toHaveLength(1500);
-      expect(result.every((s) => s.user_id === testUser.id)).toBe(true);
     });
 
-    it('status가 completed인 것만 반환한다', async () => {
+    it('status가 completed인 것만 스트릭에 포함한다', async () => {
       await createReceiptSubmissions(supabase, [
         {
           user_id: testUser.id,
@@ -123,9 +82,41 @@ describe('SupabaseStreakRepository (integration)', () => {
         },
       ]);
 
-      const submissions = await repository.findReceiptSubmissions(testUser.id);
+      const streaks = await repository.findStreaks(testUser.id);
 
-      expect(submissions).toHaveLength(2);
+      // 1/15, 1/18만 completed → 연속이 아니므로 스트릭 2개
+      expect(streaks).toHaveLength(2);
+      expect(streaks.every((s) => s.continuous_count === 1)).toBe(true);
+    });
+
+    it('연속 3일 제출하면 3일짜리 스트릭을 반환한다', async () => {
+      await createReceiptSubmissions(supabase, [
+        { user_id: testUser.id, created_at: '2026-01-15T12:00:00+09:00' },
+        { user_id: testUser.id, created_at: '2026-01-16T12:00:00+09:00' },
+        { user_id: testUser.id, created_at: '2026-01-17T12:00:00+09:00' },
+      ]);
+
+      const streaks = await repository.findStreaks(testUser.id);
+
+      expect(streaks).toHaveLength(1);
+      expect(streaks[0]).toEqual({
+        start_date: '2026-01-15',
+        end_date: '2026-01-17',
+        continuous_count: 3,
+      });
+    });
+
+    it('하루에 여러 번 제출해도 1일로 계산한다', async () => {
+      await createReceiptSubmissions(supabase, [
+        { user_id: testUser.id, created_at: '2026-01-15T09:00:00+09:00' },
+        { user_id: testUser.id, created_at: '2026-01-15T12:00:00+09:00' },
+        { user_id: testUser.id, created_at: '2026-01-15T18:00:00+09:00' },
+      ]);
+
+      const streaks = await repository.findStreaks(testUser.id);
+
+      expect(streaks).toHaveLength(1);
+      expect(streaks[0].continuous_count).toBe(1);
     });
   });
 });

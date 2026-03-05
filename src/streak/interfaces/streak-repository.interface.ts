@@ -1,9 +1,3 @@
-export interface ReceiptSubmission {
-  id: string;
-  user_id: string;
-  created_at: string;
-}
-
 export interface Streak {
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD
@@ -11,7 +5,7 @@ export interface Streak {
 }
 
 export interface IStreakRepository {
-  findReceiptSubmissions(userId: string): Promise<ReceiptSubmission[]>;
+  findStreaks(userId: string): Promise<Streak[]>;
 }
 
 export const STREAK_REPOSITORY = Symbol('STREAK_REPOSITORY');
