@@ -16,6 +16,7 @@ import {
 import { EveryReceiptService } from './every-receipt.service';
 import { EveryReceiptDto } from './dto/get-every-receipts.dto';
 import { EveryReceiptDetailResponseDto } from './dto/get-every-receipt-detail.dto';
+import { MonthlyReceiptCountResponseDto } from './dto/get-monthly-receipt-count.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { EveryReceipt } from './interfaces/every-receipt-repository.interface';
@@ -44,6 +45,28 @@ export class EveryReceiptController {
     @CurrentUser('userId') userId: string,
   ): Promise<EveryReceipt[]> {
     return this.everyReceiptService.getEveryReceipts(userId);
+  }
+
+  @Get('monthly-count')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '이번 달 완료 영수증 갯수 조회',
+    description:
+      '사용자가 이번 달에 제출하여 완료(completed)된 영수증의 갯수를 조회합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '이번 달 완료 영수증 갯수 조회 성공',
+    type: MonthlyReceiptCountResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 실패 (토큰 없음, 만료, 유효하지 않음)',
+  })
+  async getMonthlyReceiptCount(
+    @CurrentUser('userId') userId: string,
+  ): Promise<MonthlyReceiptCountResponseDto> {
+    return await this.everyReceiptService.getMonthlyReceiptCount(userId);
   }
 
   @Get(':id')

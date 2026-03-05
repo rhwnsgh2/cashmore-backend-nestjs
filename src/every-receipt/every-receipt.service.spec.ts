@@ -147,6 +147,102 @@ describe('EveryReceiptService', () => {
     });
   });
 
+  describe('getMonthlyReceiptCount', () => {
+    it('이번 달 completed 영수증 갯수를 반환한다', async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+
+      repository.setReceipts(userId, [
+        {
+          id: 'receipt-1',
+          createdAt: new Date(year, month - 1, 5).toISOString(),
+          pointAmount: 250,
+          status: 'completed',
+          imageUrl: null,
+        },
+        {
+          id: 'receipt-2',
+          createdAt: new Date(year, month - 1, 10).toISOString(),
+          pointAmount: 200,
+          status: 'completed',
+          imageUrl: null,
+        },
+      ]);
+
+      const result = await service.getMonthlyReceiptCount(userId);
+
+      expect(result.count).toBe(2);
+    });
+
+    it('pending/rejected 영수증은 카운트하지 않는다', async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+
+      repository.setReceipts(userId, [
+        {
+          id: 'receipt-completed',
+          createdAt: new Date(year, month - 1, 5).toISOString(),
+          pointAmount: 250,
+          status: 'completed',
+          imageUrl: null,
+        },
+        {
+          id: 'receipt-pending',
+          createdAt: new Date(year, month - 1, 6).toISOString(),
+          pointAmount: null,
+          status: 'pending',
+          imageUrl: null,
+        },
+        {
+          id: 'receipt-rejected',
+          createdAt: new Date(year, month - 1, 7).toISOString(),
+          pointAmount: null,
+          status: 'rejected',
+          imageUrl: null,
+        },
+      ]);
+
+      const result = await service.getMonthlyReceiptCount(userId);
+
+      expect(result.count).toBe(1);
+    });
+
+    it('다른 달의 영수증은 카운트하지 않는다', async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+
+      repository.setReceipts(userId, [
+        {
+          id: 'receipt-this-month',
+          createdAt: new Date(year, month - 1, 5).toISOString(),
+          pointAmount: 250,
+          status: 'completed',
+          imageUrl: null,
+        },
+        {
+          id: 'receipt-last-month',
+          createdAt: new Date(year, month - 2, 15).toISOString(),
+          pointAmount: 200,
+          status: 'completed',
+          imageUrl: null,
+        },
+      ]);
+
+      const result = await service.getMonthlyReceiptCount(userId);
+
+      expect(result.count).toBe(1);
+    });
+
+    it('영수증이 없으면 0을 반환한다', async () => {
+      const result = await service.getMonthlyReceiptCount(userId);
+
+      expect(result.count).toBe(0);
+    });
+  });
+
   describe('getEveryReceiptDetail', () => {
     const receiptId = 123;
 

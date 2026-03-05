@@ -85,6 +85,30 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     };
   }
 
+  async countByUserIdAndMonth(
+    userId: string,
+    year: number,
+    month: number,
+  ): Promise<number> {
+    const startDate = new Date(year, month - 1, 1).toISOString();
+    const endDate = new Date(year, month, 1).toISOString();
+
+    const { count, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .gte('created_at', startDate)
+      .lt('created_at', endDate);
+
+    if (error) {
+      throw error;
+    }
+
+    return count ?? 0;
+  }
+
   async findReReviewStatus(receiptId: number): Promise<ReReviewStatus | null> {
     const { data, error } = await this.supabaseService
       .getClient()

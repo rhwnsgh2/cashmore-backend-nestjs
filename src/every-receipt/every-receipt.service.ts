@@ -6,6 +6,7 @@ import {
 } from './interfaces/every-receipt-repository.interface';
 import { buildScoreResponse } from './utils/score.util';
 import { EveryReceiptDetailResponseDto } from './dto/get-every-receipt-detail.dto';
+import { MonthlyReceiptCountResponseDto } from './dto/get-monthly-receipt-count.dto';
 
 @Injectable()
 export class EveryReceiptService {
@@ -16,6 +17,18 @@ export class EveryReceiptService {
 
   async getEveryReceipts(userId: string): Promise<EveryReceipt[]> {
     return this.everyReceiptRepository.findByUserId(userId);
+  }
+
+  async getMonthlyReceiptCount(
+    userId: string,
+  ): Promise<MonthlyReceiptCountResponseDto> {
+    const now = new Date();
+    const count = await this.everyReceiptRepository.countByUserIdAndMonth(
+      userId,
+      now.getFullYear(),
+      now.getMonth() + 1,
+    );
+    return { count };
   }
 
   async getEveryReceiptDetail(

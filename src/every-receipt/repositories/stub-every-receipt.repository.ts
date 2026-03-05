@@ -53,6 +53,23 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     return Promise.resolve(this.details.get(`${userId}:${receiptId}`) ?? null);
   }
 
+  countByUserIdAndMonth(
+    userId: string,
+    year: number,
+    month: number,
+  ): Promise<number> {
+    const userReceipts = this.receipts.get(userId) || [];
+    const count = userReceipts.filter((r) => {
+      const date = new Date(r.createdAt);
+      return (
+        date.getFullYear() === year &&
+        date.getMonth() + 1 === month &&
+        r.status === 'completed'
+      );
+    }).length;
+    return Promise.resolve(count);
+  }
+
   findReReviewStatus(receiptId: number): Promise<ReReviewStatus | null> {
     return Promise.resolve(this.reReviewStatuses.get(receiptId) ?? null);
   }

@@ -40,6 +40,11 @@ export interface IEveryReceiptRepository {
     userId: string,
   ): Promise<EveryReceiptDetail | null>;
   findReReviewStatus(receiptId: number): Promise<ReReviewStatus | null>;
+  countByUserIdAndMonth(
+    userId: string,
+    year: number,
+    month: number,
+  ): Promise<number>;
 }
 
 export const EVERY_RECEIPT_REPOSITORY = Symbol('EVERY_RECEIPT_REPOSITORY');
