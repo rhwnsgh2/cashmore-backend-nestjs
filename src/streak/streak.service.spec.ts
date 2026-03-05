@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import dayjs from 'dayjs';
 import { StreakService } from './streak.service';
 import { STREAK_REPOSITORY } from './interfaces/streak-repository.interface';
 import { StubStreakRepository } from './repositories/stub-streak.repository';
@@ -59,6 +60,21 @@ describe('StreakService', () => {
           continuous_count: 3,
         },
       ]);
+    });
+
+    it('경계에 걸치지 않는 스트릭은 그대로 반환한다', async () => {
+      const recentDate = dayjs().subtract(10, 'day').format('YYYY-MM-DD');
+      repository.setStreaks(userId, [
+        {
+          start_date: recentDate,
+          end_date: dayjs().format('YYYY-MM-DD'),
+          continuous_count: 10,
+        },
+      ]);
+
+      const streaks = await service.getAllStreaks(userId);
+      expect(streaks).toHaveLength(1);
+      expect(streaks[0].continuous_count).toBe(10);
     });
   });
 });

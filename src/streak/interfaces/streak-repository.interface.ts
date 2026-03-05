@@ -5,7 +5,7 @@ export interface Streak {
 }
 
 export interface IStreakRepository {
-  findStreaks(userId: string): Promise<Streak[]>;
+  findStreaks(userId: string, days?: number): Promise<Streak[]>;
 }
 
 export const STREAK_REPOSITORY = Symbol('STREAK_REPOSITORY');

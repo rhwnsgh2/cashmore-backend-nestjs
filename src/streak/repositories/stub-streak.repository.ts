@@ -14,7 +14,7 @@ export class StubStreakRepository implements IStreakRepository {
     this.streaks.clear();
   }
 
-  findStreaks(userId: string): Promise<Streak[]> {
+  findStreaks(userId: string, _days?: number): Promise<Streak[]> {
     return Promise.resolve(this.streaks.get(userId) || []);
   }
 }
