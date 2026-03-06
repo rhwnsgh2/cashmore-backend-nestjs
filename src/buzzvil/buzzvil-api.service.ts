@@ -1,12 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { BUZZVIL_CONFIG } from './buzzvil.constants';
 
 @Injectable()
 export class BuzzvilApiService {
-  private readonly logger = new Logger(BuzzvilApiService.name);
-
   constructor(private httpService: HttpService) {}
 
   async getAds(params: {
@@ -20,8 +18,9 @@ export class BuzzvilApiService {
     deviceName?: string;
     userAgent?: string;
     cursor?: string;
+    revenueTypes: string[];
   }) {
-    const revenueTypes = JSON.stringify(['cpc', 'cpm']);
+    const revenueTypes = JSON.stringify(params.revenueTypes);
 
     const appConfig =
       params.platform === 'A' ? BUZZVIL_CONFIG.aos : BUZZVIL_CONFIG.ios;
@@ -50,8 +49,6 @@ export class BuzzvilApiService {
         params: queryParams,
       }),
     );
-
-    console.log(response.data);
 
     return response.data;
   }

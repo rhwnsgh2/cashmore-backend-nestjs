@@ -23,7 +23,7 @@ export class BuzzvilService {
   ) {}
 
   async getAds(authId: string, clientIp: string, query: GetAdsQueryDto) {
-    return this.buzzvilApiService.getAds({
+    const data = await this.buzzvilApiService.getAds({
       userId: authId,
       clientIp,
       ifa: query.ifa || DEFAULT_IFA,
@@ -34,7 +34,16 @@ export class BuzzvilService {
       deviceName: query.device_name,
       userAgent: query.user_agent,
       cursor: query.cursor,
+      revenueTypes: ['cpc', 'cpm'],
     });
+
+    if (data.ads) {
+      data.ads = data.ads.filter(
+        (ad: { reward_condition?: string }) => ad.reward_condition !== 'action',
+      );
+    }
+
+    return data;
   }
 
   async participate(

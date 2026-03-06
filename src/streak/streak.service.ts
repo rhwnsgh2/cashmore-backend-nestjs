@@ -30,7 +30,7 @@ export class StreakService {
 
   private hitsDateBoundary(streaks: Streak[], days: number): boolean {
     const oldest = streaks[streaks.length - 1];
-    const boundary = dayjs().subtract(days, 'day').format('YYYY-MM-DD');
+    const boundary = dayjs().subtract(days - 1, 'day').format('YYYY-MM-DD');
     return oldest.start_date <= boundary;
   }
 }
