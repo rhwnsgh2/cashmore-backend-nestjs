@@ -33,7 +33,7 @@ export class JwtAuthGuard implements CanActivate {
 
     // if (process.env.NODE_ENV === 'development') {
     //   request.user = {
-    //     userId: 'f557fdba-0c63-4a6e-a9fd-8ccc7a5dc460',
+    //     userId: '9444d32b-f4a7-4565-af56-6118d793732a',
     //     authId: 'df508abd-13bd-4a21-a53c-335acf21f24d',
     //   };
     //   return true;
