@@ -39,6 +39,7 @@ describe('BuzzvilApiService', () => {
       clientIp: '1.2.3.4',
       ifa: 'ifa-uuid',
       platform: 'A' as const,
+      revenueTypes: ['cpc', 'cpm'],
     };
 
     it('필수 파라미터로 Buzzvil API를 호출한다', async () => {
