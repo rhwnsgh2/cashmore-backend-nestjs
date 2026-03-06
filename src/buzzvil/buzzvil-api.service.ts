@@ -21,7 +21,7 @@ export class BuzzvilApiService {
     userAgent?: string;
     cursor?: string;
   }) {
-    const revenueTypes = JSON.stringify(['cpa']);
+    const revenueTypes = JSON.stringify(['cpc', 'cpm']);
 
     const appConfig =
       params.platform === 'A' ? BUZZVIL_CONFIG.aos : BUZZVIL_CONFIG.ios;
@@ -30,7 +30,7 @@ export class BuzzvilApiService {
       app_id: appConfig.appId,
       unit_id: appConfig.unitId,
       country: 'KR',
-      target_fill: 1,
+      target_fill: 5,
       revenue_types: revenueTypes,
       user_id: params.userId,
       client_ip: params.clientIp,
@@ -50,6 +50,8 @@ export class BuzzvilApiService {
         params: queryParams,
       }),
     );
+
+    console.log(response.data);
 
     return response.data;
   }

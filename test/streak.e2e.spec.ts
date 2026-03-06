@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import dayjs from 'dayjs';
 import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
@@ -186,6 +187,30 @@ describe('Streak API (e2e)', () => {
           continuous_count: 3,
         },
       ]);
+    });
+
+    it('90일 경계를 넘는 연속 스트릭이 있으면 범위를 확장하여 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      // 오늘부터 120일 전까지 매일 영수증 제출
+      const submissions = Array.from({ length: 120 }, (_, i) => ({
+        user_id: testUser.id,
+        created_at: dayjs()
+          .subtract(i, 'day')
+          .hour(12)
+          .format('YYYY-MM-DDTHH:mm:ssZ'),
+      }));
+
+      await createReceiptSubmissions(supabase, submissions);
+
+      const response = await request(app.getHttpServer())
+        .get('/streak/all')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.streaks).toHaveLength(1);
+      expect(response.body.streaks[0].continuous_count).toBe(120);
     });
 
     it('중간에 끊긴 경우 스트릭 2개를 반환한다', async () => {

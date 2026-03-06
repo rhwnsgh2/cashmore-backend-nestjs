@@ -142,21 +142,25 @@ describe('Buzzvil API (e2e) - Real DB', () => {
     it('여러 건 적립 → 모두 반환 + total_point 합산', async () => {
       await request(app.getHttpServer())
         .post('/buzzvil/postback')
-        .send(buildPostbackBody({
-          user_id: testUser.auth_id,
-          campaign_id: '10075328',
-          point: '100',
-        }))
+        .send(
+          buildPostbackBody({
+            user_id: testUser.auth_id,
+            campaign_id: '10075328',
+            point: '100',
+          }),
+        )
         .expect(200);
 
       await request(app.getHttpServer())
         .post('/buzzvil/postback')
-        .send(buildPostbackBody({
-          user_id: testUser.auth_id,
-          campaign_id: '99999',
-          point: '50',
-          title: '보너스',
-        }))
+        .send(
+          buildPostbackBody({
+            user_id: testUser.auth_id,
+            campaign_id: '99999',
+            point: '50',
+            title: '보너스',
+          }),
+        )
         .expect(200);
 
       const response = await request(app.getHttpServer())
@@ -174,11 +178,13 @@ describe('Buzzvil API (e2e) - Real DB', () => {
 
       await request(app.getHttpServer())
         .post('/buzzvil/postback')
-        .send(buildPostbackBody({
-          user_id: otherUser.auth_id,
-          campaign_id: '10075328',
-          point: '100',
-        }))
+        .send(
+          buildPostbackBody({
+            user_id: otherUser.auth_id,
+            campaign_id: '10075328',
+            point: '100',
+          }),
+        )
         .expect(200);
 
       const response = await request(app.getHttpServer())
