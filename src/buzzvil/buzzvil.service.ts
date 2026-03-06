@@ -39,7 +39,9 @@ export class BuzzvilService {
 
     if (data.ads) {
       data.ads = data.ads.filter(
-        (ad: { reward_condition?: string }) => ad.reward_condition !== 'action',
+        (ad: { reward_condition?: string; name?: string }) =>
+          ad.reward_condition !== 'action' &&
+          !(ad.name && ad.name.includes('쿠팡')),
       );
     }
 
