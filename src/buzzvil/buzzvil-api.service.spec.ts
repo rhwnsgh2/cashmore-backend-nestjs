@@ -47,6 +47,7 @@ describe('BuzzvilApiService', () => {
       expect(httpGet).toHaveBeenCalledOnce();
       const [url, config] = httpGet.mock.calls[0];
       expect(url).toContain('/api/s2s/ads');
+
       expect(config.params).toMatchObject({
         app_id: BUZZVIL_CONFIG.aos.appId,
         unit_id: BUZZVIL_CONFIG.aos.unitId,
@@ -55,7 +56,7 @@ describe('BuzzvilApiService', () => {
         ifa: 'ifa-uuid',
         platform: 'A',
         country: 'KR',
-        target_fill: 1,
+        target_fill: 5,
       });
     });
 

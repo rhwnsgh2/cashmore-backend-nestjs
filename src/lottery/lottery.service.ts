@@ -66,7 +66,7 @@ export class LotteryService {
     { amount: 10, probability: 5.52 },
     { amount: 30, probability: 0.5 },
     { amount: 500, probability: 0.08 },
-  ];
+  ]; // 기대값: 5.797
 
   private static readonly MAX_100_REWARDS = [
     { amount: 3, probability: 81 },
@@ -74,7 +74,7 @@ export class LotteryService {
     { amount: 10, probability: 3 },
     { amount: 30, probability: 0.8 },
     { amount: 100, probability: 0.2 },
-  ];
+  ]; // 기대값: 3.92
 
   private static readonly MAX_1000_REWARDS = [
     { amount: 8, probability: 90.7 },
@@ -82,7 +82,7 @@ export class LotteryService {
     { amount: 50, probability: 1 },
     { amount: 500, probability: 0.2 },
     { amount: 1000, probability: 0.05 },
-  ];
+  ]; // 기대값: 10.061
 
   private getRewardTable(lotteryType: LotteryType) {
     switch (lotteryType) {
