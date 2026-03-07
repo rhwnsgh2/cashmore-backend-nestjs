@@ -29,7 +29,7 @@ export class BuzzvilApiService {
       app_id: appConfig.appId,
       unit_id: appConfig.unitId,
       country: 'KR',
-      target_fill: 5,
+      target_fill: 10,
       revenue_types: revenueTypes,
       user_id: params.userId,
       client_ip: params.clientIp,
