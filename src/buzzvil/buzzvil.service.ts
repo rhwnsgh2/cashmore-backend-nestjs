@@ -37,6 +37,7 @@ export class BuzzvilService {
       revenueTypes: ['cpc', 'cpm'],
     });
 
+    const before = data.ads?.length ?? 0;
     if (data.ads) {
       data.ads = data.ads.filter(
         (ad: { reward_condition?: string; name?: string }) =>
@@ -44,6 +45,8 @@ export class BuzzvilService {
           !(ad.name && ad.name.includes('쿠팡')),
       );
     }
+    const after = data.ads?.length ?? 0;
+    this.logger.log(`getAds: before=${before}, after=${after}`);
 
     return data;
   }
