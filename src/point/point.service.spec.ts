@@ -118,34 +118,37 @@ describe('PointService', () => {
 
     it('이번주 적립 포인트를 계산한다 (POINT_ADD_TYPES + status=done)', async () => {
       const now = dayjs().tz('Asia/Seoul');
-      const thisWeekStart = now.startOf('week').add(1, 'day'); // 월요일
+      const thisWeekStart =
+        now.day() === 0
+          ? now.subtract(6, 'day').startOf('day')
+          : now.startOf('week').add(1, 'day');
 
       repository.setPointActions(userId, [
         {
           id: 1,
           type: 'EVERY_RECEIPT', // POINT_ADD_TYPES에 포함
-          created_at: thisWeekStart.add(1, 'day').toISOString(),
+          created_at: thisWeekStart.add(1, 'hour').toISOString(),
           point_amount: 100,
           status: 'done',
         },
         {
           id: 2,
           type: 'ATTENDANCE', // POINT_ADD_TYPES에 포함
-          created_at: thisWeekStart.add(2, 'day').toISOString(),
+          created_at: thisWeekStart.add(2, 'hour').toISOString(),
           point_amount: 50,
           status: 'done',
         },
         {
           id: 3,
           type: 'EXCHANGE_POINT_TO_CASH', // POINT_ADD_TYPES에 미포함
-          created_at: thisWeekStart.add(1, 'day').toISOString(),
+          created_at: thisWeekStart.add(3, 'hour').toISOString(),
           point_amount: -500,
           status: 'done',
         },
         {
           id: 4,
           type: 'EVERY_RECEIPT',
-          created_at: thisWeekStart.add(1, 'day').toISOString(),
+          created_at: thisWeekStart.add(4, 'hour').toISOString(),
           point_amount: 200,
           status: 'pending', // status가 done이 아님
         },
@@ -159,7 +162,10 @@ describe('PointService', () => {
 
     it('지난주 적립 포인트를 계산한다', async () => {
       const now = dayjs().tz('Asia/Seoul');
-      const thisWeekStart = now.startOf('week').add(1, 'day');
+      const thisWeekStart =
+        now.day() === 0
+          ? now.subtract(6, 'day').startOf('day')
+          : now.startOf('week').add(1, 'day');
       const lastWeekStart = thisWeekStart.subtract(7, 'day');
 
       repository.setPointActions(userId, [
