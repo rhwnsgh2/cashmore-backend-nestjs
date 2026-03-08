@@ -28,7 +28,8 @@ async function bootstrap() {
   } else {
     app.use(
       morgan('combined', {
-        skip: (req, res) => res.statusCode < 400 && !req.url?.includes('/buzzvil'),
+        skip: (req, res) =>
+          res.statusCode < 400 && !req.url?.includes('/buzzvil'),
       }),
     );
   }

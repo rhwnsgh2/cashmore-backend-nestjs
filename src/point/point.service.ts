@@ -40,8 +40,11 @@ export class PointService {
     // 오늘
     const todayStart = now.startOf('day');
 
-    // 이번주 월요일 ~ 다음주 월요일
-    const thisWeekStart = now.startOf('week').add(1, 'day'); // 월요일
+    // 이번주 월요일 (일요일인 경우 -6일로 이번주 월요일 계산)
+    const thisWeekStart =
+      now.day() === 0
+        ? now.subtract(6, 'day').startOf('day')
+        : now.startOf('week').add(1, 'day');
 
     // 지난주 월요일
     const lastWeekStart = thisWeekStart.subtract(7, 'day');
