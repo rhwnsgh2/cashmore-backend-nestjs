@@ -61,7 +61,7 @@ export class JwtAuthGuard implements CanActivate {
       if (payload.exp && payload.exp < now) {
         const expiredAgo = Math.floor((now - payload.exp) / 60);
         this.logger.warn(
-          `[EXPIRED_TOKEN] authId=${payload.sub}, expiredAgo=${expiredAgo}min`,
+          `[EXPIRED_TOKEN] authId=${payload.sub}, expiredAgo=${expiredAgo}min, url=${(request as { url: string }).url}`,
         );
       }
 
