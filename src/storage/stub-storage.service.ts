@@ -1,7 +1,5 @@
-import {
-  IStorageService,
-  SignedUrlResult,
-} from './interfaces/storage-service.interface';
+import type { SignedUrlResult } from './interfaces/storage-service.interface';
+import type { IStorageService } from './interfaces/storage-service.interface';
 
 export class StubStorageService implements IStorageService {
   private lastGeneratedPath: string | null = null;
@@ -20,20 +18,20 @@ export class StubStorageService implements IStorageService {
     this.shouldFail = false;
   }
 
-  async generateSignedUploadUrl(
+  generateSignedUploadUrl(
     bucket: string,
     path: string,
     contentType: string = 'image/jpeg',
     _expiresInSeconds: number = 3600,
   ): Promise<SignedUrlResult> {
     if (this.shouldFail) {
-      throw new Error('Storage service failure');
+      return Promise.reject(new Error('Storage service failure'));
     }
 
     this.lastGeneratedPath = path;
-    return {
+    return Promise.resolve({
       url: `https://storage.googleapis.com/signed/${bucket}/${path}?contentType=${contentType}`,
-    };
+    });
   }
 
   getPublicUrl(bucket: string, path: string): string {
