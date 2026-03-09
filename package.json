@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.971.0",
+    "@google-cloud/storage": "^7.19.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

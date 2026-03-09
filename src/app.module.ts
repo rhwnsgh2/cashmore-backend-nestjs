@@ -27,6 +27,7 @@ import { StepRewardsModule } from './step-rewards/step-rewards.module';
 import { WatchedAdModule } from './watched-ad/watched-ad.module';
 import { LocalPromotionModule } from './local-promotion/local-promotion.module';
 import { BuzzvilModule } from './buzzvil/buzzvil.module';
+import { StorageModule } from './storage/storage.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -70,6 +71,7 @@ import configuration from './config/configuration';
     WatchedAdModule,
     LocalPromotionModule,
     BuzzvilModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [

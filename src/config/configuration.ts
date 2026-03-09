@@ -7,4 +7,9 @@ export default () => ({
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     jwtSecret: process.env.SUPABASE_JWT_SECRET,
   },
+  gcs: {
+    projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+    clientEmail: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+    privateKey: process.env.GOOGLE_CLOUD_PRIVATE_KEY,
+  },
 });

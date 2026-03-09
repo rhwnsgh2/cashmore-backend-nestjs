@@ -116,6 +116,13 @@ export class InfrastructureStack extends cdk.Stack {
       'cashmore/firebase',
     );
 
+    // Reference GCS secret (Google Cloud Storage)
+    const gcsSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'GcsSecret',
+      'cashmore/gcs',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 2048,
@@ -177,6 +184,18 @@ export class InfrastructureStack extends cdk.Stack {
         ),
         FIREBASE_PRIVATE_KEY: ecs.Secret.fromSecretsManager(
           firebaseSecret,
+          'privateKey',
+        ),
+        GOOGLE_CLOUD_PROJECT_ID: ecs.Secret.fromSecretsManager(
+          gcsSecret,
+          'projectId',
+        ),
+        GOOGLE_CLOUD_CLIENT_EMAIL: ecs.Secret.fromSecretsManager(
+          gcsSecret,
+          'clientEmail',
+        ),
+        GOOGLE_CLOUD_PRIVATE_KEY: ecs.Secret.fromSecretsManager(
+          gcsSecret,
           'privateKey',
         ),
       },
