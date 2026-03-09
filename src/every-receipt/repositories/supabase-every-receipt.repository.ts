@@ -128,7 +128,9 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     return data.status as ReReviewStatus;
   }
 
-  async insert(params: InsertEveryReceiptParams): Promise<InsertedEveryReceipt> {
+  async insert(
+    params: InsertEveryReceiptParams,
+  ): Promise<InsertedEveryReceipt> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('every_receipt')
@@ -138,7 +140,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
         status: 'pending',
         point: 0,
         position: params.position,
-      })
+      } as any)
       .select('id')
       .single<{ id: number }>();
 
