@@ -12,4 +12,7 @@ export default () => ({
     clientEmail: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     privateKey: process.env.GOOGLE_CLOUD_PRIVATE_KEY,
   },
+  amplitude: {
+    apiKey: process.env.AMPLITUDE_API_KEY,
+  },
 });

@@ -4,12 +4,14 @@ import { EveryReceiptService } from './every-receipt.service';
 import { EVERY_RECEIPT_REPOSITORY } from './interfaces/every-receipt-repository.interface';
 import { SupabaseEveryReceiptRepository } from './repositories/supabase-every-receipt.repository';
 import { AuthModule } from '../auth/auth.module';
+import { ReceiptQueueService } from './receipt-queue.service';
 
 @Module({
   imports: [AuthModule],
   controllers: [EveryReceiptController],
   providers: [
     EveryReceiptService,
+    ReceiptQueueService,
     {
       provide: EVERY_RECEIPT_REPOSITORY,
       useClass: SupabaseEveryReceiptRepository,

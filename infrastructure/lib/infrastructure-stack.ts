@@ -123,6 +123,13 @@ export class InfrastructureStack extends cdk.Stack {
       'cashmore/gcs',
     );
 
+    // Reference Amplitude secret
+    const amplitudeSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'AmplitudeSecret',
+      'cashmore/amplitude',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 2048,
@@ -197,6 +204,10 @@ export class InfrastructureStack extends cdk.Stack {
         GOOGLE_CLOUD_PRIVATE_KEY: ecs.Secret.fromSecretsManager(
           gcsSecret,
           'privateKey',
+        ),
+        AMPLITUDE_API_KEY: ecs.Secret.fromSecretsManager(
+          amplitudeSecret,
+          'AMPLITUDE_API_KEY',
         ),
       },
     });

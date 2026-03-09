@@ -12,15 +12,30 @@ import {
   createReceiptReReview,
 } from './helpers/streak.helper';
 import { generateTestToken } from './helpers/auth.helper';
+import { ReceiptQueueService } from '../src/every-receipt/receipt-queue.service';
+import { AmplitudeService } from '../src/amplitude/amplitude.service';
 
 describe('EveryReceipt API (e2e)', () => {
   let app: INestApplication;
   const supabase = getTestSupabaseAdminClient();
 
+  const stubQueueService = {
+    publish: () => Promise.resolve('test-message-id'),
+  };
+  const stubAmplitudeService = {
+    track: () => {},
+    onModuleDestroy: () => Promise.resolve(),
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(ReceiptQueueService)
+      .useValue(stubQueueService)
+      .overrideProvider(AmplitudeService)
+      .useValue(stubAmplitudeService)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
@@ -302,6 +317,121 @@ describe('EveryReceipt API (e2e)', () => {
         .expect(200);
 
       expect(response.body.reReviewStatus).toBe('pending');
+    });
+  });
+
+  describe('POST /every_receipt/confirm-upload', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/every_receipt/confirm-upload')
+        .send({ publicUrl: 'https://storage.googleapis.com/bucket/image.jpg' })
+        .expect(401);
+
+      expect(response.body.message).toBe('No token provided');
+    });
+
+    it('영수증 업로드 확인에 성공한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/every_receipt/confirm-upload')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          publicUrl: 'https://storage.googleapis.com/bucket/image.jpg',
+        })
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.everyReceiptId).toBeDefined();
+      expect(response.body.imageUrl).toBe(
+        'https://storage.googleapis.com/bucket/image.jpg',
+      );
+    });
+
+    it('DB에 영수증이 pending 상태로 저장된다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/every_receipt/confirm-upload')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          publicUrl: 'https://storage.googleapis.com/bucket/image.jpg',
+        })
+        .expect(201);
+
+      const { data: receipt } = await supabase
+        .from('every_receipt')
+        .select('*')
+        .eq('id', response.body.everyReceiptId)
+        .single();
+
+      expect(receipt).not.toBeNull();
+      expect(receipt!.status).toBe('pending');
+      expect(receipt!.point).toBe(0);
+      expect(receipt!.image_url).toBe(
+        'https://storage.googleapis.com/bucket/image.jpg',
+      );
+      expect(receipt!.user_id).toBe(testUser.id);
+    });
+
+    it('currentPosition을 포함하여 저장할 수 있다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/every_receipt/confirm-upload')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          publicUrl: 'https://storage.googleapis.com/bucket/image.jpg',
+          currentPosition: 'POINT(127.0 37.5)',
+        })
+        .expect(201);
+
+      const { data: receipt } = await supabase
+        .from('every_receipt')
+        .select('*')
+        .eq('id', response.body.everyReceiptId)
+        .single();
+
+      expect(receipt!.position).toEqual({
+        type: 'Point',
+        coordinates: [127, 37.5],
+      });
+    });
+
+    it('여러 영수증을 연속으로 등록할 수 있다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response1 = await request(app.getHttpServer())
+        .post('/every_receipt/confirm-upload')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          publicUrl: 'https://storage.googleapis.com/bucket/image1.jpg',
+        })
+        .expect(201);
+
+      const response2 = await request(app.getHttpServer())
+        .post('/every_receipt/confirm-upload')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          publicUrl: 'https://storage.googleapis.com/bucket/image2.jpg',
+        })
+        .expect(201);
+
+      expect(response1.body.everyReceiptId).not.toBe(
+        response2.body.everyReceiptId,
+      );
+
+      // GET으로 목록 확인
+      const listResponse = await request(app.getHttpServer())
+        .get('/every_receipt')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(listResponse.body).toHaveLength(2);
     });
   });
 });

@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
+import type {
+  InsertEveryReceiptParams,
+  InsertedEveryReceipt,
+} from '../interfaces/every-receipt-repository.interface';
 import {
   IEveryReceiptRepository,
   EveryReceipt,
@@ -122,5 +126,26 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     }
 
     return data.status as ReReviewStatus;
+  }
+
+  async insert(params: InsertEveryReceiptParams): Promise<InsertedEveryReceipt> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .insert({
+        user_id: params.userId,
+        image_url: params.imageUrl,
+        status: 'pending',
+        point: 0,
+        position: params.position,
+      })
+      .select('id')
+      .single<{ id: number }>();
+
+    if (error || !data) {
+      throw error ?? new Error('Failed to insert receipt');
+    }
+
+    return { id: data.id };
   }
 }

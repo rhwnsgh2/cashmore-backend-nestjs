@@ -2,20 +2,82 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EveryReceiptService } from './every-receipt.service';
 import { EVERY_RECEIPT_REPOSITORY } from './interfaces/every-receipt-repository.interface';
 import { StubEveryReceiptRepository } from './repositories/stub-every-receipt.repository';
+import type { ReceiptQueueMessage } from './receipt-queue.service';
+import { ReceiptQueueService } from './receipt-queue.service';
+import type { AmplitudeEventProperties } from '../amplitude/amplitude.service';
+import { AmplitudeService } from '../amplitude/amplitude.service';
+
+interface TrackedEvent {
+  eventType: string;
+  userId: string;
+  properties?: AmplitudeEventProperties;
+}
+
+class StubAmplitudeService {
+  private events: TrackedEvent[] = [];
+
+  track(
+    eventType: string,
+    userId: string,
+    eventProperties?: AmplitudeEventProperties,
+  ): void {
+    this.events.push({ eventType, userId, properties: eventProperties });
+  }
+
+  getEvents(): TrackedEvent[] {
+    return this.events;
+  }
+
+  clear(): void {
+    this.events = [];
+  }
+}
+
+class StubReceiptQueueService {
+  private messages: ReceiptQueueMessage[] = [];
+  private shouldFail = false;
+
+  publish(message: ReceiptQueueMessage): Promise<string> {
+    if (this.shouldFail) {
+      return Promise.reject(new Error('PubSub publish failed'));
+    }
+    this.messages.push(message);
+    return Promise.resolve('test-message-id');
+  }
+
+  getMessages(): ReceiptQueueMessage[] {
+    return this.messages;
+  }
+
+  setShouldFail(fail: boolean): void {
+    this.shouldFail = fail;
+  }
+
+  clear(): void {
+    this.messages = [];
+    this.shouldFail = false;
+  }
+}
 
 describe('EveryReceiptService', () => {
   let service: EveryReceiptService;
   let repository: StubEveryReceiptRepository;
+  let queueService: StubReceiptQueueService;
+  let amplitudeService: StubAmplitudeService;
 
   const userId = 'test-user-id';
 
   beforeEach(async () => {
     repository = new StubEveryReceiptRepository();
+    queueService = new StubReceiptQueueService();
+    amplitudeService = new StubAmplitudeService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EveryReceiptService,
         { provide: EVERY_RECEIPT_REPOSITORY, useValue: repository },
+        { provide: ReceiptQueueService, useValue: queueService },
+        { provide: AmplitudeService, useValue: amplitudeService },
       ],
     }).compile();
 
@@ -24,6 +86,8 @@ describe('EveryReceiptService', () => {
 
   afterEach(() => {
     repository.clear();
+    queueService.clear();
+    amplitudeService.clear();
   });
 
   describe('getEveryReceipts', () => {
@@ -321,6 +385,88 @@ describe('EveryReceiptService', () => {
       const result = await service.getEveryReceiptDetail(receiptId, userId);
 
       expect(result.reReviewStatus).toBeNull();
+    });
+  });
+
+  describe('confirmUpload', () => {
+    const publicUrl = 'https://storage.googleapis.com/bucket/user/image.jpg';
+
+    it('영수증을 DB에 등록하고 성공 응답을 반환한다', async () => {
+      const result = await service.confirmUpload(userId, publicUrl, null);
+
+      expect(result.success).toBe(true);
+      expect(result.everyReceiptId).toBe(1);
+      expect(result.imageUrl).toBe(publicUrl);
+    });
+
+    it('DB에 올바른 파라미터로 insert한다', async () => {
+      await service.confirmUpload(userId, publicUrl, 'POINT(127.0 37.5)');
+
+      const inserted = repository.getInsertedReceipts();
+      expect(inserted).toHaveLength(1);
+      expect(inserted[0]).toEqual({
+        userId,
+        imageUrl: publicUrl,
+        position: 'POINT(127.0 37.5)',
+      });
+    });
+
+    it('position이 null이면 null로 저장한다', async () => {
+      await service.confirmUpload(userId, publicUrl, null);
+
+      const inserted = repository.getInsertedReceipts();
+      expect(inserted[0].position).toBeNull();
+    });
+
+    it('PubSub에 메시지를 발행한다', async () => {
+      await service.confirmUpload(userId, publicUrl, null);
+
+      // PubSub은 fire-and-forget이므로 약간의 대기
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const messages = queueService.getMessages();
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        imageUrl: publicUrl,
+        userId,
+        everyReceiptId: 1,
+      });
+    });
+
+    it('PubSub 발행 실패해도 응답은 성공한다', async () => {
+      queueService.setShouldFail(true);
+
+      const result = await service.confirmUpload(userId, publicUrl, null);
+
+      expect(result.success).toBe(true);
+      expect(result.everyReceiptId).toBe(1);
+    });
+
+    it('여러 번 호출하면 각각 다른 ID를 반환한다', async () => {
+      const result1 = await service.confirmUpload(userId, publicUrl, null);
+      const result2 = await service.confirmUpload(
+        userId,
+        'https://storage.googleapis.com/bucket/user/image2.jpg',
+        null,
+      );
+
+      expect(result1.everyReceiptId).toBe(1);
+      expect(result2.everyReceiptId).toBe(2);
+    });
+
+    it('Amplitude에 daily_receipt_uploaded 이벤트를 전송한다', async () => {
+      await service.confirmUpload(userId, publicUrl, null);
+
+      const events = amplitudeService.getEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0].eventType).toBe('daily_receipt_uploaded');
+      expect(events[0].userId).toBe(userId);
+      expect(events[0].properties).toEqual(
+        expect.objectContaining({
+          everyReceiptId: 1,
+        }),
+      );
+      expect(events[0].properties?.timestamp).toBeDefined();
     });
   });
 });

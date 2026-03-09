@@ -1,8 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
   ParseIntPipe,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -17,6 +19,10 @@ import { EveryReceiptService } from './every-receipt.service';
 import { EveryReceiptDto } from './dto/get-every-receipts.dto';
 import { EveryReceiptDetailResponseDto } from './dto/get-every-receipt-detail.dto';
 import { MonthlyReceiptCountResponseDto } from './dto/get-monthly-receipt-count.dto';
+import {
+  ConfirmUploadRequestDto,
+  ConfirmUploadResponseDto,
+} from './dto/confirm-upload.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { EveryReceipt } from './interfaces/every-receipt-repository.interface';
@@ -67,6 +73,33 @@ export class EveryReceiptController {
     @CurrentUser('userId') userId: string,
   ): Promise<MonthlyReceiptCountResponseDto> {
     return await this.everyReceiptService.getMonthlyReceiptCount(userId);
+  }
+
+  @Post('confirm-upload')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '영수증 업로드 확인',
+    description:
+      '업로드된 영수증 이미지를 확인하고 DB에 등록한 뒤 AI 처리 큐에 발행합니다.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '영수증 업로드 확인 성공',
+    type: ConfirmUploadResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 실패 (토큰 없음, 만료, 유효하지 않음)',
+  })
+  async confirmUpload(
+    @CurrentUser('userId') userId: string,
+    @Body() body: ConfirmUploadRequestDto,
+  ): Promise<ConfirmUploadResponseDto> {
+    return await this.everyReceiptService.confirmUpload(
+      userId,
+      body.publicUrl,
+      body.currentPosition ?? null,
+    );
   }
 
   @Get(':id')

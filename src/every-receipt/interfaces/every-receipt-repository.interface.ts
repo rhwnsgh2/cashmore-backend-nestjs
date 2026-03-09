@@ -33,6 +33,16 @@ export interface EveryReceiptDetail {
   scoreData: ScoreData | null;
 }
 
+export interface InsertEveryReceiptParams {
+  userId: string;
+  imageUrl: string;
+  position: string | null;
+}
+
+export interface InsertedEveryReceipt {
+  id: number;
+}
+
 export interface IEveryReceiptRepository {
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]>;
   findById(
@@ -45,6 +55,7 @@ export interface IEveryReceiptRepository {
     year: number,
     month: number,
   ): Promise<number>;
+  insert(params: InsertEveryReceiptParams): Promise<InsertedEveryReceipt>;
 }
 
 export const EVERY_RECEIPT_REPOSITORY = Symbol('EVERY_RECEIPT_REPOSITORY');

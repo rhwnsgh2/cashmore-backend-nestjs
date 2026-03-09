@@ -1,3 +1,7 @@
+import type {
+  InsertEveryReceiptParams,
+  InsertedEveryReceipt,
+} from '../interfaces/every-receipt-repository.interface';
 import {
   IEveryReceiptRepository,
   EveryReceipt,
@@ -9,6 +13,8 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
   private receipts = new Map<string, EveryReceipt[]>();
   private details = new Map<string, EveryReceiptDetail>();
   private reReviewStatuses = new Map<number, ReReviewStatus | null>();
+  private nextInsertId = 1;
+  private insertedReceipts: InsertEveryReceiptParams[] = [];
 
   setReceipts(userId: string, receipts: EveryReceipt[]): void {
     this.receipts.set(userId, receipts);
@@ -26,10 +32,16 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     this.reReviewStatuses.set(receiptId, status);
   }
 
+  getInsertedReceipts(): InsertEveryReceiptParams[] {
+    return this.insertedReceipts;
+  }
+
   clear(): void {
     this.receipts.clear();
     this.details.clear();
     this.reReviewStatuses.clear();
+    this.nextInsertId = 1;
+    this.insertedReceipts = [];
   }
 
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]> {
@@ -72,5 +84,11 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
 
   findReReviewStatus(receiptId: number): Promise<ReReviewStatus | null> {
     return Promise.resolve(this.reReviewStatuses.get(receiptId) ?? null);
+  }
+
+  insert(params: InsertEveryReceiptParams): Promise<InsertedEveryReceipt> {
+    this.insertedReceipts.push(params);
+    const id = this.nextInsertId++;
+    return Promise.resolve({ id });
   }
 }
