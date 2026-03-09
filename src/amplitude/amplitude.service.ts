@@ -22,7 +22,9 @@ export class AmplitudeService implements OnModuleDestroy {
       this.initialized = true;
       this.logger.log('Amplitude 초기화 완료');
     } else {
-      this.logger.warn('AMPLITUDE_API_KEY가 설정되지 않아 이벤트가 전송되지 않습니다.');
+      this.logger.warn(
+        'AMPLITUDE_API_KEY가 설정되지 않아 이벤트가 전송되지 않습니다.',
+      );
     }
   }
 
@@ -38,9 +40,9 @@ export class AmplitudeService implements OnModuleDestroy {
     amplitude.track(eventType, eventProperties, { user_id: userId });
   }
 
-  async onModuleDestroy(): Promise<void> {
+  onModuleDestroy(): void {
     if (this.initialized) {
-      await amplitude.flush();
+      amplitude.flush();
     }
   }
 }
