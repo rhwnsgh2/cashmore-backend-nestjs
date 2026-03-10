@@ -111,13 +111,14 @@ export class ApplovinClient {
     const url = `https://r.applovin.com/maxReport?${params}`;
     const response = await fetch(url);
 
-    const data = (await response.json()) as RevenueReportResponse;
-
     if (!response.ok) {
+      const text = await response.text();
       throw new Error(
-        `Revenue Fill Rate API error: ${response.status} - ${JSON.stringify(data)}`
+        `Revenue Fill Rate API error: ${response.status} - ${text}`
       );
     }
+
+    const data = (await response.json()) as RevenueReportResponse;
 
     if (data.code !== 200) {
       throw new Error(`Revenue Fill Rate API returned code: ${data.code}`);

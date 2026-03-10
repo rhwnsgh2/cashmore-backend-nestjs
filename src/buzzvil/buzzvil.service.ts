@@ -1,6 +1,7 @@
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { BuzzvilApiService } from './buzzvil-api.service';
 import { AuthService } from '../auth/auth.service';
+import { FcmService } from '../fcm/fcm.service';
 import { GetAdsQueryDto } from './dto/get-ads.dto';
 import { ParticipateRequestDto } from './dto/participate.dto';
 import { PostbackBodyDto } from './dto/postback.dto';
@@ -18,6 +19,7 @@ export class BuzzvilService {
   constructor(
     private buzzvilApiService: BuzzvilApiService,
     private authService: AuthService,
+    private fcmService: FcmService,
     @Inject(BUZZVIL_REPOSITORY)
     private buzzvilRepository: IBuzzvilRepository,
   ) {}
@@ -34,19 +36,8 @@ export class BuzzvilService {
       deviceName: query.device_name,
       userAgent: query.user_agent,
       cursor: query.cursor,
-      revenueTypes: ['cpc', 'cpm'],
+      revenueTypes: [],
     });
-
-    const before = data.ads?.length ?? 0;
-    if (data.ads) {
-      data.ads = data.ads.filter(
-        (ad: { reward_condition?: string; name?: string }) =>
-          ad.reward_condition !== 'action' &&
-          !(ad.name && ad.name.includes('쿠팡')),
-      );
-    }
-    const after = data.ads?.length ?? 0;
-    this.logger.log(`getAds: before=${before}, after=${after}`);
 
     return data;
   }
@@ -108,6 +99,8 @@ export class BuzzvilService {
     this.logger.log(
       `Postback processed: auth_id=${dto.user_id}, user_id=${userId}, point=${pointAmount}, campaign_id=${dto.campaign_id}`,
     );
+
+    void this.fcmService.sendRefreshMessage(userId, 'point_update');
 
     return { message: 'OK' };
   }

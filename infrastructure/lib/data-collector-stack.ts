@@ -4,7 +4,6 @@ import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 import * as path from 'path';
@@ -63,6 +62,13 @@ export class DataCollectorStack extends cdk.Stack {
         logGroup,
       }
     );
+
+    // 비동기 호출 재시도 비활성화 (타임아웃 시 중복 실행 방지)
+    new lambda.EventInvokeConfig(this, 'ApplovinCollectorEventInvokeConfig', {
+      function: applovinCollector,
+      maxEventAge: cdk.Duration.hours(1),
+      retryAttempts: 0,
+    });
 
     // Lambda에 Secrets Manager 읽기 권한 부여
     applovinSecret.grantRead(applovinCollector);

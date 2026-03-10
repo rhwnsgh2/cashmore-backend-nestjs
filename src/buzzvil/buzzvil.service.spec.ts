@@ -4,6 +4,7 @@ import { ConflictException } from '@nestjs/common';
 import { BuzzvilService } from './buzzvil.service';
 import { BuzzvilApiService } from './buzzvil-api.service';
 import { AuthService } from '../auth/auth.service';
+import { FcmService } from '../fcm/fcm.service';
 import { BUZZVIL_REPOSITORY } from './interfaces/buzzvil-repository.interface';
 import { StubBuzzvilRepository } from './repositories/stub-buzzvil.repository';
 import { PostbackBodyDto } from './dto/postback.dto';
@@ -39,6 +40,7 @@ describe('BuzzvilService', () => {
         BuzzvilService,
         { provide: BuzzvilApiService, useValue: {} },
         { provide: AuthService, useValue: mockAuthService },
+        { provide: FcmService, useValue: { sendRefreshMessage: vi.fn() } },
         { provide: BUZZVIL_REPOSITORY, useValue: stubRepository },
       ],
     }).compile();
