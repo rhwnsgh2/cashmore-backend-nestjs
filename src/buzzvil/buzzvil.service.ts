@@ -36,7 +36,7 @@ export class BuzzvilService {
       deviceName: query.device_name,
       userAgent: query.user_agent,
       cursor: query.cursor,
-      revenueTypes: [],
+      revenueTypes: ['cpm', 'cpc', 'cpi', 'cpe'],
     });
 
     return data;
