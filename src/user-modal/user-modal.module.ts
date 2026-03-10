@@ -16,5 +16,6 @@ import { AuthModule } from '../auth/auth.module';
       useClass: SupabaseUserModalRepository,
     },
   ],
+  exports: [USER_MODAL_REPOSITORY],
 })
 export class UserModalModule {}

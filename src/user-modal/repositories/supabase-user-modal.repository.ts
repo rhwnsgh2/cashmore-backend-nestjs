@@ -38,4 +38,35 @@ export class SupabaseUserModalRepository implements IUserModalRepository {
       additionalData: row.additional_data,
     }));
   }
+
+  async hasModalByName(userId: string, name: UserModalType): Promise<boolean> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('modal_shown')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('name', name)
+      .limit(1);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data?.length ?? 0) > 0;
+  }
+
+  async createModal(userId: string, name: UserModalType): Promise<void> {
+    const { error } = await this.supabase
+      .getClient()
+      .from('modal_shown')
+      .insert({
+        user_id: userId,
+        name,
+        status: 'pending',
+      } as any);
+
+    if (error) {
+      throw error;
+    }
+  }
 }

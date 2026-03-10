@@ -29,6 +29,7 @@ import { LocalPromotionModule } from './local-promotion/local-promotion.module';
 import { BuzzvilModule } from './buzzvil/buzzvil.module';
 import { StorageModule } from './storage/storage.module';
 import { AmplitudeModule } from './amplitude/amplitude.module';
+import { NpsSurveyModule } from './nps-survey/nps-survey.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -74,6 +75,7 @@ import configuration from './config/configuration';
     BuzzvilModule,
     StorageModule,
     AmplitudeModule,
+    NpsSurveyModule,
   ],
   controllers: [AppController],
   providers: [

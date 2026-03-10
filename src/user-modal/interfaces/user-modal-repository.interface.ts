@@ -24,6 +24,8 @@ export interface UserModal {
 
 export interface IUserModalRepository {
   findPendingByUserId(userId: string): Promise<UserModal[]>;
+  hasModalByName(userId: string, name: UserModalType): Promise<boolean>;
+  createModal(userId: string, name: UserModalType): Promise<void>;
 }
 
 export const USER_MODAL_REPOSITORY = Symbol('USER_MODAL_REPOSITORY');
