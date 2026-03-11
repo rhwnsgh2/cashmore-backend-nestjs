@@ -16,6 +16,11 @@ import type {
  */
 export class StubLotteryRepository implements ILotteryRepository {
   private lotteries: Map<string, Lottery[]> = new Map();
+  private insertedReasons: {
+    userId: string;
+    reason: string;
+    issuedAt: string;
+  }[] = [];
 
   // 데이터 설정 메서드
   setLotteries(userId: string, lotteries: Lottery[]): void {
@@ -24,6 +29,7 @@ export class StubLotteryRepository implements ILotteryRepository {
 
   clear(): void {
     this.lotteries.clear();
+    this.insertedReasons = [];
   }
 
   // ILotteryRepository 구현
@@ -69,6 +75,14 @@ export class StubLotteryRepository implements ILotteryRepository {
     userLotteries.push(lottery);
     this.lotteries.set(data.user_id, userLotteries);
 
+    if (data.reason) {
+      this.insertedReasons.push({
+        userId: data.user_id,
+        reason: data.reason,
+        issuedAt: data.issued_at,
+      });
+    }
+
     return Promise.resolve(lottery);
   }
 
@@ -94,6 +108,23 @@ export class StubLotteryRepository implements ILotteryRepository {
 
   insertAdLotterySlot(_data: InsertAdLotterySlotData): Promise<void> {
     return Promise.resolve();
+  }
+
+  existsByUserIdAndReasonToday(
+    userId: string,
+    reason: string,
+    todayStart: string,
+    _todayEnd: string,
+  ): Promise<boolean> {
+    const userLotteries = this.lotteries.get(userId) || [];
+    // insertLottery에서 reason을 저장하지 않으므로 insertedReasons로 추적
+    const exists = this.insertedReasons.some(
+      (r) =>
+        r.userId === userId &&
+        r.reason === reason &&
+        r.issuedAt >= todayStart,
+    );
+    return Promise.resolve(exists);
   }
 
   findMaxRewardLotteries(_limit: number): Promise<MaxRewardLottery[]> {

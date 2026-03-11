@@ -127,6 +127,24 @@ export class LotteryService {
       throw new BadRequestException(`Invalid lottery type: ${lotteryType}`);
     }
 
+    // 황금 복권은 하루 1회 제한
+    if (reason === '황금 복권') {
+      const todayStart = dayjs().tz('Asia/Seoul').startOf('day').toISOString();
+      const todayEnd = dayjs().tz('Asia/Seoul').endOf('day').toISOString();
+      const alreadyIssued =
+        await this.lotteryRepository.existsByUserIdAndReasonToday(
+          userId,
+          reason,
+          todayStart,
+          todayEnd,
+        );
+      if (alreadyIssued) {
+        throw new BadRequestException(
+          '황금 복권은 하루에 한 번만 받을 수 있습니다.',
+        );
+      }
+    }
+
     const rewardAmount = this.calculateRewardAmount(lotteryType);
     const issuedAt = dayjs().toISOString();
     const expiresAt = dayjs().tz('Asia/Seoul').endOf('day').toISOString();

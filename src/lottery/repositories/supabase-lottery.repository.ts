@@ -110,6 +110,28 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
     }
   }
 
+  async existsByUserIdAndReasonToday(
+    userId: string,
+    reason: string,
+    todayStart: string,
+    todayEnd: string,
+  ): Promise<boolean> {
+    const { count, error } = await this.supabaseService
+      .getClient()
+      .from('lotteries')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('reason', reason)
+      .gte('issued_at', todayStart)
+      .lte('issued_at', todayEnd);
+
+    if (error) {
+      throw error;
+    }
+
+    return (count ?? 0) > 0;
+  }
+
   async findMaxRewardLotteries(limit: number): Promise<MaxRewardLottery[]> {
     interface LotteryRow {
       user_id: string;

@@ -52,10 +52,7 @@ export class StubAttendanceRepository implements IAttendanceRepository {
     );
   }
 
-  insertAttendance(
-    userId: string,
-    date: string,
-  ): Promise<AttendanceRecord> {
+  insertAttendance(userId: string, date: string): Promise<AttendanceRecord> {
     const record: AttendanceRecord = {
       id: this.nextId++,
       userId,
@@ -89,8 +86,10 @@ export class StubAttendanceRepository implements IAttendanceRepository {
     endDate: string,
   ): Promise<AttendanceRecord[]> {
     const records = this.attendances.get(userId) || [];
-    return Promise.resolve(records.filter(
-      (r) => r.createdAtDate >= startDate && r.createdAtDate <= endDate,
-    ));
+    return Promise.resolve(
+      records.filter(
+        (r) => r.createdAtDate >= startDate && r.createdAtDate <= endDate,
+      ),
+    );
   }
 }

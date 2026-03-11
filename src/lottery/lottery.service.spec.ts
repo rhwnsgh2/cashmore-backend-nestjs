@@ -207,6 +207,25 @@ describe('LotteryService', () => {
       expect(result).toBeDefined();
       expect(result.user_id).toBe(userId);
     });
+
+    it('황금 복권은 하루 1회만 발급 가능하다', async () => {
+      await service.issueLottery(userId, 'MAX_1000', '황금 복권');
+
+      await expect(
+        service.issueLottery(userId, 'MAX_1000', '황금 복권'),
+      ).rejects.toThrow('황금 복권은 하루에 한 번만 받을 수 있습니다.');
+    });
+
+    it('황금 복권이 아닌 reason은 제한 없이 발급 가능하다', async () => {
+      await service.issueLottery(userId, 'MAX_500', 'other_reason');
+      const result = await service.issueLottery(
+        userId,
+        'MAX_500',
+        'other_reason',
+      );
+
+      expect(result).toBeDefined();
+    });
   });
 
   describe('showAdAndClaim', () => {
