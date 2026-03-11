@@ -116,13 +116,10 @@ export class StubLotteryRepository implements ILotteryRepository {
     todayStart: string,
     _todayEnd: string,
   ): Promise<boolean> {
-    const userLotteries = this.lotteries.get(userId) || [];
     // insertLottery에서 reason을 저장하지 않으므로 insertedReasons로 추적
     const exists = this.insertedReasons.some(
       (r) =>
-        r.userId === userId &&
-        r.reason === reason &&
-        r.issuedAt >= todayStart,
+        r.userId === userId && r.reason === reason && r.issuedAt >= todayStart,
     );
     return Promise.resolve(exists);
   }
