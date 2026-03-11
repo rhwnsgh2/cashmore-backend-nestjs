@@ -265,4 +265,101 @@ describe('AttendanceService', () => {
       expect(result[0].point).toBeNull();
     });
   });
+
+  describe('checkIn', () => {
+    it('출석 체크에 성공한다', async () => {
+      const result = await service.checkIn(userId);
+
+      expect(result.success).toBe(true);
+      expect(result.weeklyBonusEarned).toBe(false);
+      expect(result.reason).toBeUndefined();
+    });
+
+    it('출석 체크 시 포인트가 2P 부여된다', async () => {
+      await service.checkIn(userId);
+
+      const pointActions = repository.getInsertedPointActions();
+      expect(pointActions).toHaveLength(1);
+      expect(pointActions[0].type).toBe('ATTENDANCE');
+      expect(pointActions[0].pointAmount).toBe(2);
+    });
+
+    it('출석 체크 시 attendance_id가 포인트 액션에 포함된다', async () => {
+      await service.checkIn(userId);
+
+      const pointActions = repository.getInsertedPointActions();
+      expect(pointActions[0].additionalData).toHaveProperty('attendance_id');
+    });
+
+    it('이미 출석한 경우 실패를 반환한다', async () => {
+      await service.checkIn(userId);
+
+      const result = await service.checkIn(userId);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe('Already attended today');
+      expect(result.weeklyBonusEarned).toBe(false);
+    });
+
+    it('주간 개근 시 보너스 포인트 5P가 지급된다', async () => {
+      const todayDate = getTodayKST();
+      const dayOfWeek = todayDate.getDay();
+
+      const startOfWeek = new Date(todayDate);
+      if (dayOfWeek === 0) {
+        startOfWeek.setDate(todayDate.getDate() - 6);
+      } else {
+        startOfWeek.setDate(todayDate.getDate() - dayOfWeek + 1);
+      }
+
+      const records: {
+        id: number;
+        userId: string;
+        createdAtDate: string;
+        createdAt: string;
+      }[] = [];
+      const todayStr = formatDate(todayDate);
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        const dateStr = formatDate(date);
+
+        if (dateStr === todayStr) continue;
+
+        records.push({
+          id: i + 1,
+          userId,
+          createdAtDate: dateStr,
+          createdAt: `${dateStr}T09:00:00+09:00`,
+        });
+      }
+      repository.setAttendances(userId, records);
+
+      const result = await service.checkIn(userId);
+
+      expect(result.success).toBe(true);
+      expect(result.weeklyBonusEarned).toBe(true);
+
+      const pointActions = repository.getInsertedPointActions();
+      const bonusAction = pointActions.find(
+        (a) => a.type === 'WEEKLY_ATTENDANCE_BONUS',
+      );
+      expect(bonusAction).toBeDefined();
+      expect(bonusAction!.pointAmount).toBe(5);
+    });
+  });
 });
+
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayKST(): Date {
+  const now = new Date();
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const kst = new Date(now.getTime() + kstOffset);
+  return new Date(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
+}

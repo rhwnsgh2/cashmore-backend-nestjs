@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
-import {
+import type {
   IAttendanceRepository,
   AttendanceRecord,
   AttendancePointAction,
@@ -77,6 +77,108 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       pointAmount: item.point_amount,
       additionalData: item.additional_data,
       type: item.type as 'ATTENDANCE' | 'ATTENDANCE_AD',
+    }));
+  }
+
+  async findByUserIdAndDate(
+    userId: string,
+    date: string,
+  ): Promise<AttendanceRecord | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('attendance')
+      .select('id, user_id, created_at_date, created_at')
+      .eq('user_id', userId)
+      .eq('created_at_date', date)
+      .maybeSingle<AttendanceRow>();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      createdAtDate: data.created_at_date,
+      createdAt: data.created_at,
+    };
+  }
+
+  async insertAttendance(
+    userId: string,
+    date: string,
+  ): Promise<AttendanceRecord> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('attendance')
+      .insert({ user_id: userId, created_at_date: date } as any)
+      .select('id, user_id, created_at_date, created_at')
+      .single<AttendanceRow>();
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      createdAtDate: data.created_at_date,
+      createdAt: data.created_at,
+    };
+  }
+
+  async insertPointAction(
+    userId: string,
+    type: 'ATTENDANCE' | 'WEEKLY_ATTENDANCE_BONUS',
+    pointAmount: number,
+    additionalData: Record<string, unknown>,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .insert({
+        user_id: userId,
+        type,
+        point_amount: pointAmount,
+        additional_data: additionalData,
+      } as any);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async findAttendancesByUserIdInDateRange(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<AttendanceRecord[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('attendance')
+      .select('id, user_id, created_at_date, created_at')
+      .eq('user_id', userId)
+      .gte('created_at_date', startDate)
+      .lte('created_at_date', endDate)
+      .returns<AttendanceRow[]>();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    return data.map((item) => ({
+      id: item.id,
+      userId: item.user_id,
+      createdAtDate: item.created_at_date,
+      createdAt: item.created_at,
     }));
   }
 }
