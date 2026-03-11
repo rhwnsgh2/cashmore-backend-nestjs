@@ -25,14 +25,14 @@ export class StubInvitationRepository implements IInvitationRepository {
     this.nextId = 1;
   }
 
-  async createOrGetInvitation(
+  createOrGetInvitation(
     userId: string,
     type: 'default' | 'normal' = 'normal',
   ): Promise<Invitation> {
     const key = this.makeKey(userId, type);
     const existing = this.invitations.get(key);
     if (existing) {
-      return existing;
+      return Promise.resolve(existing);
     }
 
     const invitation: Invitation = {
@@ -45,6 +45,6 @@ export class StubInvitationRepository implements IInvitationRepository {
     };
 
     this.invitations.set(key, invitation);
-    return invitation;
+    return Promise.resolve(invitation);
   }
 }
