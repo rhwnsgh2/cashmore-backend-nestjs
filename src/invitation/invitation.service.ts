@@ -1,4 +1,10 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   INVITATION_REPOSITORY,
   type IInvitationRepository,
@@ -10,6 +16,7 @@ import {
   POINTS_PER_INVITATION,
 } from './constants/invitation-steps';
 import type { StepEventResponseDto } from './dto/step-event-response.dto';
+import type { StepRewardResponseDto } from './dto/step-reward.dto';
 
 @Injectable()
 export class InvitationService {
@@ -60,8 +67,7 @@ export class InvitationService {
         INVITATION_STEP_START_DATE,
       );
 
-    const stepRewards =
-      await this.invitationRepository.findStepRewards(userId);
+    const stepRewards = await this.invitationRepository.findStepRewards(userId);
     const receivedRewards = stepRewards.map((r) => r.stepCount);
 
     const basePoints = invitationCount * POINTS_PER_INVITATION;
@@ -77,5 +83,55 @@ export class InvitationService {
       steps: INVITATION_STEPS,
       success: true,
     };
+  }
+
+  async claimStepReward(
+    userId: string,
+    stepCount: number,
+  ): Promise<StepRewardResponseDto> {
+    const invitationId =
+      await this.invitationRepository.findInvitationIdByUserId(userId);
+
+    if (invitationId === null) {
+      return { success: false, error: 'Invitation not found' };
+    }
+
+    // 초대 수 확인
+    const currentCount =
+      await this.invitationRepository.countInvitedUsersSince(
+        invitationId,
+        INVITATION_STEP_START_DATE,
+      );
+
+    if (currentCount < stepCount) {
+      throw new BadRequestException('Current count is less than step count');
+    }
+
+    // 해당 단계가 존재하는지 확인
+    const eligibleStep = INVITATION_STEPS.find((s) => s.count === stepCount);
+
+    if (!eligibleStep) {
+      throw new BadRequestException('Eligible step not found');
+    }
+
+    // 이미 수령했는지 확인
+    const alreadyReceived = await this.invitationRepository.hasStepReward(
+      userId,
+      stepCount,
+    );
+
+    if (alreadyReceived) {
+      throw new ConflictException('Already received step reward');
+    }
+
+    // 보상 지급
+    await this.invitationRepository.createStepReward(
+      userId,
+      eligibleStep.amount,
+      eligibleStep.count,
+      eligibleStep.reward,
+    );
+
+    return { success: true };
   }
 }

@@ -153,4 +153,45 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       .filter((row) => row.additional_data?.step_count)
       .map((row) => ({ stepCount: row.additional_data.step_count! }));
   }
+
+  async hasStepReward(userId: string, stepCount: number): Promise<boolean> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('point_actions')
+      .select('id')
+      .eq('type', 'INVITE_STEP_REWARD')
+      .eq('user_id', userId)
+      .eq('additional_data->>step_count', stepCount)
+      .returns<{ id: number }[]>();
+
+    if (error || !data) {
+      return false;
+    }
+
+    return data.length > 0;
+  }
+
+  async createStepReward(
+    userId: string,
+    amount: number,
+    stepCount: number,
+    stepName: string,
+  ): Promise<void> {
+    const client = this.supabaseService.getClient();
+
+    const { error } = await client.from('point_actions').insert({
+      type: 'INVITE_STEP_REWARD',
+      user_id: userId,
+      point_amount: amount,
+      additional_data: {
+        step_count: stepCount,
+        step_name: stepName,
+      },
+    } as any);
+
+    if (error) {
+      throw error;
+    }
+  }
 }

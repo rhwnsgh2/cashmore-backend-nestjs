@@ -86,4 +86,21 @@ export class StubInvitationRepository implements IInvitationRepository {
   findStepRewards(userId: string): Promise<StepRewardAction[]> {
     return Promise.resolve(this.stepRewards.get(userId) ?? []);
   }
+
+  hasStepReward(userId: string, stepCount: number): Promise<boolean> {
+    const rewards = this.stepRewards.get(userId) ?? [];
+    return Promise.resolve(rewards.some((r) => r.stepCount === stepCount));
+  }
+
+  createStepReward(
+    userId: string,
+    _amount: number,
+    stepCount: number,
+    _stepName: string,
+  ): Promise<void> {
+    const rewards = this.stepRewards.get(userId) ?? [];
+    rewards.push({ stepCount });
+    this.stepRewards.set(userId, rewards);
+    return Promise.resolve();
+  }
 }

@@ -227,4 +227,108 @@ describe('Invitation API (e2e)', () => {
       });
     });
   });
+
+  describe('POST /invitation-step-reward', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/invitation-step-reward')
+        .send({ stepCount: 3 })
+        .expect(401);
+
+      expect(response.body.message).toBe('No token provided');
+    });
+
+    it('초대장이 없으면 success: false를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/invitation-step-reward')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ stepCount: 3 })
+        .expect(201);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Invitation not found');
+    });
+
+    it('초대 수가 부족하면 400을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      // 초대장 생성
+      await request(app.getHttpServer())
+        .get('/invitation')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post('/invitation-step-reward')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ stepCount: 3 })
+        .expect(400);
+    });
+
+    it('조건을 충족하면 보상을 수령한다', async () => {
+      const inviter = await createTestUser(supabase);
+      const inviterToken = generateTestToken(inviter.auth_id);
+
+      // 초대장 생성
+      const invitationRes = await request(app.getHttpServer())
+        .get('/invitation')
+        .set('Authorization', `Bearer ${inviterToken}`)
+        .expect(200);
+
+      // 초대 유저 3명 추가
+      for (let i = 0; i < 3; i++) {
+        const invitee = await createTestUser(supabase);
+        await supabase.from('invitation_user').insert({
+          invitation_id: invitationRes.body.id,
+          user_id: invitee.id,
+        });
+      }
+
+      const response = await request(app.getHttpServer())
+        .post('/invitation-step-reward')
+        .set('Authorization', `Bearer ${inviterToken}`)
+        .send({ stepCount: 3 })
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+    });
+
+    it('이미 수령한 보상은 409를 반환한다', async () => {
+      const inviter = await createTestUser(supabase);
+      const inviterToken = generateTestToken(inviter.auth_id);
+
+      // 초대장 생성
+      const invitationRes = await request(app.getHttpServer())
+        .get('/invitation')
+        .set('Authorization', `Bearer ${inviterToken}`)
+        .expect(200);
+
+      // 초대 유저 3명 추가
+      for (let i = 0; i < 3; i++) {
+        const invitee = await createTestUser(supabase);
+        await supabase.from('invitation_user').insert({
+          invitation_id: invitationRes.body.id,
+          user_id: invitee.id,
+        });
+      }
+
+      // 첫 번째 수령
+      await request(app.getHttpServer())
+        .post('/invitation-step-reward')
+        .set('Authorization', `Bearer ${inviterToken}`)
+        .send({ stepCount: 3 })
+        .expect(201);
+
+      // 중복 수령 시도
+      await request(app.getHttpServer())
+        .post('/invitation-step-reward')
+        .set('Authorization', `Bearer ${inviterToken}`)
+        .send({ stepCount: 3 })
+        .expect(409);
+    });
+  });
 });

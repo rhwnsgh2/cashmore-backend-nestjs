@@ -18,11 +18,15 @@ export interface IInvitationRepository {
   ): Promise<Invitation>;
   getInvitationByCode(code: string): Promise<Invitation | null>;
   findInvitationIdByUserId(userId: string): Promise<number | null>;
-  countInvitedUsersSince(
-    invitationId: number,
-    since: string,
-  ): Promise<number>;
+  countInvitedUsersSince(invitationId: number, since: string): Promise<number>;
   findStepRewards(userId: string): Promise<StepRewardAction[]>;
+  hasStepReward(userId: string, stepCount: number): Promise<boolean>;
+  createStepReward(
+    userId: string,
+    amount: number,
+    stepCount: number,
+    stepName: string,
+  ): Promise<void>;
 }
 
 export const INVITATION_REPOSITORY = Symbol('INVITATION_REPOSITORY');

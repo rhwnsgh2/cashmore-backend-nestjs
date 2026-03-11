@@ -161,16 +161,73 @@ describe('InvitationService', () => {
     it('단계별 보상 포인트도 합산한다', async () => {
       const invitation = await service.getOrCreateInvitation(userId);
       repository.setInvitedUserCount(invitation.id, 5);
-      repository.setStepRewards(userId, [
-        { stepCount: 3 },
-        { stepCount: 5 },
-      ]);
+      repository.setStepRewards(userId, [{ stepCount: 3 }, { stepCount: 5 }]);
 
       const result = await service.getStepEvent(userId);
 
       expect(result.receivedRewards).toEqual([3, 5]);
       // 기본: 5 * 300 = 1500, 단계: 1000 + 2000 = 3000
       expect(result.totalPoints).toBe(4500);
+    });
+  });
+
+  describe('claimStepReward', () => {
+    const userId = 'test-user';
+
+    it('초대장이 없으면 success: false를 반환한다', async () => {
+      const result = await service.claimStepReward(userId, 3);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invitation not found');
+    });
+
+    it('초대 수가 부족하면 BadRequestException을 던진다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 2);
+
+      await expect(service.claimStepReward(userId, 3)).rejects.toThrow(
+        'Current count is less than step count',
+      );
+    });
+
+    it('존재하지 않는 단계이면 BadRequestException을 던진다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 100);
+
+      await expect(service.claimStepReward(userId, 99)).rejects.toThrow(
+        'Eligible step not found',
+      );
+    });
+
+    it('이미 수령한 보상이면 ConflictException을 던진다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 5);
+      repository.setStepRewards(userId, [{ stepCount: 3 }]);
+
+      await expect(service.claimStepReward(userId, 3)).rejects.toThrow(
+        'Already received step reward',
+      );
+    });
+
+    it('조건을 충족하면 보상을 지급하고 success: true를 반환한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 3);
+
+      const result = await service.claimStepReward(userId, 3);
+
+      expect(result.success).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('보상 지급 후 중복 수령이 불가능하다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 3);
+
+      await service.claimStepReward(userId, 3);
+
+      await expect(service.claimStepReward(userId, 3)).rejects.toThrow(
+        'Already received step reward',
+      );
     });
   });
 });
