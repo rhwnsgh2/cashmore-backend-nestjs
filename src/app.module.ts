@@ -30,6 +30,7 @@ import { BuzzvilModule } from './buzzvil/buzzvil.module';
 import { StorageModule } from './storage/storage.module';
 import { AmplitudeModule } from './amplitude/amplitude.module';
 import { NpsSurveyModule } from './nps-survey/nps-survey.module';
+import { InvitationModule } from './invitation/invitation.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -76,6 +77,7 @@ import configuration from './config/configuration';
     StorageModule,
     AmplitudeModule,
     NpsSurveyModule,
+    InvitationModule,
   ],
   controllers: [AppController],
   providers: [
