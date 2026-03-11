@@ -42,15 +42,17 @@ export class StubAttendanceRepository implements IAttendanceRepository {
     return Promise.resolve(this.pointActions.get(userId) || []);
   }
 
-  async findByUserIdAndDate(
+  findByUserIdAndDate(
     userId: string,
     date: string,
   ): Promise<AttendanceRecord | null> {
     const records = this.attendances.get(userId) || [];
-    return records.find((r) => r.createdAtDate === date) || null;
+    return Promise.resolve(
+      records.find((r) => r.createdAtDate === date) || null,
+    );
   }
 
-  async insertAttendance(
+  insertAttendance(
     userId: string,
     date: string,
   ): Promise<AttendanceRecord> {
@@ -63,26 +65,32 @@ export class StubAttendanceRepository implements IAttendanceRepository {
     const existing = this.attendances.get(userId) || [];
     existing.push(record);
     this.attendances.set(userId, existing);
-    return record;
+    return Promise.resolve(record);
   }
 
-  async insertPointAction(
+  insertPointAction(
     userId: string,
     type: 'ATTENDANCE' | 'WEEKLY_ATTENDANCE_BONUS',
     pointAmount: number,
     additionalData: Record<string, unknown>,
   ): Promise<void> {
-    this.insertedPointActions.push({ userId, type, pointAmount, additionalData });
+    this.insertedPointActions.push({
+      userId,
+      type,
+      pointAmount,
+      additionalData,
+    });
+    return Promise.resolve();
   }
 
-  async findAttendancesByUserIdInDateRange(
+  findAttendancesByUserIdInDateRange(
     userId: string,
     startDate: string,
     endDate: string,
   ): Promise<AttendanceRecord[]> {
     const records = this.attendances.get(userId) || [];
-    return records.filter(
+    return Promise.resolve(records.filter(
       (r) => r.createdAtDate >= startDate && r.createdAtDate <= endDate,
-    );
+    ));
   }
 }
