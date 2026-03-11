@@ -97,11 +97,10 @@ export class InvitationService {
     }
 
     // 초대 수 확인
-    const currentCount =
-      await this.invitationRepository.countInvitedUsersSince(
-        invitationId,
-        INVITATION_STEP_START_DATE,
-      );
+    const currentCount = await this.invitationRepository.countInvitedUsersSince(
+      invitationId,
+      INVITATION_STEP_START_DATE,
+    );
 
     if (currentCount < stepCount) {
       throw new BadRequestException('Current count is less than step count');

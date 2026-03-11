@@ -67,10 +67,19 @@ export class AttendanceService {
       };
     }
 
-    const attendance = await this.attendanceRepository.insertAttendance(
-      userId,
-      today,
-    );
+    let attendance;
+    try {
+      attendance = await this.attendanceRepository.insertAttendance(
+        userId,
+        today,
+      );
+    } catch {
+      return {
+        success: false,
+        weeklyBonusEarned: false,
+        reason: 'Already attended today',
+      };
+    }
 
     await this.attendanceRepository.insertPointAction(
       userId,

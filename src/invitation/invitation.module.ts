@@ -9,7 +9,11 @@ import { SupabaseInvitationRepository } from './repositories/supabase-invitation
 
 @Module({
   imports: [AuthModule],
-  controllers: [InvitationController, InvitationStepEventController, InvitationStepRewardController],
+  controllers: [
+    InvitationController,
+    InvitationStepEventController,
+    InvitationStepRewardController,
+  ],
   providers: [
     InvitationService,
     {
