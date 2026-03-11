@@ -13,11 +13,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Attendance')
-@Controller('attendance')
+@Controller()
 export class AttendanceController {
   constructor(private attendanceService: AttendanceService) {}
 
-  @Get()
+  @Get('attendances')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
@@ -38,7 +38,7 @@ export class AttendanceController {
     return this.attendanceService.getAttendances(userId);
   }
 
-  @Post()
+  @Post('attendance')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
