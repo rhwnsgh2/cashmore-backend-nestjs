@@ -7,11 +7,22 @@ export interface Invitation {
   status: 'pending' | 'used';
 }
 
+export interface StepRewardAction {
+  stepCount: number;
+}
+
 export interface IInvitationRepository {
   createOrGetInvitation(
     userId: string,
     type?: 'default' | 'normal',
   ): Promise<Invitation>;
+  getInvitationByCode(code: string): Promise<Invitation | null>;
+  findInvitationIdByUserId(userId: string): Promise<number | null>;
+  countInvitedUsersSince(
+    invitationId: number,
+    since: string,
+  ): Promise<number>;
+  findStepRewards(userId: string): Promise<StepRewardAction[]>;
 }
 
 export const INVITATION_REPOSITORY = Symbol('INVITATION_REPOSITORY');

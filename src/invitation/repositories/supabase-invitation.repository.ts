@@ -3,6 +3,7 @@ import { SupabaseService } from '../../supabase/supabase.service';
 import type {
   IInvitationRepository,
   Invitation,
+  StepRewardAction,
 } from '../interfaces/invitation-repository.interface';
 import { generateUniqueCode } from '../utils/generate-code';
 
@@ -72,5 +73,84 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       type,
       status: created.status,
     };
+  }
+
+  async getInvitationByCode(code: string): Promise<Invitation | null> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('invitation')
+      .select('id, sender_id, created_at, identifier, type, status')
+      .eq('identifier', code)
+      .maybeSingle<InvitationRow>();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      senderId: data.sender_id,
+      createdAt: data.created_at,
+      identifier: data.identifier,
+      type: data.type,
+      status: data.status,
+    };
+  }
+
+  async findInvitationIdByUserId(userId: string): Promise<number | null> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('invitation')
+      .select('id')
+      .eq('sender_id', userId)
+      .eq('type', 'normal')
+      .maybeSingle<{ id: number }>();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data.id;
+  }
+
+  async countInvitedUsersSince(
+    invitationId: number,
+    since: string,
+  ): Promise<number> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('invitation_user')
+      .select('id')
+      .eq('invitation_id', invitationId)
+      .gte('created_at', since)
+      .returns<{ id: number }[]>();
+
+    if (error || !data) {
+      return 0;
+    }
+
+    return new Set(data.map((row) => row.id)).size;
+  }
+
+  async findStepRewards(userId: string): Promise<StepRewardAction[]> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('point_actions')
+      .select('additional_data')
+      .eq('type', 'INVITE_STEP_REWARD')
+      .eq('user_id', userId)
+      .returns<{ additional_data: { step_count?: number } }[]>();
+
+    if (error || !data) {
+      return [];
+    }
+
+    return data
+      .filter((row) => row.additional_data?.step_count)
+      .map((row) => ({ stepCount: row.additional_data.step_count! }));
   }
 }

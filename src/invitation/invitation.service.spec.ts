@@ -90,4 +90,87 @@ describe('InvitationService', () => {
       expect(result.identifier).toMatch(validChars);
     });
   });
+
+  describe('verifyInvitationCode', () => {
+    it('유효한 초대 코드이면 success: true를 반환한다', async () => {
+      const inviter = await service.getOrCreateInvitation('inviter-id');
+
+      const result = await service.verifyInvitationCode(
+        'other-user-id',
+        inviter.identifier,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('본인의 초대 코드이면 success: false를 반환한다', async () => {
+      const inviter = await service.getOrCreateInvitation('inviter-id');
+
+      const result = await service.verifyInvitationCode(
+        'inviter-id',
+        inviter.identifier,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('본인의 초대 코드는 사용할 수 없습니다.');
+    });
+
+    it('존재하지 않는 코드이면 success: false를 반환한다', async () => {
+      const result = await service.verifyInvitationCode(
+        'some-user',
+        'NONEXIST',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('올바른 초대 코드를 입력해주세요');
+    });
+  });
+
+  describe('getStepEvent', () => {
+    const userId = 'test-user';
+
+    it('초대장이 없으면 NotFoundException을 던진다', async () => {
+      await expect(service.getStepEvent(userId)).rejects.toThrow(
+        'Invitation not found',
+      );
+    });
+
+    it('초대 수와 보상이 없으면 기본값을 반환한다', async () => {
+      await service.getOrCreateInvitation(userId);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.success).toBe(true);
+      expect(result.invitationCount).toBe(0);
+      expect(result.receivedRewards).toEqual([]);
+      expect(result.totalPoints).toBe(0);
+      expect(result.steps).toHaveLength(4);
+    });
+
+    it('초대 수에 따라 기본 포인트를 계산한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 5);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.invitationCount).toBe(5);
+      expect(result.totalPoints).toBe(5 * 300); // 1500
+    });
+
+    it('단계별 보상 포인트도 합산한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 5);
+      repository.setStepRewards(userId, [
+        { stepCount: 3 },
+        { stepCount: 5 },
+      ]);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.receivedRewards).toEqual([3, 5]);
+      // 기본: 5 * 300 = 1500, 단계: 1000 + 2000 = 3000
+      expect(result.totalPoints).toBe(4500);
+    });
+  });
 });
