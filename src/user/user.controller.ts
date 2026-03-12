@@ -1,12 +1,16 @@
 import {
+  Body,
   Controller,
   Get,
   Header,
   NotFoundException,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConflictResponse,
   ApiNotFoundResponse,
   ApiOperation,
   ApiResponse,
@@ -15,7 +19,12 @@ import {
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UserInfoResponseDto } from './dto/get-user-info.dto';
+import {
+  CreateUserRequestDto,
+  CreateUserResponseDto,
+} from './dto/create-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthOnlyGuard } from '../auth/guards/jwt-auth-only.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('User')
@@ -53,5 +62,39 @@ export class UserController {
     }
 
     return userInfo;
+  }
+
+  @Post()
+  @UseGuards(JwtAuthOnlyGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '새 사용자 생성',
+    description:
+      '회원가입 시 새 사용자를 생성합니다. JWT 토큰의 auth_id를 기반으로 사용자를 생성합니다.',
+  })
+  @ApiBody({ type: CreateUserRequestDto })
+  @ApiResponse({
+    status: 201,
+    description: '사용자 생성 성공',
+    type: CreateUserResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 실패 (토큰 없음, 유효하지 않음)',
+  })
+  @ApiConflictResponse({
+    description: '이미 가입된 사용자',
+  })
+  async createUser(
+    @CurrentUser() user: { authId: string; email: string },
+    @Body() dto: CreateUserRequestDto,
+  ): Promise<CreateUserResponseDto> {
+    return this.userService.createUser({
+      authId: user.authId,
+      email: user.email,
+      fcmToken: dto.fcmToken,
+      marketingAgreement: dto.marketingAgreement,
+      onboardingCompleted: dto.onboardingCompleted,
+      deviceId: dto.deviceId,
+    });
   }
 }

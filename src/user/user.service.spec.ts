@@ -1,15 +1,20 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConflictException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { USER_REPOSITORY } from './interfaces/user-repository.interface';
 import { StubUserRepository } from './repositories/stub-user.repository';
+import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
+import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
 
 describe('UserService', () => {
   let service: UserService;
   let repository: StubUserRepository;
+  let modalRepository: StubUserModalRepository;
 
   beforeEach(async () => {
     repository = new StubUserRepository();
+    modalRepository = new StubUserModalRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -17,6 +22,10 @@ describe('UserService', () => {
         {
           provide: USER_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: USER_MODAL_REPOSITORY,
+          useValue: modalRepository,
         },
       ],
     }).compile();
@@ -105,7 +114,6 @@ describe('UserService', () => {
         nickname: 'testuser',
         provider: 'kakao',
       });
-      // banReason을 설정하지 않음
 
       const result = await service.getUserInfo(userId);
 
@@ -136,6 +144,220 @@ describe('UserService', () => {
 
       expect(result).not.toBeNull();
       expect(result!.email).toBe('');
+    });
+  });
+
+  describe('createUser', () => {
+    beforeEach(() => {
+      repository.clear();
+      modalRepository.clear();
+    });
+
+    it('새 사용자를 생성한다', async () => {
+      repository.setAuthProvider('auth-new', 'kakao');
+
+      const result = await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: true,
+        onboardingCompleted: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.userId).toBeTruthy();
+      expect(result.nickname).toBeTruthy();
+    });
+
+    it('이미 가입된 사용자면 ConflictException을 던진다', async () => {
+      repository.setUser({
+        id: 'existing-id',
+        email: 'existing@example.com',
+        auth_id: 'auth-existing',
+        created_at: '2025-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'existing',
+        provider: 'kakao',
+      });
+
+      await expect(
+        service.createUser({
+          authId: 'auth-existing',
+          email: 'existing@example.com',
+          marketingAgreement: false,
+          onboardingCompleted: false,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('deviceId가 있고 첫 기기이면 joined 이벤트를 기록한다', async () => {
+      repository.setAuthProvider('auth-new', 'apple');
+
+      const result = await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: false,
+        onboardingCompleted: false,
+        deviceId: 'device-123',
+      });
+
+      expect(result.success).toBe(true);
+      const events = repository.getDeviceEvents();
+      expect(events.some((e) => e.event_name === 'joined')).toBe(true);
+    });
+
+    it('온보딩 완료 시 온보딩 모달과 포인트를 생성한다', async () => {
+      repository.setAuthProvider('auth-new', 'kakao');
+
+      const result = await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: false,
+        onboardingCompleted: true,
+        deviceId: 'device-123',
+      });
+
+      expect(result.success).toBe(true);
+
+      // 온보딩 포인트 지급 확인
+      const pointActions = repository.getPointActions();
+      expect(
+        pointActions.some(
+          (p) => p.type === 'ONBOARDING_EVENT' && p.pointAmount === 40,
+        ),
+      ).toBe(true);
+    });
+
+    it('초대받지 않은 사용자에게 invite_code_input_lotto 모달을 생성한다', async () => {
+      repository.setAuthProvider('auth-new', 'kakao');
+
+      const result = await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: false,
+        onboardingCompleted: false,
+      });
+
+      expect(result.success).toBe(true);
+
+      const hasModal = await modalRepository.hasModalByName(
+        result.userId!,
+        'invite_code_input_lotto',
+      );
+      expect(hasModal).toBe(true);
+    });
+
+    it('deviceId가 없으면 디바이스 이벤트를 처리하지 않는다', async () => {
+      repository.setAuthProvider('auth-new', 'kakao');
+
+      await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: false,
+        onboardingCompleted: true,
+        // deviceId 없음
+      });
+
+      const events = repository.getDeviceEvents();
+      expect(events).toHaveLength(0);
+
+      const pointActions = repository.getPointActions();
+      expect(
+        pointActions.some((p) => p.type === 'ONBOARDING_EVENT'),
+      ).toBe(false);
+    });
+
+    it('이미 기기 이벤트가 있으면 joined 이벤트를 기록하지 않는다', async () => {
+      repository.setAuthProvider('auth-new', 'apple');
+      repository.setDeviceEvents([
+        { device_id: 'device-existing', event_name: 'joined' },
+      ]);
+
+      await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: false,
+        onboardingCompleted: true,
+        deviceId: 'device-existing',
+      });
+
+      // 기존 1개만 있어야 함 (새로 추가 안 됨)
+      const events = repository.getDeviceEvents();
+      expect(events.filter((e) => e.event_name === 'joined')).toHaveLength(1);
+    });
+
+    it('온보딩 완료 시 onboarding 모달과 onboarding_event 디바이스 이벤트를 생성한다', async () => {
+      repository.setAuthProvider('auth-new', 'kakao');
+
+      const result = await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: false,
+        onboardingCompleted: true,
+        deviceId: 'device-123',
+      });
+
+      // 온보딩 모달 확인
+      const hasOnboardingModal = await modalRepository.hasModalByName(
+        result.userId!,
+        'onboarding',
+      );
+      expect(hasOnboardingModal).toBe(true);
+
+      // onboarding_event 디바이스 이벤트 확인
+      const events = repository.getDeviceEvents();
+      expect(events.some((e) => e.event_name === 'onboarding_event')).toBe(
+        true,
+      );
+    });
+
+    it('onboardingCompleted가 false면 온보딩 모달/포인트를 생성하지 않는다', async () => {
+      repository.setAuthProvider('auth-new', 'kakao');
+
+      const result = await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: false,
+        onboardingCompleted: false,
+        deviceId: 'device-123',
+      });
+
+      expect(result.success).toBe(true);
+
+      const hasOnboardingModal = await modalRepository.hasModalByName(
+        result.userId!,
+        'onboarding',
+      );
+      expect(hasOnboardingModal).toBe(false);
+
+      const pointActions = repository.getPointActions();
+      expect(
+        pointActions.some((p) => p.type === 'ONBOARDING_EVENT'),
+      ).toBe(false);
+    });
+
+    it('이미 초대받은 사용자에게는 invite 모달을 생성하지 않는다', async () => {
+      repository.setAuthProvider('auth-new', 'kakao');
+
+      const originalIsInvited = repository.isInvitedUser.bind(repository);
+      repository.isInvitedUser = async () => true;
+
+      const result = await service.createUser({
+        authId: 'auth-new',
+        email: 'new@example.com',
+        marketingAgreement: false,
+        onboardingCompleted: false,
+      });
+
+      expect(result.success).toBe(true);
+
+      const hasModal = await modalRepository.hasModalByName(
+        result.userId!,
+        'invite_code_input_lotto',
+      );
+      expect(hasModal).toBe(false);
+
+      repository.isInvitedUser = originalIsInvited;
     });
   });
 });

@@ -1,10 +1,17 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import type {
   IUserRepository,
   UserRole,
   UserProvider,
 } from './interfaces/user-repository.interface';
 import { USER_REPOSITORY } from './interfaces/user-repository.interface';
+import type { IUserModalRepository } from '../user-modal/interfaces/user-modal-repository.interface';
+import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 
 export interface UserInfoResponse {
   id: string;
@@ -18,45 +25,70 @@ export interface UserInfoResponse {
   nickname: string;
 }
 
-// 닉네임 자동 생성
+export interface CreateUserParams {
+  authId: string;
+  email: string;
+  fcmToken?: string;
+  marketingAgreement: boolean;
+  onboardingCompleted: boolean;
+  deviceId?: string;
+}
+
+export interface CreateUserResult {
+  success: boolean;
+  userId?: string;
+  nickname?: string;
+  error?: string;
+}
+
+const ONBOARDING_POINT_AMOUNT = 40;
+
+const ADJECTIVES = [
+  '따뜻한', '다정한', '부드러운', '행복한', '상냥한', '여유로운', '평화로운',
+  '밝은', '활기찬', '느긋한', '씩씩한', '편안한', '귀여운', '유쾌한', '포근한',
+  '진심인', '성실한', '소중한', '깔끔한', '똑똑한', '온화한', '명랑한',
+  '사랑스러운', '낙천적인', '담백한', '진정한', '든든한', '친절한', '꾸준한',
+  '다부진', '부지런한', '따사로운', '상쾌한', '단단한', '유연한', '재치있는',
+  '열정적인', '집중하는', '소박한', '묵직한', '사려깊은', '확실한', '정직한',
+  '용감한', '기분좋은', '정다운', '잔잔한', '햇살같은', '단정한', '기운찬',
+  '깨끗한', '자연스러운', '상큼한', '감성적인', '신중한', '섬세한', '활발한',
+  '정갈한', '꼼꼼한', '진솔한', '확고한', '자상한', '선한', '믿음직한',
+  '침착한', '쿨한', '평온한', '청량한', '알뜰한', '푸른', '맑은', '조용한',
+  '화사한', '푸근한', '반짝이는', '싱그러운', '다채로운', '순한', '고요한',
+  '풋풋한', '똘똘한',
+] as const;
+
+const NOUNS = [
+  '고양이', '강아지', '사자', '코끼리', '호랑이', '여우', '토끼', '다람쥐',
+  '펭귄', '돌고래', '고래', '참새', '비둘기', '까치', '부엉이', '독수리',
+  '고슴도치', '거북이', '병아리', '백로', '오리', '송아지', '판다', '캥거루',
+  '코알라', '나비', '너구리', '무당벌레', '물고기', '금붕어', '햄스터',
+  '장미', '해바라기', '튤립', '코스모스', '수국', '백합', '국화', '민들레',
+  '클로버', '라벤더', '선인장', '소나무', '참나무', '단풍', '벚꽃', '목련',
+  '대나무', '풀잎', '연꽃', '들꽃', '수련', '포도', '사과', '복숭아', '꿀벌',
+  '딸기', '바나나', '수박', '멜론', '오렌지', '블루베리', '체리', '레몬',
+  '쿼카', '카피바라', '호두', '나뭇잎', '개나리', '꽃잎', '열매', '새싹',
+  '버섯', '구름', '매화', '진달래', '철쭉', '모란',
+] as const;
+
 function generateNickname(): string {
-  const adjectives = [
-    '행복한',
-    '즐거운',
-    '신나는',
-    '활기찬',
-    '밝은',
-    '따뜻한',
-    '귀여운',
-    '멋진',
-    '용감한',
-    '지혜로운',
-  ];
-  const nouns = [
-    '고양이',
-    '강아지',
-    '토끼',
-    '펭귄',
-    '다람쥐',
-    '판다',
-    '코알라',
-    '여우',
-    '사자',
-    '호랑이',
-  ];
-
-  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  const number = Math.floor(Math.random() * 1000);
-
-  return `${adjective}${noun}${number}`;
+  const adjective = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const suffix = Math.floor(Math.random() * 10000)
+    .toString()
+    .padStart(4, '0');
+  return `${adjective}${noun}${suffix}`;
 }
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @Inject(USER_REPOSITORY)
     private userRepository: IUserRepository,
+    @Inject(USER_MODAL_REPOSITORY)
+    private userModalRepository: IUserModalRepository,
   ) {}
 
   async getUserInfo(userId: string): Promise<UserInfoResponse | null> {
@@ -93,5 +125,117 @@ export class UserService {
       marketingAgreement: user.marketing_info,
       nickname,
     };
+  }
+
+  async createUser(params: CreateUserParams): Promise<CreateUserResult> {
+    // 1. 이미 존재하는 사용자인지 확인
+    const existingUser = await this.userRepository.findByAuthId(params.authId);
+    if (existingUser) {
+      throw new ConflictException('이미 가입된 사용자입니다.');
+    }
+
+    // 2. 닉네임 생성
+    const nickname = generateNickname();
+
+    // 3. provider 조회
+    const provider = await this.userRepository.getAuthProvider(params.authId);
+
+    // 4. 사용자 생성
+    const { id: userId } = await this.userRepository.create({
+      authId: params.authId,
+      email: params.email,
+      nickname,
+      fcmToken: params.fcmToken || null,
+      marketingAgreement: params.marketingAgreement,
+      deviceId: params.deviceId || null,
+      provider,
+    });
+
+    // 5. 디바이스 이벤트 처리
+    if (params.deviceId) {
+      await this.handleDeviceEvents(
+        params.deviceId,
+        userId,
+        params.onboardingCompleted,
+      );
+    }
+
+    // 6. 초대 보상 대상 확인
+    await this.handleInviteRewardModal(userId);
+
+    return { success: true, userId, nickname };
+  }
+
+  private async handleDeviceEvents(
+    deviceId: string,
+    userId: string,
+    onboardingCompleted: boolean,
+  ): Promise<void> {
+    try {
+      const deviceEvents =
+        await this.userRepository.findDeviceEventsByDeviceId(deviceId);
+
+      if (deviceEvents.length === 0) {
+        // 첫 기기 → joined 이벤트 기록
+        await this.userRepository.createDeviceEvent(
+          deviceId,
+          'joined',
+          userId,
+        );
+
+        if (onboardingCompleted) {
+          // 온보딩 모달 생성
+          await this.userModalRepository.createModal(userId, 'onboarding');
+
+          // 온보딩 포인트 지급
+          await this.startOnboardingEvent(deviceId, userId);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to handle device events: ${error}`);
+    }
+  }
+
+  private async startOnboardingEvent(
+    deviceId: string,
+    userId: string,
+  ): Promise<void> {
+    // 이미 온보딩 이벤트 참여했는지 확인
+    const deviceEvents =
+      await this.userRepository.findDeviceEventsByDeviceId(deviceId);
+    const alreadyParticipated = deviceEvents.some(
+      (e) => e.event_name === 'onboarding_event',
+    );
+
+    if (alreadyParticipated) {
+      return;
+    }
+
+    await this.userRepository.createDeviceEvent(
+      deviceId,
+      'onboarding_event',
+      userId,
+    );
+
+    await this.userRepository.createPointAction(
+      userId,
+      'ONBOARDING_EVENT',
+      ONBOARDING_POINT_AMOUNT,
+      {},
+    );
+  }
+
+  private async handleInviteRewardModal(userId: string): Promise<void> {
+    try {
+      const isInvited = await this.userRepository.isInvitedUser(userId);
+      if (!isInvited) {
+        await this.userModalRepository.createModal(
+          userId,
+          'invite_code_input_lotto',
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Failed to handle invite reward modal: ${error}`);
+    }
   }
 }
