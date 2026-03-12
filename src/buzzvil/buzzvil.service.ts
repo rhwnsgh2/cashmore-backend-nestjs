@@ -36,8 +36,21 @@ export class BuzzvilService {
       deviceName: query.device_name,
       userAgent: query.user_agent,
       cursor: query.cursor,
-      revenueTypes: ['cpm', 'cpc', 'cpi', 'cpe'],
+      revenueTypes: ['cpc', 'cpm', 'cpq', 'cpinsta', 'cpa', 'cpl', 'cpcquiz'],
     });
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const ads = (Array.isArray(data?.ads) ? data.ads : []) as Array<{
+      type?: string;
+    }>;
+    const typeCounts: Record<string, number> = {};
+    for (const ad of ads) {
+      const t = ad.type ?? 'unknown';
+      typeCounts[t] = (typeCounts[t] ?? 0) + 1;
+    }
+    this.logger.log(
+      `getAds: authId=${authId}, total=${ads.length}, types=${JSON.stringify(typeCounts)}`,
+    );
 
     return data;
   }
@@ -47,16 +60,34 @@ export class BuzzvilService {
     clientIp: string,
     dto: ParticipateRequestDto,
   ) {
-    return this.buzzvilApiService.participate({
+    const ifa = dto.ifa || DEFAULT_IFA;
+    const params = {
       userId: authId,
       clientIp,
-      ifa: dto.ifa || DEFAULT_IFA,
+      ifa,
       platform: dto.platform,
       campaignId: dto.campaign_id,
       payload: dto.payload,
       deviceName: dto.device_name,
       carrier: dto.carrier,
-    });
+    };
+
+    try {
+      const result = await this.buzzvilApiService.participate(params);
+      this.logger.log(
+        `participate OK: authId=${authId}, platform=${dto.platform}, campaign_id=${dto.campaign_id}, ifa=${ifa}`,
+      );
+      return result;
+    } catch (error) {
+      const ax = error as {
+        response?: { status?: number; data?: unknown };
+        message?: string;
+      };
+      this.logger.error(
+        `participate FAIL: authId=${authId}, platform=${dto.platform}, campaign_id=${dto.campaign_id}, ifa=${ifa}, status=${ax.response?.status}, body=${JSON.stringify(ax.response?.data)}, msg=${ax.message}`,
+      );
+      throw error;
+    }
   }
 
   async handlePostback(dto: PostbackBodyDto): Promise<{ message: string }> {
