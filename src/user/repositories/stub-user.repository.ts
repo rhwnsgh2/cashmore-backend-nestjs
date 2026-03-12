@@ -72,7 +72,7 @@ export class StubUserRepository implements IUserRepository {
     return Promise.resolve(user || null);
   }
 
-  async create(data: CreateUserData): Promise<{ id: string }> {
+  create(data: CreateUserData): Promise<{ id: string }> {
     const id = `user-${Date.now()}`;
     const user: User = {
       id,
@@ -85,7 +85,7 @@ export class StubUserRepository implements IUserRepository {
       provider: data.provider,
     };
     this.users.set(id, user);
-    return { id };
+    return Promise.resolve({ id });
   }
 
   updateNickname(userId: string, nickname: string): Promise<void> {
@@ -101,32 +101,36 @@ export class StubUserRepository implements IUserRepository {
     return Promise.resolve(this.banReasons.get(authId) || null);
   }
 
-  async getAuthProvider(authId: string): Promise<UserProvider> {
-    return this.authProviders.get(authId) || 'other';
+  getAuthProvider(authId: string): Promise<UserProvider> {
+    return Promise.resolve(this.authProviders.get(authId) || 'other');
   }
 
-  async findDeviceEventsByDeviceId(deviceId: string): Promise<DeviceEvent[]> {
-    return this.deviceEvents.filter((e) => e.device_id === deviceId);
+  findDeviceEventsByDeviceId(deviceId: string): Promise<DeviceEvent[]> {
+    return Promise.resolve(
+      this.deviceEvents.filter((e) => e.device_id === deviceId),
+    );
   }
 
-  async createDeviceEvent(
+  createDeviceEvent(
     deviceId: string,
     eventName: string,
     _userId: string,
   ): Promise<void> {
     this.deviceEvents.push({ device_id: deviceId, event_name: eventName });
+    return Promise.resolve();
   }
 
-  async createPointAction(
+  createPointAction(
     userId: string,
     type: string,
     pointAmount: number,
     _additionalData: Record<string, unknown>,
   ): Promise<void> {
     this.pointActions.push({ userId, type, pointAmount });
+    return Promise.resolve();
   }
 
-  async isInvitedUser(userId: string): Promise<boolean> {
-    return this.invitedUsers.has(userId);
+  isInvitedUser(userId: string): Promise<boolean> {
+    return Promise.resolve(this.invitedUsers.has(userId));
   }
 }

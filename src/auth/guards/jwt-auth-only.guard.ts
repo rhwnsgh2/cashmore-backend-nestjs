@@ -28,7 +28,7 @@ export class JwtAuthOnlyGuard implements CanActivate {
 
   constructor(private configService: ConfigService) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
 

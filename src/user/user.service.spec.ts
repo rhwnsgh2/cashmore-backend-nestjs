@@ -262,9 +262,9 @@ describe('UserService', () => {
       expect(events).toHaveLength(0);
 
       const pointActions = repository.getPointActions();
-      expect(
-        pointActions.some((p) => p.type === 'ONBOARDING_EVENT'),
-      ).toBe(false);
+      expect(pointActions.some((p) => p.type === 'ONBOARDING_EVENT')).toBe(
+        false,
+      );
     });
 
     it('이미 기기 이벤트가 있으면 joined 이벤트를 기록하지 않는다', async () => {
@@ -331,16 +331,16 @@ describe('UserService', () => {
       expect(hasOnboardingModal).toBe(false);
 
       const pointActions = repository.getPointActions();
-      expect(
-        pointActions.some((p) => p.type === 'ONBOARDING_EVENT'),
-      ).toBe(false);
+      expect(pointActions.some((p) => p.type === 'ONBOARDING_EVENT')).toBe(
+        false,
+      );
     });
 
     it('이미 초대받은 사용자에게는 invite 모달을 생성하지 않는다', async () => {
       repository.setAuthProvider('auth-new', 'kakao');
 
       const originalIsInvited = repository.isInvitedUser.bind(repository);
-      repository.isInvitedUser = async () => true;
+      repository.isInvitedUser = () => Promise.resolve(true);
 
       const result = await service.createUser({
         authId: 'auth-new',
