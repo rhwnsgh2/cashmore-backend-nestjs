@@ -163,18 +163,7 @@ export class InvitationService {
       `초대장 처리 로직 userId :${invitedUserId} , invitationCode : ${inviteCode}`,
     );
 
-    // 1. deviceId 필수 검증 (요청에서 받거나, 없으면 DB에서 조회)
-    let resolvedDeviceId = deviceId;
-    if (!resolvedDeviceId) {
-      resolvedDeviceId =
-        (await this.invitationRepository.findUserDeviceId(invitedUserId)) ??
-        undefined;
-    }
-    if (!resolvedDeviceId) {
-      return { success: false, error: 'deviceId가 필요합니다.' };
-    }
-
-    // 2. 초대코드 조회
+    // 1. 초대코드 조회
     const invitation =
       await this.invitationRepository.getInvitationByCode(inviteCode);
 
@@ -185,7 +174,7 @@ export class InvitationService {
       return { success: false, error: '올바른 초대 코드를 입력해주세요' };
     }
 
-    // 3. 본인 초대코드 검증
+    // 2. 본인 초대코드 검증
     if (invitation.senderId === invitedUserId) {
       return {
         success: false,
@@ -193,9 +182,20 @@ export class InvitationService {
       };
     }
 
-    // 4. invitation type이 normal인지 검증
+    // 3. invitation type이 normal인지 검증
     if (invitation.type !== 'normal') {
       return { success: false, error: '유효하지 않은 초대장입니다.' };
+    }
+
+    // 4. deviceId 검증 (DB에서 조회)
+    let resolvedDeviceId = deviceId;
+    if (!resolvedDeviceId) {
+      resolvedDeviceId =
+        (await this.invitationRepository.findUserDeviceId(invitedUserId)) ??
+        undefined;
+    }
+    if (!resolvedDeviceId) {
+      return { success: false, error: 'deviceId가 필요합니다.' };
     }
 
     // 5. 가입 후 24시간 이내인지 검증
