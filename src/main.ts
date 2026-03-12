@@ -34,7 +34,20 @@ async function bootstrap() {
     );
   }
 
-  // Swagger 설정
+  // Swagger 설정 (커스텀 헤더 인증)
+  const swaggerApiKey = configService.get<string>('BATCH_API_KEY');
+  if (swaggerApiKey) {
+    app.use(
+      ['/api-docs', '/api-docs-json'],
+      (req: any, res: any, next: any) => {
+        if (req.headers['x-api-key'] !== swaggerApiKey) {
+          return res.status(403).json({ message: 'Forbidden' });
+        }
+        next();
+      },
+    );
+  }
+
   const config = new DocumentBuilder()
     .setTitle('Cashmore API')
     .setDescription('Cashmore Backend API Documentation')
