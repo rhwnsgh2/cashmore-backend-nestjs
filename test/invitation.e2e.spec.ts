@@ -360,14 +360,14 @@ describe('Invitation API (e2e)', () => {
         inviterToken,
         inviteeToken,
         deviceId,
-        inviteCode: invitationRes.body.identifier as string,
+        invitationCode: invitationRes.body.identifier as string,
       };
     }
 
     it('토큰 없이 요청하면 401을 반환한다', async () => {
       const response = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
-        .send({ inviteCode: 'ABC234', deviceId: 'device-1' })
+        .send({ invitationCode: 'ABC234', deviceId: 'device-1' })
         .expect(401);
 
       expect(response.body.message).toBe('No token provided');
@@ -376,13 +376,13 @@ describe('Invitation API (e2e)', () => {
     // === 성공 케이스 ===
 
     it('유효한 초대코드로 초대 보상을 처리한다', async () => {
-      const { inviteeToken, inviteCode, deviceId } =
+      const { inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       const response = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       expect(response.body.success).toBe(true);
@@ -393,13 +393,13 @@ describe('Invitation API (e2e)', () => {
     });
 
     it('초대 관계(invitation_user)가 생성된다', async () => {
-      const { invitee, inviteeToken, inviteCode, deviceId } =
+      const { invitee, inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       // DB에서 직접 확인
@@ -412,13 +412,13 @@ describe('Invitation API (e2e)', () => {
     });
 
     it('초대자에게 INVITE_REWARD 300P가 지급된다', async () => {
-      const { inviter, inviteeToken, inviteCode, deviceId } =
+      const { inviter, inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       const { data } = await supabase
@@ -432,13 +432,13 @@ describe('Invitation API (e2e)', () => {
     });
 
     it('피초대자에게 INVITED_USER_REWARD_RANDOM 포인트가 지급된다', async () => {
-      const { invitee, inviteeToken, inviteCode, deviceId } =
+      const { invitee, inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       const { data } = await supabase
@@ -452,13 +452,13 @@ describe('Invitation API (e2e)', () => {
     });
 
     it('피초대자 디바이스에 invitation_reward 이벤트가 기록된다', async () => {
-      const { inviteeToken, inviteCode, deviceId } =
+      const { inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       const { data } = await supabase
@@ -471,13 +471,13 @@ describe('Invitation API (e2e)', () => {
     });
 
     it('초대자에게 invite_reward_received 모달이 생성된다', async () => {
-      const { inviter, inviteeToken, inviteCode, deviceId } =
+      const { inviter, inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       const { data } = await supabase
@@ -497,7 +497,7 @@ describe('Invitation API (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode: 'ZZZZZZ', deviceId })
+        .send({ invitationCode: 'ZZZZZZ', deviceId })
         .expect(201);
 
       expect(response.body.success).toBe(false);
@@ -505,14 +505,14 @@ describe('Invitation API (e2e)', () => {
     });
 
     it('본인의 초대코드이면 실패한다', async () => {
-      const { inviterToken, inviteCode, deviceId } =
+      const { inviterToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       // 초대자 본인이 자기 코드로 보상 요청
       const response = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviterToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       expect(response.body.success).toBe(false);
@@ -541,7 +541,7 @@ describe('Invitation API (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode: defaultInvitation!.identifier, deviceId })
+        .send({ invitationCode: defaultInvitation!.identifier, deviceId })
         .expect(201);
 
       expect(response.body.success).toBe(false);
@@ -550,7 +550,7 @@ describe('Invitation API (e2e)', () => {
     // === 실패 케이스: 중복 보상 방지 ===
 
     it('이미 invitation_reward를 받은 디바이스면 실패한다', async () => {
-      const { inviteeToken, inviteCode, deviceId } =
+      const { inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       // 이미 다른 초대를 통해 보상을 받은 디바이스
@@ -562,7 +562,7 @@ describe('Invitation API (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       expect(response.body.success).toBe(false);
@@ -570,14 +570,14 @@ describe('Invitation API (e2e)', () => {
     });
 
     it('동일한 보상 처리를 다시 호출하면 실패한다', async () => {
-      const { inviteeToken, inviteCode, deviceId } =
+      const { inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       // 첫 번째 성공
       const first = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       expect(first.body.success).toBe(true);
@@ -586,7 +586,7 @@ describe('Invitation API (e2e)', () => {
       const second = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       expect(second.body.success).toBe(false);
@@ -622,7 +622,7 @@ describe('Invitation API (e2e)', () => {
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
         .send({
-          inviteCode: invitationRes.body.identifier,
+          invitationCode: invitationRes.body.identifier,
           deviceId,
         })
         .expect(201);
@@ -659,7 +659,7 @@ describe('Invitation API (e2e)', () => {
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
         .send({
-          inviteCode: invitationRes.body.identifier,
+          invitationCode: invitationRes.body.identifier,
           deviceId,
         })
         .expect(201);
@@ -670,14 +670,14 @@ describe('Invitation API (e2e)', () => {
     // === 중복 보상 방지: 같은 유저가 다른 디바이스로 재시도 ===
 
     it('이미 초대 보상을 받은 유저가 다른 디바이스로 재시도하면 실패한다', async () => {
-      const { invitee, inviteeToken, inviteCode, deviceId } =
+      const { invitee, inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       // 첫 번째 성공
       const first = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       expect(first.body.success).toBe(true);
@@ -689,7 +689,7 @@ describe('Invitation API (e2e)', () => {
       const second = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId: newDeviceId })
+        .send({ invitationCode, deviceId: newDeviceId })
         .expect(201);
 
       expect(second.body.success).toBe(false);
@@ -698,13 +698,13 @@ describe('Invitation API (e2e)', () => {
     // === 데이터 무결성 검증 ===
 
     it('초대자 INVITE_REWARD의 additional_data에 피초대자 정보가 포함된다', async () => {
-      const { inviter, invitee, inviteeToken, inviteCode, deviceId } =
+      const { inviter, invitee, inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       const { data } = await supabase
@@ -719,13 +719,13 @@ describe('Invitation API (e2e)', () => {
     });
 
     it('invite_reward_received 모달에 rewardAmount가 포함된다', async () => {
-      const { inviter, inviteeToken, inviteCode, deviceId } =
+      const { inviter, inviteeToken, invitationCode, deviceId } =
         await setupInvitationScenario();
 
       await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${inviteeToken}`)
-        .send({ inviteCode, deviceId })
+        .send({ invitationCode, deviceId })
         .expect(201);
 
       const { data } = await supabase
@@ -758,14 +758,14 @@ describe('Invitation API (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${noDeviceToken}`)
-        .send({ inviteCode: invitationRes.body.identifier })
+        .send({ invitationCode: invitationRes.body.identifier })
         .expect(201);
 
       expect(response.body.success).toBe(false);
     });
 
     it('서로 다른 피초대자는 같은 초대코드로 각각 보상을 받을 수 있다', async () => {
-      const { inviter, inviteCode } = await setupInvitationScenario();
+      const { inviter, invitationCode } = await setupInvitationScenario();
 
       // 피초대자 A
       const inviteeA = await createTestUser(supabase);
@@ -782,13 +782,13 @@ describe('Invitation API (e2e)', () => {
       const resA = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${tokenA}`)
-        .send({ inviteCode, deviceId: deviceA })
+        .send({ invitationCode, deviceId: deviceA })
         .expect(201);
 
       const resB = await request(app.getHttpServer())
         .post('/invitation/lotto-process')
         .set('Authorization', `Bearer ${tokenB}`)
-        .send({ inviteCode, deviceId: deviceB })
+        .send({ invitationCode, deviceId: deviceB })
         .expect(201);
 
       expect(resA.body.success).toBe(true);
