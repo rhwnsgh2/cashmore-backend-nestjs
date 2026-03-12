@@ -1,20 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class LottoProcessRequestDto {
   @ApiProperty({ description: '초대 코드', example: 'ABC234' })
   @IsString()
   @IsNotEmpty()
-  inviteCode: string;
-
-  @ApiProperty({
-    description: '디바이스 ID',
-    example: 'device-123',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  deviceId?: string;
+  invitationCode: string;
 }
 
 export class LottoProcessResponseDto {

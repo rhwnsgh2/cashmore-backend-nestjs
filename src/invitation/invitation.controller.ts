@@ -92,10 +92,9 @@ export class InvitationController {
     @CurrentUser('userId') userId: string,
     @Body() dto: LottoProcessRequestDto,
   ): Promise<LottoProcessResponseDto> {
-    return this.invitationService.processInvitationReward({
+    return await this.invitationService.processInvitationReward({
       invitedUserId: userId,
-      inviteCode: dto.inviteCode,
-      deviceId: dto.deviceId,
+      inviteCode: dto.invitationCode,
     });
   }
 }

@@ -115,18 +115,6 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
     }
 
     return data[0].id;
-
-
-
-
-
-
-
-
-
-
-
-
   }
 
   async countInvitedUsersSince(
