@@ -5,13 +5,19 @@ import {
   Invitation,
 } from './interfaces/invitation-repository.interface';
 import { StubInvitationRepository } from './repositories/stub-invitation.repository';
+import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
+import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
+import { FcmService } from '../fcm/fcm.service';
+import { SlackService } from '../slack/slack.service';
 
 describe('InvitationService', () => {
   let service: InvitationService;
   let repository: StubInvitationRepository;
+  let modalRepository: StubUserModalRepository;
 
   beforeEach(async () => {
     repository = new StubInvitationRepository();
+    modalRepository = new StubUserModalRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -19,6 +25,24 @@ describe('InvitationService', () => {
         {
           provide: INVITATION_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: USER_MODAL_REPOSITORY,
+          useValue: modalRepository,
+        },
+        {
+          provide: FcmService,
+          useValue: {
+            sendRefreshMessage: async () => {},
+            pushNotification: async () => {},
+          },
+        },
+        {
+          provide: SlackService,
+          useValue: {
+            reportBugToSlack: async () => {},
+            reportToInvitationNoti: async () => {},
+          },
         },
       ],
     }).compile();
@@ -228,6 +252,301 @@ describe('InvitationService', () => {
       await expect(service.claimStepReward(userId, 3)).rejects.toThrow(
         'Already received step reward',
       );
+    });
+  });
+
+  describe('processInvitationReward', () => {
+    const senderId = 'sender-user-id';
+    const invitedUserId = 'invited-user-id';
+    const deviceId = 'device-123';
+    let invitation: Invitation;
+
+    beforeEach(async () => {
+      repository.clear();
+      modalRepository.clear();
+
+      // 초대자의 초대장 생성
+      invitation = await service.getOrCreateInvitation(senderId);
+
+      // 피초대자의 deviceId 설정
+      repository.setUserDeviceId(invitedUserId, deviceId);
+    });
+
+    // === 성공 케이스 ===
+
+    it('유효한 초대코드로 초대 보상을 처리한다', async () => {
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.rewardPoint).toBeDefined();
+      expect(typeof result.rewardPoint).toBe('number');
+    });
+
+    it('초대 관계(invitation_user)를 생성한다', async () => {
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      const invitationUsers = repository.getInvitationUsers();
+      expect(invitationUsers).toHaveLength(1);
+      expect(invitationUsers[0].invitationId).toBe(invitation.id);
+      expect(invitationUsers[0].userId).toBe(invitedUserId);
+    });
+
+    it('초대자에게 INVITE_REWARD 300P를 지급한다', async () => {
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      const pointActions = repository.getPointActions();
+      const senderReward = pointActions.find(
+        (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
+      );
+      expect(senderReward).toBeDefined();
+      expect(senderReward!.pointAmount).toBe(300);
+    });
+
+    it('피초대자에게 INVITED_USER_REWARD_RANDOM 랜덤 포인트를 지급한다', async () => {
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      const pointActions = repository.getPointActions();
+      const invitedReward = pointActions.find(
+        (p) =>
+          p.userId === invitedUserId && p.type === 'INVITED_USER_REWARD_RANDOM',
+      );
+      expect(invitedReward).toBeDefined();
+      expect([300, 500, 1000, 3000, 50000]).toContain(
+        invitedReward!.pointAmount,
+      );
+    });
+
+    it('피초대자의 디바이스에 invitation_reward 이벤트를 기록한다', async () => {
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      const deviceEvents = repository.getDeviceEvents();
+      expect(
+        deviceEvents.some(
+          (e) =>
+            e.device_id === deviceId && e.event_name === 'invitation_reward',
+        ),
+      ).toBe(true);
+    });
+
+    it('초대자에게 invite_reward_received 모달을 생성한다', async () => {
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      const hasModal = await modalRepository.hasModalByName(
+        senderId,
+        'invite_reward_received',
+      );
+      expect(hasModal).toBe(true);
+    });
+
+    // === 실패 케이스: 초대코드 검증 ===
+
+    it('존재하지 않는 초대코드이면 실패한다', async () => {
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: 'NONEXIST',
+        deviceId,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
+    it('본인의 초대코드이면 실패한다', async () => {
+      const result = await service.processInvitationReward({
+        invitedUserId: senderId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('본인');
+    });
+
+    it('invitation type이 normal이 아니면 실패한다', async () => {
+      const defaultInvitation: Invitation = {
+        id: 999,
+        senderId: 'other-sender',
+        createdAt: new Date().toISOString(),
+        identifier: 'DEFAUL',
+        type: 'default',
+        status: 'pending',
+      };
+      repository.setInvitation('other-sender', defaultInvitation, 'default');
+
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: 'DEFAUL',
+        deviceId,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    // === 실패 케이스: 중복 보상 방지 ===
+
+    it('이미 invitation_reward를 받은 디바이스면 보상을 지급하지 않는다', async () => {
+      // 이미 다른 초대를 통해 보상을 받은 디바이스
+      repository.setDeviceEvents([
+        { device_id: deviceId, event_name: 'invitation_reward' },
+      ]);
+
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('이미');
+    });
+
+    it('초대자에게 이미 해당 유저에 대한 INVITE_REWARD가 있으면 중복 보상하지 않는다', async () => {
+      // 첫 번째 보상 처리
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      // 같은 유저에 대해 다시 처리 시도
+      const newDeviceId = 'device-456';
+      repository.setUserDeviceId(invitedUserId, newDeviceId);
+
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId: newDeviceId,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    // === 실패 케이스: 가입 시간 제한 ===
+
+    it('가입 후 24시간이 초과한 유저는 초대 보상을 받을 수 없다', async () => {
+      // 25시간 전에 가입한 유저
+      const twentyFiveHoursAgo = new Date(
+        Date.now() - 25 * 60 * 60 * 1000,
+      ).toISOString();
+      repository.setUserCreatedAt(invitedUserId, twentyFiveHoursAgo);
+
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('24시간');
+    });
+
+    it('가입 후 24시간 이내인 유저는 초대 보상을 받을 수 있다', async () => {
+      // 23시간 전에 가입한 유저
+      const twentyThreeHoursAgo = new Date(
+        Date.now() - 23 * 60 * 60 * 1000,
+      ).toISOString();
+      repository.setUserCreatedAt(invitedUserId, twentyThreeHoursAgo);
+
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    // === 엣지 케이스 ===
+
+    it('deviceId가 요청에도 DB에도 없으면 실패한다', async () => {
+      const noDeviceUserId = 'no-device-user';
+      const result = await service.processInvitationReward({
+        invitedUserId: noDeviceUserId,
+        inviteCode: invitation.identifier,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('보상 처리 후 동일한 processInvitationReward를 다시 호출하면 실패한다', async () => {
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('서로 다른 피초대자는 같은 초대코드로 각각 보상을 받을 수 있다', async () => {
+      const anotherInvitedUserId = 'another-invited-user';
+      const anotherDeviceId = 'device-789';
+      repository.setUserDeviceId(anotherInvitedUserId, anotherDeviceId);
+
+      const result1 = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      const result2 = await service.processInvitationReward({
+        invitedUserId: anotherInvitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId: anotherDeviceId,
+      });
+
+      expect(result1.success).toBe(true);
+      expect(result2.success).toBe(true);
+
+      // 초대자에게 INVITE_REWARD가 2건 지급되었는지 확인
+      const pointActions = repository.getPointActions();
+      const senderRewards = pointActions.filter(
+        (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
+      );
+      expect(senderRewards).toHaveLength(2);
+    });
+
+    it('랜덤 보상 금액은 허용된 값 중 하나이다', async () => {
+      const allowedAmounts = [300, 500, 1000, 3000, 50000];
+
+      const result = await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      expect(result.success).toBe(true);
+      expect(allowedAmounts).toContain(result.rewardPoint);
     });
   });
 });

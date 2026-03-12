@@ -11,6 +11,18 @@ export class StubInvitationRepository implements IInvitationRepository {
   private stepRewards: Map<string, StepRewardAction[]> = new Map();
   private nextId = 1;
 
+  // processInvitationReward 관련 내부 저장소
+  private userDeviceIds: Map<string, string> = new Map();
+  private userCreatedAts: Map<string, string> = new Map();
+  private deviceEvents: { device_id: string; event_name: string }[] = [];
+  private invitationUsers: { invitationId: number; userId: string }[] = [];
+  private pointActions: {
+    userId: string;
+    type: string;
+    pointAmount: number;
+    additionalData: Record<string, unknown>;
+  }[] = [];
+
   private makeKey(userId: string, type: string): string {
     return `${userId}:${type}`;
   }
@@ -31,10 +43,45 @@ export class StubInvitationRepository implements IInvitationRepository {
     this.stepRewards.set(userId, rewards);
   }
 
+  // 테스트 헬퍼 메서드
+  setUserDeviceId(userId: string, deviceId: string): void {
+    this.userDeviceIds.set(userId, deviceId);
+  }
+
+  setUserCreatedAt(userId: string, createdAt: string): void {
+    this.userCreatedAts.set(userId, createdAt);
+  }
+
+  setDeviceEvents(events: { device_id: string; event_name: string }[]): void {
+    this.deviceEvents = events;
+  }
+
+  getInvitationUsers(): { invitationId: number; userId: string }[] {
+    return this.invitationUsers;
+  }
+
+  getPointActions(): {
+    userId: string;
+    type: string;
+    pointAmount: number;
+    additionalData: Record<string, unknown>;
+  }[] {
+    return this.pointActions;
+  }
+
+  getDeviceEvents(): { device_id: string; event_name: string }[] {
+    return this.deviceEvents;
+  }
+
   clear(): void {
     this.invitations.clear();
     this.invitedUserCounts.clear();
     this.stepRewards.clear();
+    this.userDeviceIds.clear();
+    this.userCreatedAts.clear();
+    this.deviceEvents = [];
+    this.invitationUsers = [];
+    this.pointActions = [];
     this.nextId = 1;
   }
 
@@ -101,6 +148,66 @@ export class StubInvitationRepository implements IInvitationRepository {
     const rewards = this.stepRewards.get(userId) ?? [];
     rewards.push({ stepCount });
     this.stepRewards.set(userId, rewards);
+    return Promise.resolve();
+  }
+
+  // processInvitationReward 관련 인터페이스 구현
+
+  findUserDeviceId(userId: string): Promise<string | null> {
+    return Promise.resolve(this.userDeviceIds.get(userId) ?? null);
+  }
+
+  findUserCreatedAt(userId: string): Promise<string | null> {
+    return Promise.resolve(this.userCreatedAts.get(userId) ?? null);
+  }
+
+  hasDeviceEventParticipation(
+    deviceId: string,
+    eventName: string,
+  ): Promise<boolean> {
+    const found = this.deviceEvents.some(
+      (e) => e.device_id === deviceId && e.event_name === eventName,
+    );
+    return Promise.resolve(found);
+  }
+
+  createDeviceEventParticipation(
+    deviceId: string,
+    eventName: string,
+    _userId: string,
+  ): Promise<void> {
+    this.deviceEvents.push({ device_id: deviceId, event_name: eventName });
+    return Promise.resolve();
+  }
+
+  hasInviteRewardForUser(
+    senderId: string,
+    invitedUserId: string,
+  ): Promise<boolean> {
+    const found = this.pointActions.some(
+      (p) =>
+        p.userId === senderId &&
+        p.type === 'INVITE_REWARD' &&
+        p.additionalData?.invited_user_id === invitedUserId,
+    );
+    return Promise.resolve(found);
+  }
+
+  private nextInvitationUserId = 1;
+
+  createInvitationUser(invitationId: number, userId: string): Promise<number> {
+    const id = this.nextInvitationUserId++;
+    this.invitationUsers.push({ invitationId, userId });
+    return Promise.resolve(id);
+  }
+
+  createPointAction(
+    userId: string,
+    type: string,
+    pointAmount: number,
+    additionalData: Record<string, unknown>,
+  ): Promise<void> {
+    this.pointActions.push({ userId, type, pointAmount, additionalData });
     return Promise.resolve();
   }
 }

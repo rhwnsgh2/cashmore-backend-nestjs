@@ -36,7 +36,16 @@ export class BuzzvilService {
       deviceName: query.device_name,
       userAgent: query.user_agent,
       cursor: query.cursor,
-      revenueTypes: ['cpc', 'cpm', 'cpq', 'cpinsta', 'cpa', 'cpl', 'cpcquiz'],
+      revenueTypes: [
+        'cpc',
+        'cpm',
+        'cpq',
+        'cpinsta',
+        'cpa',
+        'cpl',
+        'cpcquiz',
+        // 'cpk',
+      ],
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -81,10 +90,13 @@ export class BuzzvilService {
     } catch (error) {
       const ax = error as {
         response?: { status?: number; data?: unknown };
+        config?: { headers?: unknown; data?: string; url?: string };
         message?: string;
       };
       this.logger.error(
-        `participate FAIL: authId=${authId}, platform=${dto.platform}, campaign_id=${dto.campaign_id}, ifa=${ifa}, status=${ax.response?.status}, body=${JSON.stringify(ax.response?.data)}, msg=${ax.message}`,
+        `participate FAIL: authId=${authId}, platform=${dto.platform}, campaign_id=${dto.campaign_id}, ifa=${ifa}, ` +
+          `status=${ax.response?.status}, resBody=${JSON.stringify(ax.response?.data)}, msg=${ax.message}, ` +
+          `reqUrl=${ax.config?.url}, reqHeaders=${JSON.stringify(ax.config?.headers)}, reqBody=${ax.config?.data}`,
       );
       throw error;
     }

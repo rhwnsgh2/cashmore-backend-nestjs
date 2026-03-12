@@ -15,14 +15,33 @@ import {
   INVITATION_STEP_START_DATE,
   POINTS_PER_INVITATION,
 } from './constants/invitation-steps';
+import {
+  USER_MODAL_REPOSITORY,
+  type IUserModalRepository,
+} from '../user-modal/interfaces/user-modal-repository.interface';
+import { FcmService } from '../fcm/fcm.service';
+import { SlackService } from '../slack/slack.service';
 import type { StepEventResponseDto } from './dto/step-event-response.dto';
 import type { StepRewardResponseDto } from './dto/step-reward.dto';
+import type { LottoProcessResponseDto } from './dto/lotto-process.dto';
+import { getRandomRewardPoint } from './utils/random-reward';
+import { addSeparator } from './utils/add-separator';
+
+interface ProcessInvitationRewardParams {
+  invitedUserId: string;
+  inviteCode: string;
+  deviceId?: string;
+}
 
 @Injectable()
 export class InvitationService {
   constructor(
     @Inject(INVITATION_REPOSITORY)
     private invitationRepository: IInvitationRepository,
+    @Inject(USER_MODAL_REPOSITORY)
+    private userModalRepository: IUserModalRepository,
+    private fcmService: FcmService,
+    private slackService: SlackService,
   ) {}
 
   async getOrCreateInvitation(userId: string): Promise<Invitation> {
@@ -132,5 +151,158 @@ export class InvitationService {
     );
 
     return { success: true };
+  }
+
+  async processInvitationReward(
+    params: ProcessInvitationRewardParams,
+  ): Promise<LottoProcessResponseDto> {
+    const { invitedUserId, inviteCode, deviceId } = params;
+
+    // Slack: 초대장 처리 시작 로깅
+    void this.slackService.reportBugToSlack(
+      `초대장 처리 로직 userId :${invitedUserId} , invitationCode : ${inviteCode}`,
+    );
+
+    // 1. deviceId 필수 검증 (요청에서 받거나, 없으면 DB에서 조회)
+    let resolvedDeviceId = deviceId;
+    if (!resolvedDeviceId) {
+      resolvedDeviceId =
+        (await this.invitationRepository.findUserDeviceId(invitedUserId)) ??
+        undefined;
+    }
+    if (!resolvedDeviceId) {
+      return { success: false, error: 'deviceId가 필요합니다.' };
+    }
+
+    // 2. 초대코드 조회
+    const invitation =
+      await this.invitationRepository.getInvitationByCode(inviteCode);
+
+    if (!invitation) {
+      void this.slackService.reportBugToSlack(
+        `초대코드를 넣었지만, 초대한 유저가 삭제된 것 같습니다. ${invitedUserId}, ${inviteCode}`,
+      );
+      return { success: false, error: '올바른 초대 코드를 입력해주세요' };
+    }
+
+    // 3. 본인 초대코드 검증
+    if (invitation.senderId === invitedUserId) {
+      return {
+        success: false,
+        error: '본인의 초대 코드는 사용할 수 없습니다.',
+      };
+    }
+
+    // 4. invitation type이 normal인지 검증
+    if (invitation.type !== 'normal') {
+      return { success: false, error: '유효하지 않은 초대장입니다.' };
+    }
+
+    // 5. 가입 후 24시간 이내인지 검증
+    const createdAt =
+      await this.invitationRepository.findUserCreatedAt(invitedUserId);
+    if (createdAt) {
+      const hoursSinceCreation =
+        (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60);
+      if (hoursSinceCreation > 24) {
+        return {
+          success: false,
+          error: '가입 후 24시간이 지나 초대 보상을 받을 수 없습니다.',
+        };
+      }
+    }
+
+    // 6. 이미 보상을 받은 디바이스인지 검증 (웹과 동일: DB의 device_id로 체크)
+    const alreadyReceivedByDevice =
+      await this.invitationRepository.hasDeviceEventParticipation(
+        resolvedDeviceId,
+        'invitation_reward',
+      );
+    if (alreadyReceivedByDevice) {
+      return {
+        success: false,
+        error: '이미 초대 보상을 받은 디바이스입니다.',
+      };
+    }
+
+    // 7. 초대자에게 이미 해당 유저에 대한 보상이 있는지 검증
+    const alreadyRewardedForUser =
+      await this.invitationRepository.hasInviteRewardForUser(
+        invitation.senderId,
+        invitedUserId,
+      );
+    if (alreadyRewardedForUser) {
+      void this.slackService.reportToInvitationNoti(
+        `이미 초대 리워드가 지급된 유저입니다.`,
+        invitation.senderId,
+      );
+      return { success: false, error: '이미 처리된 초대입니다.' };
+    }
+
+    // === 검증 통과, 보상 처리 시작 ===
+
+    // 8. 초대 관계 생성
+    const invitationUserId =
+      await this.invitationRepository.createInvitationUser(
+        invitation.id,
+        invitedUserId,
+      );
+
+    // 9. 초대자에게 INVITE_REWARD 300P 지급
+    await this.invitationRepository.createPointAction(
+      invitation.senderId,
+      'INVITE_REWARD',
+      POINTS_PER_INVITATION,
+      { invited_user_id: invitedUserId },
+    );
+
+    // 10. 초대자에게 모달 생성
+    await this.userModalRepository.createModal(
+      invitation.senderId,
+      'invite_reward_received',
+      { rewardAmount: POINTS_PER_INVITATION },
+    );
+
+    // 11. 초대자에게 FCM 리프레시 + 푸시 알림
+    void this.fcmService.sendRefreshMessage(
+      invitation.senderId,
+      'point_update',
+    );
+    void this.fcmService.pushNotification(
+      invitation.senderId,
+      `${addSeparator(POINTS_PER_INVITATION)} 포인트 지급 완료 💰`,
+      `내가 초대한 친구가 가입했어요!`,
+    );
+
+    // 12. 디바이스 이벤트 기록
+    await this.invitationRepository.createDeviceEventParticipation(
+      resolvedDeviceId,
+      'invitation_reward',
+      invitedUserId,
+    );
+
+    // 13. 피초대자에게 랜덤 포인트 지급
+    const rewardPoint = getRandomRewardPoint();
+    await this.invitationRepository.createPointAction(
+      invitedUserId,
+      'INVITED_USER_REWARD_RANDOM',
+      rewardPoint,
+      { invitation_user_id: invitationUserId },
+    );
+
+    // Slack: 초대 성공 로깅
+    void this.slackService.reportToInvitationNoti(
+      `✅ 초대를 성공한 유저에게 리워드가 지급되었습니다.`,
+      invitation.senderId,
+    );
+
+    // Slack: 랜덤 리워드 금액 로깅
+    const emoji = rewardPoint > 1000 ? '🎉' : '✅';
+    void this.slackService.reportToInvitationNoti(
+      `${emoji} 초대를 성공한 유저에게 랜덤 리워드가 지급되었습니다. ${rewardPoint}원`,
+      invitedUserId,
+    );
+
+    return { success: true, rewardPoint };
   }
 }

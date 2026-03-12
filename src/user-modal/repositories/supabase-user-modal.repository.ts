@@ -55,15 +55,25 @@ export class SupabaseUserModalRepository implements IUserModalRepository {
     return (data?.length ?? 0) > 0;
   }
 
-  async createModal(userId: string, name: UserModalType): Promise<void> {
+  async createModal(
+    userId: string,
+    name: UserModalType,
+    additionalData?: Record<string, unknown>,
+  ): Promise<void> {
+    const insertData: Record<string, unknown> = {
+      user_id: userId,
+      name,
+      status: 'pending',
+    };
+
+    if (additionalData) {
+      insertData.additional_data = additionalData;
+    }
+
     const { error } = await this.supabase
       .getClient()
       .from('modal_shown')
-      .insert({
-        user_id: userId,
-        name,
-        status: 'pending',
-      } as any);
+      .insert(insertData as any);
 
     if (error) {
       throw error;

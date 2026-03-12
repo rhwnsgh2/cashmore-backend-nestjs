@@ -130,6 +130,13 @@ export class InfrastructureStack extends cdk.Stack {
       'cashmore/amplitude',
     );
 
+    // Reference Slack secret (app webhooks)
+    const slackSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'SlackAppSecret',
+      'cashmore/slack',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 2048,
@@ -208,6 +215,14 @@ export class InfrastructureStack extends cdk.Stack {
         AMPLITUDE_API_KEY: ecs.Secret.fromSecretsManager(
           amplitudeSecret,
           'AMPLITUDE_API_KEY',
+        ),
+        SLACK_BUG_WEBHOOK_URL: ecs.Secret.fromSecretsManager(
+          slackSecret,
+          'bugWebhookUrl',
+        ),
+        SLACK_INVITATION_WEBHOOK_URL: ecs.Secret.fromSecretsManager(
+          slackSecret,
+          'invitationWebhookUrl',
         ),
       },
     });

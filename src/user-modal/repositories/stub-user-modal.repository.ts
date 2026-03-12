@@ -31,13 +31,17 @@ export class StubUserModalRepository implements IUserModalRepository {
     return Promise.resolve(found);
   }
 
-  createModal(userId: string, name: UserModalType): Promise<void> {
+  createModal(
+    userId: string,
+    name: UserModalType,
+    additionalData?: Record<string, unknown>,
+  ): Promise<void> {
     const userModals = this.modals.get(userId) || [];
     userModals.push({
       id: this.nextId++,
       name,
       status: 'pending',
-      additionalData: null,
+      additionalData: additionalData ?? null,
     });
     this.modals.set(userId, userModals);
     return Promise.resolve();

@@ -12,6 +12,10 @@ import {
   VerifyInvitationRequestDto,
   VerifyInvitationResponseDto,
 } from './dto/verify-invitation.dto';
+import {
+  LottoProcessRequestDto,
+  LottoProcessResponseDto,
+} from './dto/lotto-process.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -66,5 +70,32 @@ export class InvitationController {
       userId,
       dto.invitationCode,
     );
+  }
+
+  @Post('lotto-process')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '초대 보상 처리 (로또)',
+    description:
+      '초대 코드를 입력하여 초대 보상을 처리합니다. 초대자에게 300P, 피초대자에게 랜덤 포인트를 지급합니다.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '초대 보상 처리 결과',
+    type: LottoProcessResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 실패 (토큰 없음, 만료, 유효하지 않음)',
+  })
+  async lottoProcess(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: LottoProcessRequestDto,
+  ): Promise<LottoProcessResponseDto> {
+    return this.invitationService.processInvitationReward({
+      invitedUserId: userId,
+      inviteCode: dto.inviteCode,
+      deviceId: dto.deviceId,
+    });
   }
 }

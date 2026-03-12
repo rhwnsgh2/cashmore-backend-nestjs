@@ -106,13 +106,27 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       .select('id')
       .eq('sender_id', userId)
       .eq('type', 'normal')
-      .maybeSingle<{ id: number }>();
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .returns<{ id: number }[]>();
 
-    if (error || !data) {
+    if (error || !data || data.length === 0) {
       return null;
     }
 
-    return data.id;
+    return data[0].id;
+
+
+
+
+
+
+
+
+
+
+
+
   }
 
   async countInvitedUsersSince(
@@ -188,6 +202,141 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
         step_count: stepCount,
         step_name: stepName,
       },
+    } as any);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  // processInvitationReward 관련
+
+  async findUserDeviceId(userId: string): Promise<string | null> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('user')
+      .select('device_id')
+      .eq('id', userId)
+      .maybeSingle<{ device_id: string | null }>();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data.device_id;
+  }
+
+  async findUserCreatedAt(userId: string): Promise<string | null> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('user')
+      .select('created_at')
+      .eq('id', userId)
+      .maybeSingle<{ created_at: string }>();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data.created_at;
+  }
+
+  async hasDeviceEventParticipation(
+    deviceId: string,
+    eventName: string,
+  ): Promise<boolean> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('device_event_participation')
+      .select('id')
+      .eq('device_id', deviceId)
+      .eq('event_name', eventName)
+      .limit(1);
+
+    if (error || !data) {
+      return false;
+    }
+
+    return data.length > 0;
+  }
+
+  async createDeviceEventParticipation(
+    deviceId: string,
+    eventName: string,
+    userId: string,
+  ): Promise<void> {
+    const client = this.supabaseService.getClient();
+
+    const { error } = await client.from('device_event_participation').insert({
+      device_id: deviceId,
+      event_name: eventName,
+      user_id: userId,
+    } as any);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async hasInviteRewardForUser(
+    senderId: string,
+    invitedUserId: string,
+  ): Promise<boolean> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('point_actions')
+      .select('id')
+      .eq('user_id', senderId)
+      .eq('type', 'INVITE_REWARD')
+      .eq('additional_data->>invited_user_id', invitedUserId)
+      .limit(1);
+
+    if (error || !data) {
+      return false;
+    }
+
+    return data.length > 0;
+  }
+
+  async createInvitationUser(
+    invitationId: number,
+    userId: string,
+  ): Promise<number> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('invitation_user')
+      .insert({
+        invitation_id: invitationId,
+        user_id: userId,
+      } as any)
+      .select('id')
+      .single<{ id: number }>();
+
+    if (error) {
+      throw error;
+    }
+
+    return data.id;
+  }
+
+  async createPointAction(
+    userId: string,
+    type: string,
+    pointAmount: number,
+    additionalData: Record<string, unknown>,
+  ): Promise<void> {
+    const client = this.supabaseService.getClient();
+
+    const { error } = await client.from('point_actions').insert({
+      user_id: userId,
+      type,
+      point_amount: pointAmount,
+      additional_data: additionalData,
     } as any);
 
     if (error) {
