@@ -11,9 +11,6 @@ import {
   generateExpiredToken,
   generateInvalidToken,
 } from './helpers/auth.helper';
-import {
-  updateUserDeviceId,
-} from './helpers/invite-code.helper';
 
 describe('User API (e2e) - Real DB', () => {
   let app: INestApplication;
@@ -234,12 +231,11 @@ describe('User API (e2e) - Real DB', () => {
      */
     async function createAuthOnlyUser() {
       const email = `test-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`;
-      const { data: authUser, error } =
-        await supabase.auth.admin.createUser({
-          email,
-          password: 'test-password-123',
-          email_confirm: true,
-        });
+      const { data: authUser, error } = await supabase.auth.admin.createUser({
+        email,
+        password: 'test-password-123',
+        email_confirm: true,
+      });
       if (error || !authUser.user) {
         throw new Error(`Failed to create auth user: ${error?.message}`);
       }
@@ -267,7 +263,7 @@ describe('User API (e2e) - Real DB', () => {
 
     describe('기본 가입 (signupContext 없음)', () => {
       it('signupContext 없이 가입하면 기존 플로우대로 동작한다', async () => {
-        const { authId, email } = await createAuthOnlyUser();
+        const { authId } = await createAuthOnlyUser();
         const token = generateTestToken(authId);
 
         const response = await request(app.getHttpServer())
@@ -326,7 +322,7 @@ describe('User API (e2e) - Real DB', () => {
 
     describe('invitation_normal 가입', () => {
       it('유효한 초대코드로 가입하면 보상이 처리된다', async () => {
-        const { inviter, invitationCode } = await setupInviter();
+        const { invitationCode } = await setupInviter();
         const { authId } = await createAuthOnlyUser();
         const token = generateTestToken(authId);
         const deviceId = `device-${Date.now()}`;
