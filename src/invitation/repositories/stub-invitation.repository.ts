@@ -32,7 +32,6 @@ export class StubInvitationRepository implements IInvitationRepository {
   // every_receipt 관련 내부 저장소
   private everyReceipts: Map<number, EveryReceipt> = new Map();
 
-
   private makeKey(userId: string, type: string): string {
     return `${userId}:${type}`;
   }
@@ -102,7 +101,6 @@ export class StubInvitationRepository implements IInvitationRepository {
     this.pointActions = [];
     this.everyReceipts.clear();
     this.nextId = 1;
-
   }
 
   createOrGetInvitation(

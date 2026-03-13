@@ -17,7 +17,8 @@ export class ReceiptStatsResponseDto {
   togetherReceiptBonusPoint: number;
 
   @ApiProperty({
-    description: '총 보너스 포인트 (inviteBonusPoint + togetherReceiptBonusPoint)',
+    description:
+      '총 보너스 포인트 (inviteBonusPoint + togetherReceiptBonusPoint)',
     example: 960,
   })
   totalBonusPoint: number;

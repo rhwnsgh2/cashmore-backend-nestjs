@@ -31,8 +31,7 @@ export class SignupContextDto {
   invitationCode: string;
 
   @ApiPropertyOptional({
-    description:
-      '영수증 ID. type이 invitation_receipt일 때 필수.',
+    description: '영수증 ID. type이 invitation_receipt일 때 필수.',
     example: 12345,
   })
   @IsOptional()
