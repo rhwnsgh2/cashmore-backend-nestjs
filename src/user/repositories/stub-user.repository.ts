@@ -131,10 +131,8 @@ export class StubUserRepository implements IUserRepository {
     return Promise.resolve();
   }
 
-  findDeviceId(userId: string): Promise<string | null> {
+  findDeviceId(_userId: string): Promise<string | null> {
     const event = this.deviceEvents.find(() => true);
-    // In stub, we look for any device event associated with this user
-    // Since DeviceEvent doesn't store userId, we return the first device_id if events exist
     return Promise.resolve(event ? event.device_id : null);
   }
 
