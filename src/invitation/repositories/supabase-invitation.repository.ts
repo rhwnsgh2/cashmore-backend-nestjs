@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
 import type {
+  EveryReceipt,
   IInvitationRepository,
   Invitation,
   StepRewardAction,
@@ -293,6 +294,8 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
   async createInvitationUser(
     invitationId: number,
     userId: string,
+    type: 'normal' | 'receipt' = 'normal',
+    sourceReceiptId?: number,
   ): Promise<number> {
     const client = this.supabaseService.getClient();
 
@@ -301,6 +304,8 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       .insert({
         invitation_id: invitationId,
         user_id: userId,
+        type,
+        source_receipt_id: sourceReceiptId ?? null,
       } as any)
       .select('id')
       .single<{ id: number }>();
@@ -330,5 +335,41 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
     if (error) {
       throw error;
     }
+  }
+
+  // 영수증 초대 통계
+
+  async countInvitedUsersByReceiptId(receiptId: number): Promise<number> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('invitation_user')
+      .select('id')
+      .eq('source_receipt_id', receiptId)
+      .returns<{ id: number }[]>();
+
+    if (error || !data) {
+      return 0;
+    }
+
+    return data.length;
+  }
+
+  // grantReceiptPoint 관련
+
+  async findEveryReceiptById(receiptId: number): Promise<EveryReceipt | null> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('every_receipt')
+      .select('id, user_id, point, status, image_url, score_data, created_at')
+      .eq('id', receiptId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data as unknown as EveryReceipt;
   }
 }

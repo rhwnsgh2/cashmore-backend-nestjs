@@ -32,6 +32,7 @@ export interface CreateUserParams {
   signupContext?: {
     type: SignupType;
     invitationCode: string;
+    receiptId?: number;
   };
 }
 
@@ -40,6 +41,7 @@ export interface InvitationRewardResult {
   success: boolean;
   rewardPoint?: number;
   error?: string;
+  receiptPoint?: number;
 }
 
 export interface CreateUserResult {
@@ -298,16 +300,17 @@ export class UserService {
       provider,
     });
 
-    // 5. 디바이스 이벤트 처리
+    // 5. 디바이스 등록
     if (params.deviceId) {
-      await this.handleDeviceEvents(
-        params.deviceId,
-        userId,
-        params.onboardingCompleted,
-      );
+      await this.registerDevice(params.deviceId, userId);
     }
 
-    // 6. signupContext에 따른 분기 처리
+    // 6. 온보딩 처리
+    if (params.deviceId && params.onboardingCompleted) {
+      await this.processOnboarding(params.deviceId, userId);
+    }
+
+    // 7. signupContext에 따른 분기 처리
     let invitationReward: InvitationRewardResult | undefined;
     if (params.signupContext) {
       invitationReward = await this.handleSignupContext(
@@ -322,37 +325,35 @@ export class UserService {
     return { success: true, userId, nickname, invitationReward };
   }
 
-  private async handleDeviceEvents(
+  private async registerDevice(
     deviceId: string,
     userId: string,
-    onboardingCompleted: boolean,
   ): Promise<void> {
     try {
       const deviceEvents =
         await this.userRepository.findDeviceEventsByDeviceId(deviceId);
 
       if (deviceEvents.length === 0) {
-        // 첫 기기 → joined 이벤트 기록
         await this.userRepository.createDeviceEvent(deviceId, 'joined', userId);
-
-        if (onboardingCompleted) {
-          // 온보딩 모달 생성
-          await this.userModalRepository.createModal(userId, 'onboarding');
-
-          // 온보딩 포인트 지급
-          await this.startOnboardingEvent(deviceId, userId);
-        }
+        this.logger.log(
+          `[SIGNUP] 디바이스 등록 완료 userId=${userId} deviceId=${deviceId}`,
+        );
+      } else {
+        this.logger.log(
+          `[SIGNUP] 기존 디바이스 감지 - 스킵 userId=${userId} deviceId=${deviceId}`,
+        );
       }
     } catch (error) {
-      this.logger.error(`Failed to handle device events: ${error}`);
+      this.logger.error(
+        `[SIGNUP] 디바이스 등록 실패 userId=${userId} error=${error}`,
+      );
     }
   }
 
-  private async startOnboardingEvent(
+  private async processOnboarding(
     deviceId: string,
     userId: string,
-  ): Promise<void> {
-    // 이미 온보딩 이벤트 참여했는지 확인
+  ): Promise<{ success: boolean; pointAmount?: number; error?: string }> {
     const deviceEvents =
       await this.userRepository.findDeviceEventsByDeviceId(deviceId);
     const alreadyParticipated = deviceEvents.some(
@@ -360,59 +361,184 @@ export class UserService {
     );
 
     if (alreadyParticipated) {
-      return;
+      this.logger.log(`[ONBOARDING] 이미 온보딩 완료 - 스킵 userId=${userId}`);
+      return { success: false, error: '이미 온보딩을 완료했습니다.' };
     }
 
+    await this.userModalRepository.createModal(userId, 'onboarding');
     await this.userRepository.createDeviceEvent(
       deviceId,
       'onboarding_event',
       userId,
     );
-
     await this.userRepository.createPointAction(
       userId,
       'ONBOARDING_EVENT',
       ONBOARDING_POINT_AMOUNT,
       {},
     );
+    this.logger.log(
+      `[ONBOARDING] 온보딩 완료 userId=${userId} point=${ONBOARDING_POINT_AMOUNT}`,
+    );
+    return { success: true, pointAmount: ONBOARDING_POINT_AMOUNT };
   }
 
   private async handleSignupContext(
-    signupContext: { type: SignupType; invitationCode: string },
+    signupContext: {
+      type: SignupType;
+      invitationCode: string;
+      receiptId?: number;
+    },
     userId: string,
     deviceId?: string,
   ): Promise<InvitationRewardResult> {
+    this.logger.log(
+      `[SIGNUP] userId=${userId} type=${signupContext.type} invitationCode=${signupContext.invitationCode} receiptId=${signupContext.receiptId ?? 'none'} deviceId=${deviceId ?? 'none'}`,
+    );
     if (signupContext.type === SignupType.INVITATION_NORMAL) {
+      return this.handleInvitationNormal(signupContext, userId, deviceId);
+    }
+    if (signupContext.type === SignupType.INVITATION_RECEIPT) {
+      return this.handleInvitationReceipt(signupContext, userId, deviceId);
+    }
+    return { type: signupContext.type, success: true };
+  }
+
+  private async handleInvitationNormal(
+    signupContext: { invitationCode: string },
+    userId: string,
+    deviceId?: string,
+  ): Promise<InvitationRewardResult> {
+    try {
+      const result = await this.invitationService.processInvitationReward({
+        invitedUserId: userId,
+        inviteCode: signupContext.invitationCode,
+        deviceId,
+      });
+      this.logger.log(
+        `[SIGNUP] invitation_normal 보상처리 완료 userId=${userId} success=${result.success} rewardPoint=${result.rewardPoint}`,
+      );
+      if (result.success && result.rewardPoint) {
+        await this.userModalRepository.createModal(
+          userId,
+          'invitation_lotto_result',
+          { rewardPoint: result.rewardPoint },
+        );
+      }
+      return {
+        type: SignupType.INVITATION_NORMAL,
+        success: result.success,
+        rewardPoint: result.rewardPoint,
+        error: result.error,
+      };
+    } catch (error) {
+      this.logger.error(
+        `[SIGNUP] invitation_normal 실패 userId=${userId} error=${error}`,
+      );
+      return {
+        type: SignupType.INVITATION_NORMAL,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private async handleInvitationReceipt(
+    signupContext: { invitationCode: string; receiptId?: number },
+    userId: string,
+    deviceId?: string,
+  ): Promise<InvitationRewardResult> {
+    // 1. 초대 보상 처리
+    let inviteSuccess = false;
+    let rewardPoint: number | undefined;
+    let inviteError: string | undefined;
+
+    try {
+      const result = await this.invitationService.processInvitationReward({
+        invitedUserId: userId,
+        inviteCode: signupContext.invitationCode,
+        deviceId,
+        signupType: 'receipt',
+        receiptId: signupContext.receiptId,
+      });
+      inviteSuccess = result.success;
+      rewardPoint = result.rewardPoint;
+      inviteError = result.error;
+      this.logger.log(
+        `[SIGNUP] invitation_receipt 초대보상 완료 userId=${userId} success=${result.success} rewardPoint=${result.rewardPoint}`,
+      );
+
+      if (result.success && result.rewardPoint) {
+        await this.userModalRepository.createModal(
+          userId,
+          'invitation_lotto_result',
+          { rewardPoint: result.rewardPoint, hasReceiptReward: true },
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `[SIGNUP] invitation_receipt 초대보상 실패 userId=${userId} error=${error}`,
+      );
+      inviteError = error instanceof Error ? error.message : 'Unknown error';
+    }
+
+    // 2. 영수증 포인트 지급 (초대 보상 성공 시에만)
+    let receiptPoint: number | undefined;
+
+    if (signupContext.receiptId && !inviteSuccess) {
+      this.logger.log(
+        `[SIGNUP] invitation_receipt 초대보상 실패로 영수증 포인트 미지급 userId=${userId} receiptId=${signupContext.receiptId}`,
+      );
+    }
+
+    if (signupContext.receiptId && inviteSuccess) {
       try {
-        const result = await this.invitationService.processInvitationReward({
+        const receiptResult = await this.invitationService.grantReceiptPoint({
+          receiptId: signupContext.receiptId,
           invitedUserId: userId,
-          inviteCode: signupContext.invitationCode,
-          deviceId,
         });
-        if (result.success && result.rewardPoint) {
-          await this.userModalRepository.createModal(
-            userId,
-            'invitation_lotto_result',
-            { rewardPoint: result.rewardPoint },
-          );
-        }
-        return {
-          type: SignupType.INVITATION_NORMAL,
-          success: result.success,
-          rewardPoint: result.rewardPoint,
-          error: result.error,
-        };
+        receiptPoint = receiptResult.receiptPoint;
+        await this.userModalRepository.createModal(
+          userId,
+          'invitation_receipt_received',
+          { pointAmount: receiptPoint },
+        );
+        await this.userModalRepository.createModal(
+          userId,
+          'invitation_receipt_onboarding',
+        );
+        this.logger.log(
+          `[SIGNUP] invitation_receipt 포인트지급 완료 userId=${userId} receiptId=${signupContext.receiptId} receiptPoint=${receiptPoint}`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to process invitation reward: ${error}`);
-        return {
-          type: SignupType.INVITATION_NORMAL,
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        };
+        this.logger.error(
+          `[SIGNUP] invitation_receipt 포인트지급 실패 userId=${userId} receiptId=${signupContext.receiptId} error=${error}`,
+        );
       }
     }
-    // invitation_receipt: 현재는 아무 처리 없음 (나중에 추가)
-    return { type: signupContext.type, success: true };
+
+    this.logger.log(
+      `[SIGNUP] invitation_receipt 완료 userId=${userId} inviteSuccess=${inviteSuccess} rewardPoint=${rewardPoint} receiptPoint=${receiptPoint}`,
+    );
+    return {
+      type: SignupType.INVITATION_RECEIPT,
+      success: inviteSuccess,
+      rewardPoint,
+      error: inviteError,
+      receiptPoint,
+    };
+  }
+
+  async completeOnboarding(
+    userId: string,
+  ): Promise<{ success: boolean; pointAmount?: number; error?: string }> {
+    const deviceId = await this.userRepository.findDeviceId(userId);
+    if (!deviceId) {
+      this.logger.log(`[ONBOARDING] 디바이스 없음 userId=${userId}`);
+      return { success: false, error: '디바이스 정보를 찾을 수 없습니다.' };
+    }
+
+    return this.processOnboarding(deviceId, userId);
   }
 
   private async handleInviteRewardModal(userId: string): Promise<void> {

@@ -92,6 +92,8 @@ export interface IUserRepository {
   /**
    * 초대받은 사용자인지 확인
    */
+  findDeviceId(userId: string): Promise<string | null>;
+
   isInvitedUser(userId: string): Promise<boolean>;
 }
 

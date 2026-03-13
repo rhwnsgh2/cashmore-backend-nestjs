@@ -23,6 +23,7 @@ import {
   CreateUserRequestDto,
   CreateUserResponseDto,
 } from './dto/create-user.dto';
+import { CompleteOnboardingResponseDto } from './dto/complete-onboarding.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtAuthOnlyGuard } from '../auth/guards/jwt-auth-only.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -97,5 +98,27 @@ export class UserController {
       deviceId: dto.deviceId,
       signupContext: dto.signupContext,
     });
+  }
+
+  @Post('onboarding')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '온보딩 완료',
+    description:
+      '온보딩을 완료하고 포인트를 지급합니다. 이미 완료한 경우 실패를 반환합니다.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '온보딩 완료 성공',
+    type: CompleteOnboardingResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 실패',
+  })
+  async completeOnboarding(
+    @CurrentUser('userId') userId: string,
+  ): Promise<CompleteOnboardingResponseDto> {
+    return this.userService.completeOnboarding(userId);
   }
 }

@@ -1,4 +1,5 @@
 import type {
+  EveryReceipt,
   IInvitationRepository,
   Invitation,
   StepRewardAction,
@@ -15,13 +16,22 @@ export class StubInvitationRepository implements IInvitationRepository {
   private userDeviceIds: Map<string, string> = new Map();
   private userCreatedAts: Map<string, string> = new Map();
   private deviceEvents: { device_id: string; event_name: string }[] = [];
-  private invitationUsers: { invitationId: number; userId: string }[] = [];
+  private invitationUsers: {
+    invitationId: number;
+    userId: string;
+    type: 'normal' | 'receipt';
+    sourceReceiptId?: number;
+  }[] = [];
   private pointActions: {
     userId: string;
     type: string;
     pointAmount: number;
     additionalData: Record<string, unknown>;
   }[] = [];
+
+  // every_receipt 관련 내부 저장소
+  private everyReceipts: Map<number, EveryReceipt> = new Map();
+
 
   private makeKey(userId: string, type: string): string {
     return `${userId}:${type}`;
@@ -73,6 +83,14 @@ export class StubInvitationRepository implements IInvitationRepository {
     return this.deviceEvents;
   }
 
+  setEveryReceipt(receipt: EveryReceipt): void {
+    this.everyReceipts.set(receipt.id, receipt);
+  }
+
+  getEveryReceipt(receiptId: number): EveryReceipt | undefined {
+    return this.everyReceipts.get(receiptId);
+  }
+
   clear(): void {
     this.invitations.clear();
     this.invitedUserCounts.clear();
@@ -82,7 +100,9 @@ export class StubInvitationRepository implements IInvitationRepository {
     this.deviceEvents = [];
     this.invitationUsers = [];
     this.pointActions = [];
+    this.everyReceipts.clear();
     this.nextId = 1;
+
   }
 
   createOrGetInvitation(
@@ -195,9 +215,14 @@ export class StubInvitationRepository implements IInvitationRepository {
 
   private nextInvitationUserId = 1;
 
-  createInvitationUser(invitationId: number, userId: string): Promise<number> {
+  createInvitationUser(
+    invitationId: number,
+    userId: string,
+    type: 'normal' | 'receipt' = 'normal',
+    sourceReceiptId?: number,
+  ): Promise<number> {
     const id = this.nextInvitationUserId++;
-    this.invitationUsers.push({ invitationId, userId });
+    this.invitationUsers.push({ invitationId, userId, type, sourceReceiptId });
     return Promise.resolve(id);
   }
 
@@ -209,5 +234,20 @@ export class StubInvitationRepository implements IInvitationRepository {
   ): Promise<void> {
     this.pointActions.push({ userId, type, pointAmount, additionalData });
     return Promise.resolve();
+  }
+
+  // 영수증 초대 통계
+
+  countInvitedUsersByReceiptId(receiptId: number): Promise<number> {
+    const count = this.invitationUsers.filter(
+      (u) => u.sourceReceiptId === receiptId,
+    ).length;
+    return Promise.resolve(count);
+  }
+
+  // grantReceiptPoint 관련 인터페이스 구현
+
+  findEveryReceiptById(receiptId: number): Promise<EveryReceipt | null> {
+    return Promise.resolve(this.everyReceipts.get(receiptId) ?? null);
   }
 }

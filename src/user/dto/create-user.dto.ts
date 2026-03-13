@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   ValidateNested,
@@ -28,6 +29,15 @@ export class SignupContextDto {
   @IsString()
   @IsNotEmpty()
   invitationCode: string;
+
+  @ApiPropertyOptional({
+    description:
+      '영수증 ID. type이 invitation_receipt일 때 필수.',
+    example: 12345,
+  })
+  @IsOptional()
+  @IsNumber()
+  receiptId?: number;
 }
 
 export class CreateUserRequestDto {
@@ -82,6 +92,12 @@ export class InvitationRewardResultDto {
 
   @ApiPropertyOptional({ description: '실패 시 에러 메시지' })
   error?: string;
+
+  @ApiPropertyOptional({
+    description: '영수증 포인트 (invitation_receipt 성공 시)',
+    example: 50,
+  })
+  receiptPoint?: number;
 }
 
 export class CreateUserResponseDto {
@@ -98,8 +114,7 @@ export class CreateUserResponseDto {
   error?: string;
 
   @ApiPropertyOptional({
-    description:
-      '초대 보상 처리 결과. signupContext가 있을 때만 포함됨.',
+    description: '초대 보상 처리 결과. signupContext가 있을 때만 포함됨.',
     type: InvitationRewardResultDto,
   })
   invitationReward?: InvitationRewardResultDto;

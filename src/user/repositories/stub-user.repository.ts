@@ -18,6 +18,7 @@ export class StubUserRepository implements IUserRepository {
     userId: string;
     type: string;
     pointAmount: number;
+    additionalData: Record<string, unknown>;
   }[] = [];
   private invitedUsers: Set<string> = new Set();
   private authProviders: Map<string, UserProvider> = new Map();
@@ -124,10 +125,17 @@ export class StubUserRepository implements IUserRepository {
     userId: string,
     type: string,
     pointAmount: number,
-    _additionalData: Record<string, unknown>,
+    additionalData: Record<string, unknown>,
   ): Promise<void> {
-    this.pointActions.push({ userId, type, pointAmount });
+    this.pointActions.push({ userId, type, pointAmount, additionalData });
     return Promise.resolve();
+  }
+
+  findDeviceId(userId: string): Promise<string | null> {
+    const event = this.deviceEvents.find(() => true);
+    // In stub, we look for any device event associated with this user
+    // Since DeviceEvent doesn't store userId, we return the first device_id if events exist
+    return Promise.resolve(event ? event.device_id : null);
   }
 
   isInvitedUser(userId: string): Promise<boolean> {

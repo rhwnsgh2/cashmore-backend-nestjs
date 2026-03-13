@@ -27,10 +27,14 @@ import type { LottoProcessResponseDto } from './dto/lotto-process.dto';
 import { getRandomRewardPoint } from './utils/random-reward';
 import { addSeparator } from './utils/add-separator';
 
+const RECEIPT_BONUS_POINT = 20;
+
 interface ProcessInvitationRewardParams {
   invitedUserId: string;
   inviteCode: string;
   deviceId?: string;
+  signupType?: 'normal' | 'receipt';
+  receiptId?: number;
 }
 
 @Injectable()
@@ -156,7 +160,8 @@ export class InvitationService {
   async processInvitationReward(
     params: ProcessInvitationRewardParams,
   ): Promise<LottoProcessResponseDto> {
-    const { invitedUserId, inviteCode, deviceId } = params;
+    const { invitedUserId, inviteCode, deviceId, signupType, receiptId } =
+      params;
 
     // Slack: 초대장 처리 시작 로깅
     void this.slackService.reportBugToSlack(
@@ -246,9 +251,13 @@ export class InvitationService {
       await this.invitationRepository.createInvitationUser(
         invitation.id,
         invitedUserId,
+        signupType ?? 'normal',
+        receiptId,
       );
 
     // 9. 초대자에게 INVITE_REWARD 300P 지급
+    const isReceiptInvite = signupType === 'receipt' && receiptId;
+
     await this.invitationRepository.createPointAction(
       invitation.senderId,
       'INVITE_REWARD',
@@ -256,21 +265,46 @@ export class InvitationService {
       { invited_user_id: invitedUserId },
     );
 
-    // 10. 초대자에게 모달 생성
-    await this.userModalRepository.createModal(
-      invitation.senderId,
-      'invite_reward_received',
-      { rewardAmount: POINTS_PER_INVITATION },
-    );
+    // 9-1. 영수증 초대 시 추가 보너스 20P (INVITATION_RECEIPT)
+    if (isReceiptInvite) {
+      await this.invitationRepository.createPointAction(
+        invitation.senderId,
+        'INVITATION_RECEIPT',
+        RECEIPT_BONUS_POINT,
+        { invited_user_id: invitedUserId, receipt_id: receiptId },
+      );
+    }
+
+    // 10. 초대자에게 모달 생성 (영수증 초대 시 별도 모달)
+    if (isReceiptInvite) {
+      await this.userModalRepository.createModal(
+        invitation.senderId,
+        'invite_receipt_reward_received',
+        {
+          rewardAmount: POINTS_PER_INVITATION,
+          receiptBonusAmount: RECEIPT_BONUS_POINT,
+          receiptId,
+        },
+      );
+    } else {
+      await this.userModalRepository.createModal(
+        invitation.senderId,
+        'invite_reward_received',
+        { rewardAmount: POINTS_PER_INVITATION },
+      );
+    }
 
     // 11. 초대자에게 FCM 리프레시 + 푸시 알림
+    const totalReward = isReceiptInvite
+      ? POINTS_PER_INVITATION + RECEIPT_BONUS_POINT
+      : POINTS_PER_INVITATION;
     void this.fcmService.sendRefreshMessage(
       invitation.senderId,
       'point_update',
     );
     void this.fcmService.pushNotification(
       invitation.senderId,
-      `${addSeparator(POINTS_PER_INVITATION)} 포인트 지급 완료 💰`,
+      `${addSeparator(totalReward)} 포인트 지급 완료 💰`,
       `내가 초대한 친구가 가입했어요!`,
     );
 
@@ -304,5 +338,59 @@ export class InvitationService {
     );
 
     return { success: true, rewardPoint };
+  }
+
+  async grantReceiptPoint(params: {
+    receiptId: number;
+    invitedUserId: string;
+  }): Promise<{ receiptPoint: number }> {
+    const { receiptId, invitedUserId } = params;
+
+    const receipt =
+      await this.invitationRepository.findEveryReceiptById(receiptId);
+
+    if (!receipt) {
+      throw new NotFoundException('영수증을 찾을 수 없습니다.');
+    }
+
+    if (receipt.status !== 'completed') {
+      throw new BadRequestException('완료되지 않은 영수증입니다.');
+    }
+
+    const RECEIPT_EXPIRY_MINUTES = 12;
+    const receiptAge = Date.now() - new Date(receipt.created_at).getTime();
+    if (receiptAge > RECEIPT_EXPIRY_MINUTES * 60 * 1000) {
+      throw new BadRequestException('유효 시간이 초과된 영수증입니다.');
+    }
+
+    await this.invitationRepository.createPointAction(
+      invitedUserId,
+      'INVITATION_RECEIPT',
+      receipt.point,
+      { source_receipt_id: receiptId, point: receipt.point },
+    );
+
+    return { receiptPoint: receipt.point };
+  }
+
+  async getReceiptStats(receiptId: number): Promise<{
+    friendCount: number;
+    inviteBonusPoint: number;
+    togetherReceiptBonusPoint: number;
+    totalBonusPoint: number;
+  }> {
+    const friendCount =
+      await this.invitationRepository.countInvitedUsersByReceiptId(receiptId);
+
+    const inviteBonusPoint = friendCount * POINTS_PER_INVITATION;
+    const togetherReceiptBonusPoint = friendCount * RECEIPT_BONUS_POINT;
+    const totalBonusPoint = inviteBonusPoint + togetherReceiptBonusPoint;
+
+    return {
+      friendCount,
+      inviteBonusPoint,
+      togetherReceiptBonusPoint,
+      totalBonusPoint,
+    };
   }
 }

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -16,6 +24,7 @@ import {
   LottoProcessRequestDto,
   LottoProcessResponseDto,
 } from './dto/lotto-process.dto';
+import { ReceiptStatsResponseDto } from './dto/receipt-stats.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -96,5 +105,27 @@ export class InvitationController {
       invitedUserId: userId,
       inviteCode: dto.invitationCode,
     });
+  }
+
+  @Get('receipt-stats/:receiptId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '영수증 초대 통계 조회',
+    description:
+      '특정 영수증을 통해 초대된 친구 수와 보상 포인트 합계를 조회합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '영수증 초대 통계 조회 성공',
+    type: ReceiptStatsResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 실패',
+  })
+  async getReceiptStats(
+    @Param('receiptId', ParseIntPipe) receiptId: number,
+  ): Promise<ReceiptStatsResponseDto> {
+    return this.invitationService.getReceiptStats(receiptId);
   }
 }

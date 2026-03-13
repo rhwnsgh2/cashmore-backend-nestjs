@@ -12,7 +12,10 @@ export type UserModalType =
   | 'invited_user_mission_reward'
   | 'affiliate_prepayment_received'
   | 'every_receipt_re_reviewed'
-  | 'invitation_lotto_result';
+  | 'invitation_lotto_result'
+  | 'invitation_receipt_received'
+  | 'invitation_receipt_onboarding'
+  | 'invite_receipt_reward_received';
 
 export type UserModalStatus = 'pending' | 'completed';
 

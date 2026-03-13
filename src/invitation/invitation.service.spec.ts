@@ -549,4 +549,5 @@ describe('InvitationService', () => {
       expect(allowedAmounts).toContain(result.rewardPoint);
     });
   });
+
 });

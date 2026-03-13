@@ -477,10 +477,38 @@ describe('User API (e2e) - Real DB', () => {
     });
 
     describe('invitation_receipt 가입', () => {
-      it('invitation_receipt로 가입하면 성공하고 보상 처리 없이 통과한다', async () => {
-        const { invitationCode } = await setupInviter();
+      /**
+       * 초대자 + 초대장 + 영수증 생성 헬퍼
+       */
+      async function setupInviterWithReceipt() {
+        const { inviter, inviterToken, invitationCode } = await setupInviter();
+
+        // 초대자의 completed 영수증 생성
+        const { data: receipt, error } = await supabase
+          .from('every_receipt')
+          .insert({
+            user_id: inviter.id,
+            point: 40,
+            status: 'completed',
+            image_url: 'https://storage.example.com/receipt.jpg',
+            score_data: { total_score: 30 },
+          })
+          .select()
+          .single();
+
+        if (error) {
+          throw new Error(`Failed to create receipt: ${error.message}`);
+        }
+
+        return { inviter, inviterToken, invitationCode, receipt };
+      }
+
+      it('유효한 초대코드 + 영수증으로 가입하면 초대 보상이 처리된다', async () => {
+        const { inviter, invitationCode, receipt } =
+          await setupInviterWithReceipt();
         const { authId } = await createAuthOnlyUser();
         const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
 
         const response = await request(app.getHttpServer())
           .post('/user')
@@ -488,10 +516,11 @@ describe('User API (e2e) - Real DB', () => {
           .send({
             marketingAgreement: false,
             onboardingCompleted: true,
-            deviceId: `device-${Date.now()}`,
+            deviceId,
             signupContext: {
               type: 'invitation_receipt',
               invitationCode,
+              receiptId: receipt.id,
             },
           })
           .expect(201);
@@ -500,13 +529,27 @@ describe('User API (e2e) - Real DB', () => {
         expect(response.body.invitationReward).toBeDefined();
         expect(response.body.invitationReward.type).toBe('invitation_receipt');
         expect(response.body.invitationReward.success).toBe(true);
-        expect(response.body.invitationReward.rewardPoint).toBeUndefined();
+        expect(response.body.invitationReward.rewardPoint).toBeDefined();
+        expect([300, 500, 1000, 3000, 50000]).toContain(
+          response.body.invitationReward.rewardPoint,
+        );
+
+        // 초대자에게 INVITE_REWARD 300P 지급 확인
+        const { data: inviterRewards } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', inviter.id)
+          .eq('type', 'INVITE_REWARD');
+
+        expect(inviterRewards).toHaveLength(1);
+        expect(inviterRewards![0].point_amount).toBe(300);
       });
 
-      it('invitation_receipt로 가입하면 invite_code_input_lotto 모달이 생성되지 않는다', async () => {
-        const { invitationCode } = await setupInviter();
+      it('INVITATION_RECEIPT 포인트가 지급된다 (영수증 복사 없음)', async () => {
+        const { invitationCode, receipt } = await setupInviterWithReceipt();
         const { authId } = await createAuthOnlyUser();
         const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
 
         const response = await request(app.getHttpServer())
           .post('/user')
@@ -514,21 +557,107 @@ describe('User API (e2e) - Real DB', () => {
           .send({
             marketingAgreement: false,
             onboardingCompleted: true,
-            deviceId: `device-${Date.now()}`,
+            deviceId,
             signupContext: {
               type: 'invitation_receipt',
               invitationCode,
+              receiptId: receipt.id,
             },
           })
           .expect(201);
 
-        const { data: modals } = await supabase
+        expect(response.body.success).toBe(true);
+        expect(response.body.invitationReward.receiptPoint).toBe(40);
+
+        // INVITATION_RECEIPT point_action 확인
+        const { data: receiptPointActions } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', response.body.userId)
+          .eq('type', 'INVITATION_RECEIPT');
+
+        expect(receiptPointActions).toHaveLength(1);
+        expect(receiptPointActions![0].point_amount).toBe(40);
+        expect(receiptPointActions![0].additional_data).toEqual({
+          source_receipt_id: receipt.id,
+          point: 40,
+        });
+
+        // every_receipt에 복사되지 않았는지 확인
+        const { data: userReceipts } = await supabase
+          .from('every_receipt')
+          .select('*')
+          .eq('user_id', response.body.userId);
+
+        expect(userReceipts).toHaveLength(0);
+      });
+
+      it('invite_code_input_lotto 모달이 생성되지 않고 invitation_lotto_result 모달이 생성된다', async () => {
+        const { invitationCode, receipt } = await setupInviterWithReceipt();
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId,
+            signupContext: {
+              type: 'invitation_receipt',
+              invitationCode,
+              receiptId: receipt.id,
+            },
+          })
+          .expect(201);
+
+        // invite_code_input_lotto 모달은 생성되지 않아야 함
+        const { data: inviteModals } = await supabase
           .from('modal_shown')
           .select('*')
           .eq('user_id', response.body.userId)
           .eq('name', 'invite_code_input_lotto');
 
-        expect(modals).toHaveLength(0);
+        expect(inviteModals).toHaveLength(0);
+
+        // invitation_lotto_result 모달이 생성되어야 함
+        const { data: lottoModals } = await supabase
+          .from('modal_shown')
+          .select('*')
+          .eq('user_id', response.body.userId)
+          .eq('name', 'invitation_lotto_result');
+
+        expect(lottoModals).toHaveLength(1);
+      });
+
+      it('존재하지 않는 영수증 ID로 가입하면 가입은 성공하고 보상은 실패한다', async () => {
+        const { invitationCode } = await setupInviter();
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId,
+            signupContext: {
+              type: 'invitation_receipt',
+              invitationCode,
+              receiptId: 999999,
+            },
+          })
+          .expect(201);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.userId).toBeDefined();
+        // 초대 보상은 성공, 영수증 포인트만 실패
+        expect(response.body.invitationReward).toBeDefined();
+        expect(response.body.invitationReward.success).toBe(true);
       });
     });
 

@@ -11,6 +11,16 @@ export interface StepRewardAction {
   stepCount: number;
 }
 
+export interface EveryReceipt {
+  id: number;
+  user_id: string;
+  point: number;
+  status: string;
+  image_url: string;
+  score_data: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface IInvitationRepository {
   createOrGetInvitation(
     userId: string,
@@ -44,13 +54,24 @@ export interface IInvitationRepository {
     senderId: string,
     invitedUserId: string,
   ): Promise<boolean>;
-  createInvitationUser(invitationId: number, userId: string): Promise<number>;
+  createInvitationUser(
+    invitationId: number,
+    userId: string,
+    type?: 'normal' | 'receipt',
+    sourceReceiptId?: number,
+  ): Promise<number>;
   createPointAction(
     userId: string,
     type: string,
     pointAmount: number,
     additionalData: Record<string, unknown>,
   ): Promise<void>;
+
+  // 영수증 초대 통계
+  countInvitedUsersByReceiptId(receiptId: number): Promise<number>;
+
+  // grantReceiptPoint 관련
+  findEveryReceiptById(receiptId: number): Promise<EveryReceipt | null>;
 }
 
 export const INVITATION_REPOSITORY = Symbol('INVITATION_REPOSITORY');

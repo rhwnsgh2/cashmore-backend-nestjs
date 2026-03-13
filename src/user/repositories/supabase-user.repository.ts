@@ -167,6 +167,22 @@ export class SupabaseUserRepository implements IUserRepository {
     }
   }
 
+  async findDeviceId(userId: string): Promise<string | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('device_event_participation')
+      .select('device_id')
+      .eq('user_id', userId)
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return (data as { device_id: string }).device_id;
+  }
+
   async isInvitedUser(userId: string): Promise<boolean> {
     const { data, error } = await this.supabaseService
       .getClient()
