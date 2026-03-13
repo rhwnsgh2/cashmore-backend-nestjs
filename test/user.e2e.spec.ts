@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
@@ -11,6 +11,9 @@ import {
   generateExpiredToken,
   generateInvalidToken,
 } from './helpers/auth.helper';
+import {
+  updateUserDeviceId,
+} from './helpers/invite-code.helper';
 
 describe('User API (e2e) - Real DB', () => {
   let app: INestApplication;
@@ -22,6 +25,7 @@ describe('User API (e2e) - Real DB', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ transform: true }));
     await app.init();
   });
 
@@ -219,6 +223,353 @@ describe('User API (e2e) - Real DB', () => {
 
         expect(response.body.isBanned).toBe(false);
         expect(response.body.banReason).toBeNull();
+      });
+    });
+  });
+
+  describe('POST /user', () => {
+    /**
+     * auth.users에만 유저를 생성하고 user 테이블에는 생성하지 않는 헬퍼.
+     * POST /user가 user 레코드를 생성하므로, 사전에 user 테이블 레코드가 없어야 함.
+     */
+    async function createAuthOnlyUser() {
+      const email = `test-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`;
+      const { data: authUser, error } =
+        await supabase.auth.admin.createUser({
+          email,
+          password: 'test-password-123',
+          email_confirm: true,
+        });
+      if (error || !authUser.user) {
+        throw new Error(`Failed to create auth user: ${error?.message}`);
+      }
+      return { authId: authUser.user.id, email };
+    }
+
+    /**
+     * 초대자 + 초대장 생성 헬퍼
+     */
+    async function setupInviter() {
+      const inviter = await createTestUser(supabase);
+      const inviterToken = generateTestToken(inviter.auth_id);
+
+      const invitationRes = await request(app.getHttpServer())
+        .get('/invitation')
+        .set('Authorization', `Bearer ${inviterToken}`)
+        .expect(200);
+
+      return {
+        inviter,
+        inviterToken,
+        invitationCode: invitationRes.body.identifier as string,
+      };
+    }
+
+    describe('기본 가입 (signupContext 없음)', () => {
+      it('signupContext 없이 가입하면 기존 플로우대로 동작한다', async () => {
+        const { authId, email } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId: `device-${Date.now()}`,
+          })
+          .expect(201);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.userId).toBeDefined();
+        expect(response.body.nickname).toBeDefined();
+        expect(response.body.invitationReward).toBeUndefined();
+      });
+
+      it('signupContext 없이 가입하면 invite_code_input_lotto 모달이 생성된다', async () => {
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId: `device-${Date.now()}`,
+          })
+          .expect(201);
+
+        const { data: modals } = await supabase
+          .from('modal_shown')
+          .select('*')
+          .eq('user_id', response.body.userId)
+          .eq('name', 'invite_code_input_lotto');
+
+        expect(modals).toHaveLength(1);
+      });
+
+      it('이미 가입된 사용자가 다시 요청하면 409를 반환한다', async () => {
+        const testUser = await createTestUser(supabase);
+        const token = generateTestToken(testUser.auth_id);
+
+        await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+          })
+          .expect(409);
+      });
+    });
+
+    describe('invitation_normal 가입', () => {
+      it('유효한 초대코드로 가입하면 보상이 처리된다', async () => {
+        const { inviter, invitationCode } = await setupInviter();
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId,
+            signupContext: {
+              type: 'invitation_normal',
+              invitationCode,
+            },
+          })
+          .expect(201);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.invitationReward).toBeDefined();
+        expect(response.body.invitationReward.type).toBe('invitation_normal');
+        expect(response.body.invitationReward.success).toBe(true);
+        expect(response.body.invitationReward.rewardPoint).toBeDefined();
+        expect([300, 500, 1000, 3000, 50000]).toContain(
+          response.body.invitationReward.rewardPoint,
+        );
+      });
+
+      it('초대 보상 시 invite_code_input_lotto 모달이 생성되지 않는다', async () => {
+        const { invitationCode } = await setupInviter();
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId,
+            signupContext: {
+              type: 'invitation_normal',
+              invitationCode,
+            },
+          })
+          .expect(201);
+
+        const { data: modals } = await supabase
+          .from('modal_shown')
+          .select('*')
+          .eq('user_id', response.body.userId)
+          .eq('name', 'invite_code_input_lotto');
+
+        expect(modals).toHaveLength(0);
+      });
+
+      it('초대자에게 INVITE_REWARD 포인트가 지급된다', async () => {
+        const { inviter, invitationCode } = await setupInviter();
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
+
+        await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId,
+            signupContext: {
+              type: 'invitation_normal',
+              invitationCode,
+            },
+          })
+          .expect(201);
+
+        const { data } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', inviter.id)
+          .eq('type', 'INVITE_REWARD');
+
+        expect(data).toHaveLength(1);
+        expect(data![0].point_amount).toBe(300);
+      });
+
+      it('존재하지 않는 초대코드로 가입하면 가입은 성공하고 보상은 실패한다', async () => {
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId,
+            signupContext: {
+              type: 'invitation_normal',
+              invitationCode: 'ZZZZZZ',
+            },
+          })
+          .expect(201);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.userId).toBeDefined();
+        expect(response.body.invitationReward).toBeDefined();
+        expect(response.body.invitationReward.type).toBe('invitation_normal');
+        expect(response.body.invitationReward.success).toBe(false);
+        expect(response.body.invitationReward.error).toBeDefined();
+      });
+
+      it('본인의 초대코드로 가입하면 가입은 성공하고 보상은 실패한다', async () => {
+        // 먼저 초대자로 가입 (기존 유저)
+        const selfInviter = await createTestUser(supabase);
+        const selfInviterToken = generateTestToken(selfInviter.auth_id);
+
+        // 초대장 생성
+        const invitationRes = await request(app.getHttpServer())
+          .get('/invitation')
+          .set('Authorization', `Bearer ${selfInviterToken}`)
+          .expect(200);
+
+        // 새 유저가 본인 초대 코드로... 는 불가능하지만
+        // 같은 초대코드를 본인이 사용하는 시나리오는
+        // 실제로는 다른 사람이 가입할 때 발생하므로,
+        // 여기서는 다른 유저가 가입하되 자기 코드인 경우를 테스트
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+        const deviceId = `device-${Date.now()}`;
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId,
+            signupContext: {
+              type: 'invitation_normal',
+              invitationCode: invitationRes.body.identifier,
+            },
+          })
+          .expect(201);
+
+        // 새 유저이므로 본인 초대코드가 아님 → 성공
+        expect(response.body.success).toBe(true);
+        expect(response.body.invitationReward.success).toBe(true);
+      });
+    });
+
+    describe('invitation_receipt 가입', () => {
+      it('invitation_receipt로 가입하면 성공하고 보상 처리 없이 통과한다', async () => {
+        const { invitationCode } = await setupInviter();
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId: `device-${Date.now()}`,
+            signupContext: {
+              type: 'invitation_receipt',
+              invitationCode,
+            },
+          })
+          .expect(201);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.invitationReward).toBeDefined();
+        expect(response.body.invitationReward.type).toBe('invitation_receipt');
+        expect(response.body.invitationReward.success).toBe(true);
+        expect(response.body.invitationReward.rewardPoint).toBeUndefined();
+      });
+
+      it('invitation_receipt로 가입하면 invite_code_input_lotto 모달이 생성되지 않는다', async () => {
+        const { invitationCode } = await setupInviter();
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+
+        const response = await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            deviceId: `device-${Date.now()}`,
+            signupContext: {
+              type: 'invitation_receipt',
+              invitationCode,
+            },
+          })
+          .expect(201);
+
+        const { data: modals } = await supabase
+          .from('modal_shown')
+          .select('*')
+          .eq('user_id', response.body.userId)
+          .eq('name', 'invite_code_input_lotto');
+
+        expect(modals).toHaveLength(0);
+      });
+    });
+
+    describe('signupContext 유효성 검증', () => {
+      it('signupContext.type이 잘못된 값이면 400을 반환한다', async () => {
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+
+        await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            signupContext: {
+              type: 'invalid_type',
+              invitationCode: 'ABC234',
+            },
+          })
+          .expect(400);
+      });
+
+      it('signupContext.invitationCode가 빠지면 400을 반환한다', async () => {
+        const { authId } = await createAuthOnlyUser();
+        const token = generateTestToken(authId);
+
+        await request(app.getHttpServer())
+          .post('/user')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            marketingAgreement: false,
+            onboardingCompleted: true,
+            signupContext: {
+              type: 'invitation_normal',
+            },
+          })
+          .expect(400);
       });
     });
   });

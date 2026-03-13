@@ -95,6 +95,7 @@ export class UserController {
       marketingAgreement: dto.marketingAgreement,
       onboardingCompleted: dto.onboardingCompleted,
       deviceId: dto.deviceId,
+      signupContext: dto.signupContext,
     });
   }
 }

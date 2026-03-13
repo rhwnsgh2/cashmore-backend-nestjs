@@ -7,6 +7,8 @@ import type {
 import { USER_REPOSITORY } from './interfaces/user-repository.interface';
 import type { IUserModalRepository } from '../user-modal/interfaces/user-modal-repository.interface';
 import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
+import { InvitationService } from '../invitation/invitation.service';
+import { SignupType } from './dto/create-user.dto';
 
 export interface UserInfoResponse {
   id: string;
@@ -27,6 +29,17 @@ export interface CreateUserParams {
   marketingAgreement: boolean;
   onboardingCompleted: boolean;
   deviceId?: string;
+  signupContext?: {
+    type: SignupType;
+    invitationCode: string;
+  };
+}
+
+export interface InvitationRewardResult {
+  type: SignupType;
+  success: boolean;
+  rewardPoint?: number;
+  error?: string;
 }
 
 export interface CreateUserResult {
@@ -34,6 +47,7 @@ export interface CreateUserResult {
   userId?: string;
   nickname?: string;
   error?: string;
+  invitationReward?: InvitationRewardResult;
 }
 
 const ONBOARDING_POINT_AMOUNT = 40;
@@ -221,6 +235,7 @@ export class UserService {
     private userRepository: IUserRepository,
     @Inject(USER_MODAL_REPOSITORY)
     private userModalRepository: IUserModalRepository,
+    private invitationService: InvitationService,
   ) {}
 
   async getUserInfo(userId: string): Promise<UserInfoResponse | null> {
@@ -292,10 +307,19 @@ export class UserService {
       );
     }
 
-    // 6. 초대 보상 대상 확인
-    await this.handleInviteRewardModal(userId);
+    // 6. signupContext에 따른 분기 처리
+    let invitationReward: InvitationRewardResult | undefined;
+    if (params.signupContext) {
+      invitationReward = await this.handleSignupContext(
+        params.signupContext,
+        userId,
+        params.deviceId,
+      );
+    } else {
+      await this.handleInviteRewardModal(userId);
+    }
 
-    return { success: true, userId, nickname };
+    return { success: true, userId, nickname, invitationReward };
   }
 
   private async handleDeviceEvents(
@@ -351,6 +375,44 @@ export class UserService {
       ONBOARDING_POINT_AMOUNT,
       {},
     );
+  }
+
+  private async handleSignupContext(
+    signupContext: { type: SignupType; invitationCode: string },
+    userId: string,
+    deviceId?: string,
+  ): Promise<InvitationRewardResult> {
+    if (signupContext.type === SignupType.INVITATION_NORMAL) {
+      try {
+        const result = await this.invitationService.processInvitationReward({
+          invitedUserId: userId,
+          inviteCode: signupContext.invitationCode,
+          deviceId,
+        });
+        if (result.success && result.rewardPoint) {
+          await this.userModalRepository.createModal(
+            userId,
+            'invitation_lotto_result',
+            { rewardPoint: result.rewardPoint },
+          );
+        }
+        return {
+          type: SignupType.INVITATION_NORMAL,
+          success: result.success,
+          rewardPoint: result.rewardPoint,
+          error: result.error,
+        };
+      } catch (error) {
+        this.logger.error(`Failed to process invitation reward: ${error}`);
+        return {
+          type: SignupType.INVITATION_NORMAL,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+    // invitation_receipt: 현재는 아무 처리 없음 (나중에 추가)
+    return { type: signupContext.type, success: true };
   }
 
   private async handleInviteRewardModal(userId: string): Promise<void> {
