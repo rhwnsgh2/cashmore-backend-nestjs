@@ -31,6 +31,8 @@ describe('DeeplinkController', () => {
           useValue: {
             reportDeeplinkClick: vi.fn().mockResolvedValue(undefined),
             reportDeeplinkMatch: vi.fn().mockResolvedValue(undefined),
+            reportDeeplinkMatchAttempt: vi.fn().mockResolvedValue(undefined),
+            reportDeeplinkMatchMiss: vi.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -41,12 +43,14 @@ describe('DeeplinkController', () => {
 
   describe('POST /deeplinks/click', () => {
     it('클릭 기록을 저장하고 결과를 반환한다', async () => {
-      const result = await controller.click({
-        clientIp: '192.168.1.100',
-        userAgent: IOS_UA,
-        params: { code: 'ABC' },
-        path: '/invite',
-      });
+      const result = await controller.click(
+        {
+          userAgent: IOS_UA,
+          params: { code: 'ABC' },
+          path: '/invite',
+        },
+        mockRequest('192.168.1.100'),
+      );
 
       expect(result).toEqual({ recorded: true });
       expect(repository.getAll().size).toBe(1);
@@ -56,12 +60,14 @@ describe('DeeplinkController', () => {
   describe('POST /deeplinks/match', () => {
     it('저장된 fingerprint와 매칭하여 결과를 반환한다', async () => {
       // 먼저 클릭 저장
-      await controller.click({
-        clientIp: '192.168.1.100',
-        userAgent: IOS_UA,
-        params: { code: 'ABC' },
-        path: '/invite',
-      });
+      await controller.click(
+        {
+          userAgent: IOS_UA,
+          params: { code: 'ABC' },
+          path: '/invite',
+        },
+        mockRequest('192.168.1.100'),
+      );
 
       // 매칭 시도
       const result = await controller.match(

@@ -1,7 +1,9 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsNotEmpty,
+  IsNumber,
   IsObject,
+  IsOptional,
   IsString,
   registerDecorator,
   ValidationOptions,
@@ -32,11 +34,6 @@ function IsStringRecord(validationOptions?: ValidationOptions) {
 }
 
 export class ClickRequestDto {
-  @ApiProperty({ description: '클라이언트 IP (SSR에서 전달)' })
-  @IsString()
-  @IsNotEmpty()
-  clientIp: string;
-
   @ApiProperty({ description: '브라우저 User-Agent 문자열' })
   @IsString()
   @IsNotEmpty()
@@ -54,4 +51,28 @@ export class ClickRequestDto {
   @IsString()
   @IsNotEmpty()
   path: string;
+
+  @ApiPropertyOptional({
+    description: 'Client Hints에서 가져온 실제 OS 버전 (e.g., "15.0.0", "18.3.1")',
+  })
+  @IsOptional()
+  @IsString()
+  platformVersion?: string;
+
+  @ApiPropertyOptional({
+    description: 'Client Hints에서 가져온 디바이스 모델 (e.g., "Pixel 7")',
+  })
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @ApiPropertyOptional({ description: '화면 너비 (px)' })
+  @IsOptional()
+  @IsNumber()
+  screenWidth?: number;
+
+  @ApiPropertyOptional({ description: '화면 높이 (px)' })
+  @IsOptional()
+  @IsNumber()
+  screenHeight?: number;
 }

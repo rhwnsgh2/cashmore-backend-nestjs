@@ -35,14 +35,36 @@ function hashFingerprint(ip: string, os: string, osVersion: string): string {
 }
 
 /**
+ * Client Hints platformVersion을 앱 측과 동일한 형식으로 정규화한다.
+ * - Android: major만 ("15.0.0" → "15")
+ * - iOS: major.minor ("18.3.1" → "18.3")
+ */
+function normalizePlatformVersion(os: string, platformVersion: string): string {
+  const parts = platformVersion.split('.');
+  if (os === 'Android') {
+    return parts[0];
+  }
+  // iOS: major.minor
+  return parts.slice(0, 2).join('.');
+}
+
+/**
  * 웹 클릭 시: User-Agent에서 OS 정보를 파싱하여 fingerprint 해시를 생성한다.
+ * platformVersion이 제공되면 UA 파싱 대신 이를 사용한다 (Client Hints).
  */
 export function generateFingerprintFromUA(
   ip: string,
   userAgent: string,
+  platformVersion?: string,
 ): string {
   const { os, osVersion } = parseUserAgent(userAgent);
-  return hashFingerprint(ip, os, osVersion);
+
+  const finalVersion =
+    platformVersion && os !== 'unknown'
+      ? normalizePlatformVersion(os, platformVersion)
+      : osVersion;
+
+  return hashFingerprint(ip, os, finalVersion);
 }
 
 /**

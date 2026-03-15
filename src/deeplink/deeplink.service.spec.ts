@@ -32,6 +32,8 @@ describe('DeeplinkService', () => {
           useValue: {
             reportDeeplinkClick: vi.fn().mockResolvedValue(undefined),
             reportDeeplinkMatch: vi.fn().mockResolvedValue(undefined),
+            reportDeeplinkMatchAttempt: vi.fn().mockResolvedValue(undefined),
+            reportDeeplinkMatchMiss: vi.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -43,7 +45,6 @@ describe('DeeplinkService', () => {
   describe('recordClick', () => {
     it('정상 클릭 기록 저장', async () => {
       await service.recordClick(TEST_IP, IOS_UA, {
-        clientIp: TEST_IP,
         userAgent: IOS_UA,
         params: { code: 'ABC' },
         path: '/invite',
@@ -54,7 +55,6 @@ describe('DeeplinkService', () => {
 
     it('params가 올바르게 저장된다', async () => {
       await service.recordClick(TEST_IP, IOS_UA, {
-        clientIp: TEST_IP,
         userAgent: IOS_UA,
         params: { code: 'ABC', receiptId: '123' },
         path: '/invite',
@@ -71,7 +71,6 @@ describe('DeeplinkService', () => {
     it('같은 fingerprint로 매칭 성공', async () => {
       // 웹에서 iOS UA로 클릭 저장
       await service.recordClick(TEST_IP, IOS_UA, {
-        clientIp: TEST_IP,
         userAgent: IOS_UA,
         params: { code: 'ABC' },
         path: '/invite',
@@ -90,7 +89,6 @@ describe('DeeplinkService', () => {
 
     it('매칭 후 데이터가 삭제된다 (재매칭 불가)', async () => {
       await service.recordClick(TEST_IP, IOS_UA, {
-        clientIp: TEST_IP,
         userAgent: IOS_UA,
         params: { code: 'ABC' },
         path: '/invite',
@@ -113,7 +111,6 @@ describe('DeeplinkService', () => {
 
     it('fingerprint 불일치 시 matched: false 반환', async () => {
       await service.recordClick(TEST_IP, IOS_UA, {
-        clientIp: TEST_IP,
         userAgent: IOS_UA,
         params: { code: 'ABC' },
         path: '/invite',

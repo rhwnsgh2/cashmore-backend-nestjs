@@ -24,7 +24,11 @@ export class DeeplinkService {
 
   /** 웹에서 클릭 시 fingerprint + 파라미터를 저장한다 */
   async recordClick(ip: string, userAgent: string, dto: ClickRequestDto) {
-    const fingerprint = generateFingerprintFromUA(ip, userAgent);
+    const fingerprint = generateFingerprintFromUA(
+      ip,
+      userAgent,
+      dto.platformVersion,
+    );
 
     await this.deeplinkRepository.saveClick(fingerprint, {
       params: dto.params,
@@ -43,6 +47,10 @@ export class DeeplinkService {
         fingerprint,
         os,
         osVersion,
+        platformVersion: dto.platformVersion,
+        model: dto.model,
+        screenWidth: dto.screenWidth,
+        screenHeight: dto.screenHeight,
       })
       .catch(() => {});
 
@@ -57,11 +65,30 @@ export class DeeplinkService {
   async matchFingerprint(ip: string, dto: MatchRequestDto) {
     const fingerprint = generateFingerprintFromApp(ip, dto.os, dto.osVersion);
 
+    this.slackService
+      .reportDeeplinkMatchAttempt({
+        ip,
+        os: dto.os,
+        osVersion: dto.osVersion,
+        fingerprint,
+      })
+      .catch(() => {});
+
     const data =
       await this.deeplinkRepository.findAndDeleteByFingerprint(fingerprint);
 
     if (!data) {
       this.logger.log(`Match miss: fingerprint=${fingerprint.slice(0, 8)}...`);
+
+      this.slackService
+        .reportDeeplinkMatchMiss({
+          ip,
+          os: dto.os,
+          osVersion: dto.osVersion,
+          fingerprint,
+        })
+        .catch(() => {});
+
       return { matched: false };
     }
 
