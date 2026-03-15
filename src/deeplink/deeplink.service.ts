@@ -69,6 +69,17 @@ export class DeeplinkService {
       `Match hit: fingerprint=${fingerprint.slice(0, 8)}..., path=${data.path}`,
     );
 
+    this.slackService
+      .reportDeeplinkMatch({
+        ip,
+        os: dto.os,
+        osVersion: dto.osVersion,
+        fingerprint,
+        path: data.path,
+        params: data.params,
+      })
+      .catch(() => {});
+
     return {
       matched: true,
       params: data.params,

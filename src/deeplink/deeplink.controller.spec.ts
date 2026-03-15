@@ -30,6 +30,7 @@ describe('DeeplinkController', () => {
           provide: SlackService,
           useValue: {
             reportDeeplinkClick: vi.fn().mockResolvedValue(undefined),
+            reportDeeplinkMatch: vi.fn().mockResolvedValue(undefined),
           },
         },
       ],

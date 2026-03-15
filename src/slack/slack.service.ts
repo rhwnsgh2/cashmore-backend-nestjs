@@ -97,4 +97,43 @@ export class SlackService {
       );
     }
   }
+
+  async reportDeeplinkMatch(info: {
+    ip: string;
+    os: string;
+    osVersion: string;
+    fingerprint: string;
+    path: string;
+    params: Record<string, string>;
+  }): Promise<void> {
+    if (this.isDisabled() || !this.invitationWebhookUrl) {
+      return;
+    }
+
+    try {
+      const kstTime = new Date().toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+      });
+      const text = [
+        '✅ 딥링크 매칭 성공',
+        `• IP: ${info.ip}`,
+        `• OS: ${info.os} ${info.osVersion}`,
+        `• 경로: ${info.path}`,
+        `• 파라미터: ${JSON.stringify(info.params)}`,
+        `• Fingerprint: ${info.fingerprint.slice(0, 12)}`,
+        `• 시각: ${kstTime}`,
+      ].join('\n');
+
+      await fetch(this.invitationWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+    } catch (error) {
+      console.error(
+        '[Slack] Failed to send deeplink match report:',
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
 }
