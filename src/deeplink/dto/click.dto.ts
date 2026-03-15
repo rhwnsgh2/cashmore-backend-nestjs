@@ -53,7 +53,8 @@ export class ClickRequestDto {
   path: string;
 
   @ApiPropertyOptional({
-    description: 'Client Hints에서 가져온 실제 OS 버전 (e.g., "15.0.0", "18.3.1")',
+    description:
+      'Client Hints에서 가져온 실제 OS 버전 (e.g., "15.0.0", "18.3.1")',
   })
   @IsOptional()
   @IsString()
