@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class MatchRequestDto {
   @ApiProperty({ description: 'OS 이름', example: 'iOS' })
@@ -11,6 +11,23 @@ export class MatchRequestDto {
   @IsString()
   @IsNotEmpty()
   osVersion: string;
+
+  @ApiPropertyOptional({ description: '화면 너비 (px)' })
+  @IsOptional()
+  @IsNumber()
+  screenWidth?: number;
+
+  @ApiPropertyOptional({ description: '화면 높이 (px)' })
+  @IsOptional()
+  @IsNumber()
+  screenHeight?: number;
+
+  @ApiPropertyOptional({
+    description: '디바이스 모델 (e.g., "Pixel 7", "iPhone15,2")',
+  })
+  @IsOptional()
+  @IsString()
+  model?: string;
 }
 
 export class MatchResponseDto {

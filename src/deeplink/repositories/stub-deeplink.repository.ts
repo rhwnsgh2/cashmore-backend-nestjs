@@ -6,19 +6,22 @@ import type {
 export class StubDeeplinkRepository implements IDeeplinkRepository {
   private store = new Map<string, DeeplinkClickData>();
 
-  saveClick(fingerprint: string, data: DeeplinkClickData): Promise<void> {
-    this.store.set(fingerprint, data);
+  saveClick(ip: string, data: DeeplinkClickData): Promise<void> {
+    this.store.set(ip, data);
     return Promise.resolve();
   }
 
-  findAndDeleteByFingerprint(
-    fingerprint: string,
-  ): Promise<DeeplinkClickData | null> {
-    const data = this.store.get(fingerprint) ?? null;
+  findAndDeleteByIp(ip: string): Promise<DeeplinkClickData | null> {
+    const data = this.store.get(ip) ?? null;
     if (data) {
-      this.store.delete(fingerprint);
+      this.store.delete(ip);
     }
     return Promise.resolve(data);
+  }
+
+  restoreClick(ip: string, data: DeeplinkClickData): Promise<void> {
+    this.store.set(ip, data);
+    return Promise.resolve();
   }
 
   getAll(): Map<string, DeeplinkClickData> {

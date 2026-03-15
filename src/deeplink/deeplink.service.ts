@@ -6,9 +6,9 @@ import {
 import { ClickRequestDto } from './dto/click.dto';
 import { MatchRequestDto } from './dto/match.dto';
 import {
-  generateFingerprintFromUA,
-  generateFingerprintFromApp,
   parseUserAgent,
+  normalizeVersion,
+  scoreMatch,
 } from './utils/fingerprint';
 import { SlackService } from '../slack/slack.service';
 
@@ -22,21 +22,26 @@ export class DeeplinkService {
     private slackService: SlackService,
   ) {}
 
-  /** 웹에서 클릭 시 fingerprint + 파라미터를 저장한다 */
+  /** 웹에서 클릭 시 IP를 키로 시그널 + 파라미터를 저장한다 */
   async recordClick(ip: string, userAgent: string, dto: ClickRequestDto) {
-    const fingerprint = generateFingerprintFromUA(
-      ip,
-      userAgent,
-      dto.platformVersion,
-    );
+    const { os, osVersion: uaVersion } = parseUserAgent(userAgent);
 
-    await this.deeplinkRepository.saveClick(fingerprint, {
+    // Client Hints platformVersion이 있으면 정규화하여 사용, 없으면 UA 파싱 버전 사용
+    const osVersion =
+      dto.platformVersion && os !== 'unknown'
+        ? normalizeVersion(os, dto.platformVersion)
+        : uaVersion;
+
+    await this.deeplinkRepository.saveClick(ip, {
+      os,
+      osVersion,
+      screenWidth: dto.screenWidth,
+      screenHeight: dto.screenHeight,
+      model: dto.model,
       params: dto.params,
       path: dto.path,
       createdAt: new Date().toISOString(),
     });
-
-    const { os, osVersion } = parseUserAgent(userAgent);
 
     this.slackService
       .reportDeeplinkClick({
@@ -44,7 +49,6 @@ export class DeeplinkService {
         userAgent,
         params: dto.params,
         path: dto.path,
-        fingerprint,
         os,
         osVersion,
         platformVersion: dto.platformVersion,
@@ -54,38 +58,71 @@ export class DeeplinkService {
       })
       .catch(() => {});
 
-    this.logger.log(
-      `Click recorded: fingerprint=${fingerprint.slice(0, 8)}..., path=${dto.path}`,
-    );
+    this.logger.log(`Click recorded: ip=${ip}, path=${dto.path}`);
 
     return { recorded: true };
   }
 
-  /** 앱 첫 실행 시 fingerprint로 매칭한다 */
-  async matchFingerprint(ip: string, dto: MatchRequestDto) {
-    const fingerprint = generateFingerprintFromApp(ip, dto.os, dto.osVersion);
-
+  /** 앱 첫 실행 시 IP + 시그널로 매칭한다 */
+  async matchClick(ip: string, dto: MatchRequestDto) {
     this.slackService
       .reportDeeplinkMatchAttempt({
         ip,
         os: dto.os,
         osVersion: dto.osVersion,
-        fingerprint,
       })
       .catch(() => {});
 
-    const data =
-      await this.deeplinkRepository.findAndDeleteByFingerprint(fingerprint);
+    const clickData = await this.deeplinkRepository.findAndDeleteByIp(ip);
 
-    if (!data) {
-      this.logger.log(`Match miss: fingerprint=${fingerprint.slice(0, 8)}...`);
+    if (!clickData) {
+      this.logger.log(`Match miss: ip=${ip}, no click data found`);
 
       this.slackService
         .reportDeeplinkMatchMiss({
           ip,
           os: dto.os,
           osVersion: dto.osVersion,
-          fingerprint,
+          reason: 'No click data found for IP',
+        })
+        .catch(() => {});
+
+      return { matched: false };
+    }
+
+    // Score the match
+    const result = scoreMatch(
+      {
+        os: clickData.os,
+        osVersion: clickData.osVersion,
+        screenWidth: clickData.screenWidth,
+        screenHeight: clickData.screenHeight,
+        model: clickData.model,
+      },
+      {
+        os: dto.os,
+        osVersion: dto.osVersion,
+        screenWidth: dto.screenWidth,
+        screenHeight: dto.screenHeight,
+        model: dto.model,
+      },
+    );
+
+    if (!result.matched) {
+      // Score 실패 시 데이터 복원 (다른 매칭 시도를 위해)
+      await this.deeplinkRepository.restoreClick(ip, clickData);
+
+      this.logger.log(
+        `Match miss: ip=${ip}, score=${result.score}, details=${result.details.join(', ')}`,
+      );
+
+      this.slackService
+        .reportDeeplinkMatchMiss({
+          ip,
+          os: dto.os,
+          osVersion: dto.osVersion,
+          reason: result.details.join(', '),
+          score: result.score,
         })
         .catch(() => {});
 
@@ -93,24 +130,30 @@ export class DeeplinkService {
     }
 
     this.logger.log(
-      `Match hit: fingerprint=${fingerprint.slice(0, 8)}..., path=${data.path}`,
+      `Match hit: ip=${ip}, score=${result.score}, path=${clickData.path}, details=${result.details.join(', ')}`,
     );
+
+    // Low confidence warning
+    if (result.score === 0) {
+      this.logger.warn(`Low confidence match: ip=${ip}, IP+OS only`);
+    }
 
     this.slackService
       .reportDeeplinkMatch({
         ip,
         os: dto.os,
         osVersion: dto.osVersion,
-        fingerprint,
-        path: data.path,
-        params: data.params,
+        path: clickData.path,
+        params: clickData.params,
+        score: result.score,
+        details: result.details,
       })
       .catch(() => {});
 
     return {
       matched: true,
-      params: data.params,
-      path: data.path,
+      params: clickData.params,
+      path: clickData.path,
     };
   }
 }

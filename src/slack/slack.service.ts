@@ -63,7 +63,6 @@ export class SlackService {
     userAgent: string;
     params: Record<string, string>;
     path: string;
-    fingerprint: string;
     os: string;
     osVersion: string;
     platformVersion?: string;
@@ -85,7 +84,6 @@ export class SlackService {
         `• OS: ${info.os} ${info.osVersion}`,
         `• 경로: ${info.path}`,
         `• 파라미터: ${JSON.stringify(info.params)}`,
-        `• Fingerprint: ${info.fingerprint.slice(0, 12)}`,
       ];
       if (info.platformVersion) {
         lines.push(`• Platform Version: ${info.platformVersion}`);
@@ -116,7 +114,6 @@ export class SlackService {
     ip: string;
     os: string;
     osVersion: string;
-    fingerprint: string;
   }): Promise<void> {
     if (this.isDisabled() || !this.invitationWebhookUrl) {
       return;
@@ -130,7 +127,6 @@ export class SlackService {
         '🔍 딥링크 매칭 시도',
         `• IP: ${info.ip}`,
         `• OS: ${info.os} ${info.osVersion}`,
-        `• Fingerprint: ${info.fingerprint.slice(0, 12)}`,
         `• 시각: ${kstTime}`,
       ].join('\n');
 
@@ -151,7 +147,8 @@ export class SlackService {
     ip: string;
     os: string;
     osVersion: string;
-    fingerprint: string;
+    reason: string;
+    score?: number;
   }): Promise<void> {
     if (this.isDisabled() || !this.invitationWebhookUrl) {
       return;
@@ -161,13 +158,17 @@ export class SlackService {
       const kstTime = new Date().toLocaleString('ko-KR', {
         timeZone: 'Asia/Seoul',
       });
-      const text = [
+      const lines = [
         '❌ 딥링크 매칭 실패',
         `• IP: ${info.ip}`,
         `• OS: ${info.os} ${info.osVersion}`,
-        `• Fingerprint: ${info.fingerprint.slice(0, 12)}`,
-        `• 시각: ${kstTime}`,
-      ].join('\n');
+        `• 사유: ${info.reason}`,
+      ];
+      if (info.score != null) {
+        lines.push(`• Score: ${info.score}`);
+      }
+      lines.push(`• 시각: ${kstTime}`);
+      const text = lines.join('\n');
 
       await fetch(this.invitationWebhookUrl, {
         method: 'POST',
@@ -186,9 +187,10 @@ export class SlackService {
     ip: string;
     os: string;
     osVersion: string;
-    fingerprint: string;
     path: string;
     params: Record<string, string>;
+    score: number;
+    details: string[];
   }): Promise<void> {
     if (this.isDisabled() || !this.invitationWebhookUrl) {
       return;
@@ -198,13 +200,16 @@ export class SlackService {
       const kstTime = new Date().toLocaleString('ko-KR', {
         timeZone: 'Asia/Seoul',
       });
+      const confidence =
+        info.score === 0 ? '⚠️ LOW' : info.score >= 3 ? '🟢 HIGH' : '🟡 MED';
       const text = [
-        '✅ 딥링크 매칭 성공',
+        `✅ 딥링크 매칭 성공 [${confidence}]`,
         `• IP: ${info.ip}`,
         `• OS: ${info.os} ${info.osVersion}`,
         `• 경로: ${info.path}`,
         `• 파라미터: ${JSON.stringify(info.params)}`,
-        `• Fingerprint: ${info.fingerprint.slice(0, 12)}`,
+        `• Score: ${info.score}`,
+        `• 시그널: ${info.details.join(' | ')}`,
         `• 시각: ${kstTime}`,
       ].join('\n');
 

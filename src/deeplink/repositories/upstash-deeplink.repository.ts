@@ -15,22 +15,24 @@ export class UpstashDeeplinkRepository implements IDeeplinkRepository {
     this.redis = Redis.fromEnv();
   }
 
-  private getKey(fingerprint: string): string {
-    return `deeplink:${fingerprint}`;
+  private getKey(ip: string): string {
+    return `deeplink:click:${ip}`;
   }
 
-  async saveClick(fingerprint: string, data: DeeplinkClickData): Promise<void> {
-    const key = this.getKey(fingerprint);
+  async saveClick(ip: string, data: DeeplinkClickData): Promise<void> {
+    const key = this.getKey(ip);
     await this.redis.set(key, JSON.stringify(data), { ex: TTL_SECONDS });
   }
 
-  async findAndDeleteByFingerprint(
-    fingerprint: string,
-  ): Promise<DeeplinkClickData | null> {
-    const key = this.getKey(fingerprint);
+  async findAndDeleteByIp(ip: string): Promise<DeeplinkClickData | null> {
+    const key = this.getKey(ip);
     const raw = await this.redis.getdel<DeeplinkClickData>(key);
     if (!raw) return null;
-
     return raw;
+  }
+
+  async restoreClick(ip: string, data: DeeplinkClickData): Promise<void> {
+    const key = this.getKey(ip);
+    await this.redis.set(key, JSON.stringify(data), { ex: TTL_SECONDS });
   }
 }

@@ -58,7 +58,7 @@ describe('DeeplinkController', () => {
   });
 
   describe('POST /deeplinks/match', () => {
-    it('저장된 fingerprint와 매칭하여 결과를 반환한다', async () => {
+    it('저장된 시그널과 매칭하여 결과를 반환한다', async () => {
       // 먼저 클릭 저장
       await controller.click(
         {
@@ -87,6 +87,32 @@ describe('DeeplinkController', () => {
       );
 
       expect(result).toEqual({ matched: false });
+    });
+
+    it('추가 시그널을 포함하여 매칭한다', async () => {
+      await controller.click(
+        {
+          userAgent: IOS_UA,
+          params: { code: 'ABC' },
+          path: '/invite',
+          screenWidth: 390,
+          screenHeight: 844,
+        },
+        mockRequest('192.168.1.100'),
+      );
+
+      const result = await controller.match(
+        {
+          os: 'iOS',
+          osVersion: '18.3',
+          screenWidth: 390,
+          screenHeight: 844,
+        },
+        mockRequest('192.168.1.100'),
+      );
+
+      expect(result.matched).toBe(true);
+      expect(result.params).toEqual({ code: 'ABC' });
     });
   });
 });

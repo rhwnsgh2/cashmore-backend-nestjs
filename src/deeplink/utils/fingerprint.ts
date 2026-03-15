@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 /**
  * User-Agent에서 OS 이름과 버전을 파싱한다.
  */
@@ -28,19 +26,12 @@ export function parseUserAgent(userAgent: string): {
 }
 
 /**
- * IP + OS + OS 버전을 SHA256 해시로 변환한다.
- */
-function hashFingerprint(ip: string, os: string, osVersion: string): string {
-  return createHash('sha256').update(`${ip}:${os}:${osVersion}`).digest('hex');
-}
-
-/**
- * Client Hints platformVersion을 앱 측과 동일한 형식으로 정규화한다.
+ * OS 버전을 비교 가능한 형식으로 정규화한다.
  * - Android: major만 ("15.0.0" → "15")
  * - iOS: major.minor ("18.3.1" → "18.3")
  */
-function normalizePlatformVersion(os: string, platformVersion: string): string {
-  const parts = platformVersion.split('.');
+export function normalizeVersion(os: string, version: string): string {
+  const parts = version.split('.');
   if (os === 'Android') {
     return parts[0];
   }
@@ -48,32 +39,127 @@ function normalizePlatformVersion(os: string, platformVersion: string): string {
   return parts.slice(0, 2).join('.');
 }
 
-/**
- * 웹 클릭 시: User-Agent에서 OS 정보를 파싱하여 fingerprint 해시를 생성한다.
- * platformVersion이 제공되면 UA 파싱 대신 이를 사용한다 (Client Hints).
- */
-export function generateFingerprintFromUA(
-  ip: string,
-  userAgent: string,
-  platformVersion?: string,
-): string {
-  const { os, osVersion } = parseUserAgent(userAgent);
+export interface ClickSignals {
+  os: string;
+  osVersion: string;
+  screenWidth?: number;
+  screenHeight?: number;
+  model?: string;
+}
 
-  const finalVersion =
-    platformVersion && os !== 'unknown'
-      ? normalizePlatformVersion(os, platformVersion)
-      : osVersion;
+export interface MatchSignals {
+  os: string;
+  osVersion: string;
+  screenWidth?: number;
+  screenHeight?: number;
+  model?: string;
+}
 
-  return hashFingerprint(ip, os, finalVersion);
+export interface ScoreResult {
+  matched: boolean;
+  score: number;
+  details: string[];
 }
 
 /**
- * 앱 매칭 시: 앱에서 전달한 OS 정보로 fingerprint 해시를 생성한다.
+ * 클릭 시그널과 매칭 시그널을 비교하여 점수를 산출한다.
+ *
+ * 규칙:
+ * - Required: OS가 일치해야 한다 (불일치 시 즉시 실패)
+ * - 추가 시그널(screenWidth+Height, osVersion major, model)이 양쪽 모두 있을 때:
+ *   - 일치 시 점수 가산, 불일치 시 패널티 없음 (단, 모두 불일치면 실패)
+ * - 추가 시그널이 한쪽에만 있거나 양쪽 모두 없으면: IP + OS만으로 매칭
  */
-export function generateFingerprintFromApp(
-  ip: string,
-  os: string,
-  osVersion: string,
-): string {
-  return hashFingerprint(ip, os, osVersion);
+export function scoreMatch(
+  click: ClickSignals,
+  match: MatchSignals,
+): ScoreResult {
+  const details: string[] = [];
+
+  // OS must match (required)
+  if (click.os.toLowerCase() !== match.os.toLowerCase()) {
+    return { matched: false, score: 0, details: ['OS mismatch'] };
+  }
+  details.push(`OS match: ${click.os}`);
+
+  let score = 0;
+  let comparableSignals = 0;
+  let matchedSignals = 0;
+
+  // Screen size comparison (both width and height must be present on both sides)
+  const clickHasScreen =
+    click.screenWidth != null && click.screenHeight != null;
+  const matchHasScreen =
+    match.screenWidth != null && match.screenHeight != null;
+  if (clickHasScreen && matchHasScreen) {
+    comparableSignals++;
+    if (
+      click.screenWidth === match.screenWidth &&
+      click.screenHeight === match.screenHeight
+    ) {
+      score += 2;
+      matchedSignals++;
+      details.push(`Screen match: ${click.screenWidth}x${click.screenHeight}`);
+    } else {
+      details.push(
+        `Screen mismatch: click=${click.screenWidth}x${click.screenHeight}, match=${match.screenWidth}x${match.screenHeight}`,
+      );
+    }
+  }
+
+  // OS version comparison (normalized)
+  const clickVersion = normalizeVersion(click.os, click.osVersion);
+  const matchVersion = normalizeVersion(match.os, match.osVersion);
+  if (
+    clickVersion &&
+    matchVersion &&
+    clickVersion !== 'unknown' &&
+    matchVersion !== 'unknown'
+  ) {
+    comparableSignals++;
+    // Compare major only for scoring
+    const clickMajor = clickVersion.split('.')[0];
+    const matchMajor = matchVersion.split('.')[0];
+    if (clickMajor === matchMajor) {
+      score += 1;
+      matchedSignals++;
+      details.push(`Version major match: ${clickMajor}`);
+    } else {
+      details.push(
+        `Version mismatch: click=${clickVersion}, match=${matchVersion}`,
+      );
+    }
+  }
+
+  // Model comparison
+  if (click.model && match.model) {
+    comparableSignals++;
+    if (click.model.toLowerCase() === match.model.toLowerCase()) {
+      score += 1;
+      matchedSignals++;
+      details.push(`Model match: ${click.model}`);
+    } else {
+      details.push(
+        `Model mismatch: click=${click.model}, match=${match.model}`,
+      );
+    }
+  }
+
+  // Decision logic:
+  // - If no comparable signals exist: IP + OS is enough (low confidence)
+  // - If comparable signals exist: at least 1 must match
+  if (comparableSignals === 0) {
+    details.push(
+      'No additional signals available, IP+OS only (low confidence)',
+    );
+    return { matched: true, score: 0, details };
+  }
+
+  if (matchedSignals >= 1) {
+    return { matched: true, score, details };
+  }
+
+  // All comparable signals failed to match
+  details.push('All additional signals mismatched');
+  return { matched: false, score: 0, details };
 }
