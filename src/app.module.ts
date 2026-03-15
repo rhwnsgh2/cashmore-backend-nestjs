@@ -31,6 +31,7 @@ import { StorageModule } from './storage/storage.module';
 import { AmplitudeModule } from './amplitude/amplitude.module';
 import { NpsSurveyModule } from './nps-survey/nps-survey.module';
 import { InvitationModule } from './invitation/invitation.module';
+import { DeeplinkModule } from './deeplink/deeplink.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -78,6 +79,7 @@ import configuration from './config/configuration';
     AmplitudeModule,
     NpsSurveyModule,
     InvitationModule,
+    DeeplinkModule,
   ],
   controllers: [AppController],
   providers: [
