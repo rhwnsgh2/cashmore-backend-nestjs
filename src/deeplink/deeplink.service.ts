@@ -61,9 +61,7 @@ export class DeeplinkService {
       await this.deeplinkRepository.findAndDeleteByFingerprint(fingerprint);
 
     if (!data) {
-      this.logger.log(
-        `Match miss: fingerprint=${fingerprint.slice(0, 8)}...`,
-      );
+      this.logger.log(`Match miss: fingerprint=${fingerprint.slice(0, 8)}...`);
       return { matched: false };
     }
 

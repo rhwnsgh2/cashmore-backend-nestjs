@@ -29,7 +29,9 @@ describe('DeeplinkService', () => {
         { provide: DEEPLINK_REPOSITORY, useValue: stubRepository },
         {
           provide: SlackService,
-          useValue: { reportDeeplinkClick: vi.fn().mockResolvedValue(undefined) },
+          useValue: {
+            reportDeeplinkClick: vi.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();
@@ -164,11 +166,7 @@ describe('fingerprint utils', () => {
 
     // Android 디바이스
     const webHashAndroid = generateFingerprintFromUA(TEST_IP, ANDROID_UA);
-    const appHashAndroid = generateFingerprintFromApp(
-      TEST_IP,
-      'Android',
-      '15',
-    );
+    const appHashAndroid = generateFingerprintFromApp(TEST_IP, 'Android', '15');
     expect(webHashAndroid).toBe(appHashAndroid);
   });
 });

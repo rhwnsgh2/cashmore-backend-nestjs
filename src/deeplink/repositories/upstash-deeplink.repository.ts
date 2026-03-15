@@ -19,10 +19,7 @@ export class UpstashDeeplinkRepository implements IDeeplinkRepository {
     return `deeplink:${fingerprint}`;
   }
 
-  async saveClick(
-    fingerprint: string,
-    data: DeeplinkClickData,
-  ): Promise<void> {
+  async saveClick(fingerprint: string, data: DeeplinkClickData): Promise<void> {
     const key = this.getKey(fingerprint);
     await this.redis.set(key, JSON.stringify(data), { ex: TTL_SECONDS });
   }
