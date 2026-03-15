@@ -16,9 +16,9 @@ export class DeeplinkController {
   @HttpCode(200)
   @ApiOperation({ summary: '웹 클릭 fingerprint 저장' })
   @ApiResponse({ status: 200, description: '클릭 기록 완료' })
-  async click(@Body() dto: ClickRequestDto, @Req() req: Request) {
-    const ip = req.ip!;
-    const userAgent = (req.headers['user-agent'] as string) || dto.userAgent;
+  async click(@Body() dto: ClickRequestDto) {
+    const ip = dto.clientIp;
+    const userAgent = dto.userAgent;
 
     this.logger.log(`Click request: ip=${ip}, path=${dto.path}`);
 

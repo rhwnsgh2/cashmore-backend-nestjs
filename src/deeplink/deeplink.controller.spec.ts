@@ -13,10 +13,9 @@ describe('DeeplinkController', () => {
   const IOS_UA =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1';
 
-  const mockRequest = (ip: string, userAgent?: string) =>
+  const mockRequest = (ip: string) =>
     ({
       ip,
-      headers: { 'user-agent': userAgent || IOS_UA },
     }) as any;
 
   beforeEach(async () => {
@@ -41,14 +40,12 @@ describe('DeeplinkController', () => {
 
   describe('POST /deeplinks/click', () => {
     it('클릭 기록을 저장하고 결과를 반환한다', async () => {
-      const result = await controller.click(
-        {
-          userAgent: IOS_UA,
-          params: { code: 'ABC' },
-          path: '/invite',
-        },
-        mockRequest('192.168.1.100', IOS_UA),
-      );
+      const result = await controller.click({
+        clientIp: '192.168.1.100',
+        userAgent: IOS_UA,
+        params: { code: 'ABC' },
+        path: '/invite',
+      });
 
       expect(result).toEqual({ recorded: true });
       expect(repository.getAll().size).toBe(1);
@@ -58,18 +55,16 @@ describe('DeeplinkController', () => {
   describe('POST /deeplinks/match', () => {
     it('저장된 fingerprint와 매칭하여 결과를 반환한다', async () => {
       // 먼저 클릭 저장
-      await controller.click(
-        {
-          userAgent: IOS_UA,
-          params: { code: 'ABC' },
-          path: '/invite',
-        },
-        mockRequest('192.168.1.100', IOS_UA),
-      );
+      await controller.click({
+        clientIp: '192.168.1.100',
+        userAgent: IOS_UA,
+        params: { code: 'ABC' },
+        path: '/invite',
+      });
 
       // 매칭 시도
       const result = await controller.match(
-        { os: 'iOS', osVersion: '18.3.2' },
+        { os: 'iOS', osVersion: '18.3' },
         mockRequest('192.168.1.100'),
       );
 
@@ -80,7 +75,7 @@ describe('DeeplinkController', () => {
 
     it('매칭되지 않으면 matched: false를 반환한다', async () => {
       const result = await controller.match(
-        { os: 'iOS', osVersion: '18.3.2' },
+        { os: 'iOS', osVersion: '18.3' },
         mockRequest('192.168.1.100'),
       );
 

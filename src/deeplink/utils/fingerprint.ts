@@ -13,7 +13,9 @@ export function parseUserAgent(userAgent: string): {
   );
   if (iosMatch) {
     const version = iosMatch[1].replace(/_/g, '.');
-    return { os: 'iOS', osVersion: version };
+    const parts = version.split('.');
+    const majorMinor = parts.slice(0, 2).join('.');
+    return { os: 'iOS', osVersion: majorMinor };
   }
 
   // Android: "Android 15" or "Android 14.0"

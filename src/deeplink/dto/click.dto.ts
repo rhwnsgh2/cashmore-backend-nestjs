@@ -32,6 +32,11 @@ function IsStringRecord(validationOptions?: ValidationOptions) {
 }
 
 export class ClickRequestDto {
+  @ApiProperty({ description: '클라이언트 IP (SSR에서 전달)' })
+  @IsString()
+  @IsNotEmpty()
+  clientIp: string;
+
   @ApiProperty({ description: '브라우저 User-Agent 문자열' })
   @IsString()
   @IsNotEmpty()

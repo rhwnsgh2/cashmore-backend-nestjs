@@ -76,7 +76,7 @@ describe('DeeplinkService', () => {
       // 앱에서 같은 OS 정보로 매칭
       const result = await service.matchFingerprint(TEST_IP, {
         os: 'iOS',
-        osVersion: '18.3.2',
+        osVersion: '18.3',
       });
 
       expect(result.matched).toBe(true);
@@ -94,14 +94,14 @@ describe('DeeplinkService', () => {
       // 첫 번째 매칭 성공
       const first = await service.matchFingerprint(TEST_IP, {
         os: 'iOS',
-        osVersion: '18.3.2',
+        osVersion: '18.3',
       });
       expect(first.matched).toBe(true);
 
       // 두 번째 매칭 실패 (이미 삭제됨)
       const second = await service.matchFingerprint(TEST_IP, {
         os: 'iOS',
-        osVersion: '18.3.2',
+        osVersion: '18.3',
       });
       expect(second.matched).toBe(false);
     });
@@ -116,7 +116,7 @@ describe('DeeplinkService', () => {
       // 다른 IP로 매칭 시도
       const result = await service.matchFingerprint('10.0.0.1', {
         os: 'iOS',
-        osVersion: '18.3.2',
+        osVersion: '18.3',
       });
 
       expect(result.matched).toBe(false);
@@ -125,7 +125,7 @@ describe('DeeplinkService', () => {
     it('저장된 데이터 없으면 matched: false 반환', async () => {
       const result = await service.matchFingerprint(TEST_IP, {
         os: 'iOS',
-        osVersion: '18.3.2',
+        osVersion: '18.3',
       });
 
       expect(result.matched).toBe(false);
@@ -136,7 +136,7 @@ describe('DeeplinkService', () => {
 describe('fingerprint utils', () => {
   it('iOS UA에서 OS 정보를 정확히 파싱한다', () => {
     const hash = generateFingerprintFromUA(TEST_IP, IOS_UA);
-    const expected = generateFingerprintFromApp(TEST_IP, 'iOS', '18.3.2');
+    const expected = generateFingerprintFromApp(TEST_IP, 'iOS', '18.3');
     expect(hash).toBe(expected);
   });
 
@@ -147,21 +147,21 @@ describe('fingerprint utils', () => {
   });
 
   it('같은 입력 → 같은 해시', () => {
-    const hash1 = generateFingerprintFromApp(TEST_IP, 'iOS', '18.3.2');
-    const hash2 = generateFingerprintFromApp(TEST_IP, 'iOS', '18.3.2');
+    const hash1 = generateFingerprintFromApp(TEST_IP, 'iOS', '18.3');
+    const hash2 = generateFingerprintFromApp(TEST_IP, 'iOS', '18.3');
     expect(hash1).toBe(hash2);
   });
 
   it('다른 IP → 다른 해시', () => {
-    const hash1 = generateFingerprintFromApp('192.168.1.1', 'iOS', '18.3.2');
-    const hash2 = generateFingerprintFromApp('192.168.1.2', 'iOS', '18.3.2');
+    const hash1 = generateFingerprintFromApp('192.168.1.1', 'iOS', '18.3');
+    const hash2 = generateFingerprintFromApp('192.168.1.2', 'iOS', '18.3');
     expect(hash1).not.toBe(hash2);
   });
 
   it('웹 UA와 앱 정보가 같은 디바이스면 같은 해시를 생성한다', () => {
     // iOS 디바이스
     const webHash = generateFingerprintFromUA(TEST_IP, IOS_UA);
-    const appHash = generateFingerprintFromApp(TEST_IP, 'iOS', '18.3.2');
+    const appHash = generateFingerprintFromApp(TEST_IP, 'iOS', '18.3');
     expect(webHash).toBe(appHash);
 
     // Android 디바이스
