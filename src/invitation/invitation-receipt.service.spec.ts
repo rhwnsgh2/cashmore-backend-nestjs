@@ -128,6 +128,57 @@ describe('InvitationService - invitation_receipt', () => {
     ).rejects.toThrow('유효 시간이 초과된 영수증입니다.');
   });
 
+  describe('isReceiptExpired', () => {
+    it('유효한 영수증이면 false를 반환한다', async () => {
+      repository.setEveryReceipt({
+        id: 200,
+        user_id: 'inviter-id',
+        point: 40,
+        status: 'completed',
+        image_url: 'https://storage.example.com/receipt.jpg',
+        score_data: { total_score: 30 },
+        created_at: new Date().toISOString(),
+      });
+
+      expect(await service.isReceiptExpired(200)).toBe(false);
+    });
+
+    it('존재하지 않는 영수증이면 true를 반환한다', async () => {
+      expect(await service.isReceiptExpired(999)).toBe(true);
+    });
+
+    it('completed가 아닌 영수증이면 true를 반환한다', async () => {
+      repository.setEveryReceipt({
+        id: 201,
+        user_id: 'inviter-id',
+        point: 0,
+        status: 'pending',
+        image_url: 'https://storage.example.com/receipt.jpg',
+        score_data: null,
+        created_at: new Date().toISOString(),
+      });
+
+      expect(await service.isReceiptExpired(201)).toBe(true);
+    });
+
+    it('12분 초과된 영수증이면 true를 반환한다', async () => {
+      const thirteenMinutesAgo = new Date(
+        Date.now() - 13 * 60 * 1000,
+      ).toISOString();
+      repository.setEveryReceipt({
+        id: 202,
+        user_id: 'inviter-id',
+        point: 40,
+        status: 'completed',
+        image_url: 'https://storage.example.com/receipt.jpg',
+        score_data: { total_score: 30 },
+        created_at: thirteenMinutesAgo,
+      });
+
+      expect(await service.isReceiptExpired(202)).toBe(true);
+    });
+  });
+
   it('영수증 포인트가 0이면 포인트 0으로 지급된다', async () => {
     repository.setEveryReceipt({
       id: 101,

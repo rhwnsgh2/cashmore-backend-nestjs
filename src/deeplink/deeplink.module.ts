@@ -3,10 +3,11 @@ import { DeeplinkController } from './deeplink.controller';
 import { DeeplinkService } from './deeplink.service';
 import { DEEPLINK_REPOSITORY } from './interfaces/deeplink-repository.interface';
 import { UpstashDeeplinkRepository } from './repositories/upstash-deeplink.repository';
+import { InvitationModule } from '../invitation/invitation.module';
 import { SlackModule } from '../slack/slack.module';
 
 @Module({
-  imports: [SlackModule],
+  imports: [SlackModule, InvitationModule],
   controllers: [DeeplinkController],
   providers: [
     DeeplinkService,

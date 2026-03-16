@@ -340,6 +340,19 @@ export class InvitationService {
     return { success: true, rewardPoint };
   }
 
+  private static readonly RECEIPT_EXPIRY_MINUTES = 12;
+
+  async isReceiptExpired(receiptId: number): Promise<boolean> {
+    const receipt =
+      await this.invitationRepository.findEveryReceiptById(receiptId);
+
+    if (!receipt) return true;
+    if (receipt.status !== 'completed') return true;
+
+    const receiptAge = Date.now() - new Date(receipt.created_at).getTime();
+    return receiptAge > InvitationService.RECEIPT_EXPIRY_MINUTES * 60 * 1000;
+  }
+
   async grantReceiptPoint(params: {
     receiptId: number;
     invitedUserId: string;
@@ -357,9 +370,8 @@ export class InvitationService {
       throw new BadRequestException('완료되지 않은 영수증입니다.');
     }
 
-    const RECEIPT_EXPIRY_MINUTES = 12;
     const receiptAge = Date.now() - new Date(receipt.created_at).getTime();
-    if (receiptAge > RECEIPT_EXPIRY_MINUTES * 60 * 1000) {
+    if (receiptAge > InvitationService.RECEIPT_EXPIRY_MINUTES * 60 * 1000) {
       throw new BadRequestException('유효 시간이 초과된 영수증입니다.');
     }
 

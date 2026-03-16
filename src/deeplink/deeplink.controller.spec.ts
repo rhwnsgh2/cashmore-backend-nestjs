@@ -5,10 +5,12 @@ import { DeeplinkService } from './deeplink.service';
 import { DEEPLINK_REPOSITORY } from './interfaces/deeplink-repository.interface';
 import { StubDeeplinkRepository } from './repositories/stub-deeplink.repository';
 import { SlackService } from '../slack/slack.service';
+import { InvitationService } from '../invitation/invitation.service';
 
 describe('DeeplinkController', () => {
   let controller: DeeplinkController;
   let repository: StubDeeplinkRepository;
+  let mockInvitationService: { isReceiptExpired: ReturnType<typeof vi.fn> };
 
   const IOS_UA =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1';
@@ -20,6 +22,9 @@ describe('DeeplinkController', () => {
 
   beforeEach(async () => {
     repository = new StubDeeplinkRepository();
+    mockInvitationService = {
+      isReceiptExpired: vi.fn().mockResolvedValue(false),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DeeplinkController],
@@ -35,6 +40,10 @@ describe('DeeplinkController', () => {
             reportDeeplinkMatchMiss: vi.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: InvitationService,
+          useValue: mockInvitationService,
+        },
       ],
     }).compile();
 
@@ -48,6 +57,38 @@ describe('DeeplinkController', () => {
           userAgent: IOS_UA,
           params: { code: 'ABC' },
           path: '/invite',
+        },
+        mockRequest('192.168.1.100'),
+      );
+
+      expect(result).toEqual({ recorded: true });
+      expect(repository.getAll().size).toBe(1);
+    });
+
+    it('invitation_receipt 경로에서 만료된 영수증이면 recorded: false를 반환한다', async () => {
+      mockInvitationService.isReceiptExpired.mockResolvedValue(true);
+
+      const result = await controller.click(
+        {
+          userAgent: IOS_UA,
+          params: { receiptId: '99' },
+          path: '/invitation_receipt',
+        },
+        mockRequest('192.168.1.100'),
+      );
+
+      expect(result).toEqual({ recorded: false, reason: 'receipt_expired' });
+      expect(repository.getAll().size).toBe(0);
+    });
+
+    it('invitation_receipt 경로에서 유효한 영수증이면 정상 기록한다', async () => {
+      mockInvitationService.isReceiptExpired.mockResolvedValue(false);
+
+      const result = await controller.click(
+        {
+          userAgent: IOS_UA,
+          params: { receiptId: '99' },
+          path: '/invitation_receipt',
         },
         mockRequest('192.168.1.100'),
       );
