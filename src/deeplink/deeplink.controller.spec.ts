@@ -10,7 +10,7 @@ import { InvitationService } from '../invitation/invitation.service';
 describe('DeeplinkController', () => {
   let controller: DeeplinkController;
   let repository: StubDeeplinkRepository;
-  let mockInvitationService: { isReceiptExpired: ReturnType<typeof vi.fn> };
+  let mockInvitationService: Record<string, ReturnType<typeof vi.fn>>;
 
   const IOS_UA =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1';
@@ -65,37 +65,6 @@ describe('DeeplinkController', () => {
       expect(repository.getAll().size).toBe(1);
     });
 
-    it('invitation_receipt 경로에서 만료된 영수증이면 recorded: false를 반환한다', async () => {
-      mockInvitationService.isReceiptExpired.mockResolvedValue(true);
-
-      const result = await controller.click(
-        {
-          userAgent: IOS_UA,
-          params: { receiptId: '99' },
-          path: '/invite',
-        },
-        mockRequest('192.168.1.100'),
-      );
-
-      expect(result).toEqual({ recorded: false, reason: 'receipt_expired' });
-      expect(repository.getAll().size).toBe(0);
-    });
-
-    it('invitation_receipt 경로에서 유효한 영수증이면 정상 기록한다', async () => {
-      mockInvitationService.isReceiptExpired.mockResolvedValue(false);
-
-      const result = await controller.click(
-        {
-          userAgent: IOS_UA,
-          params: { receiptId: '99' },
-          path: '/invite',
-        },
-        mockRequest('192.168.1.100'),
-      );
-
-      expect(result).toEqual({ recorded: true });
-      expect(repository.getAll().size).toBe(1);
-    });
   });
 
   describe('POST /deeplinks/match', () => {
@@ -154,6 +123,67 @@ describe('DeeplinkController', () => {
 
       expect(result.matched).toBe(true);
       expect(result.params).toEqual({ code: 'ABC' });
+    });
+
+    it('receiptId가 있고 유효하면 receiptValid: true를 반환한다', async () => {
+      mockInvitationService.isReceiptExpired.mockResolvedValue(false);
+
+      await controller.click(
+        {
+          userAgent: IOS_UA,
+          params: { code: 'ABC', receiptId: '99' },
+          path: '/invite',
+        },
+        mockRequest('192.168.1.100'),
+      );
+
+      const result = await controller.match(
+        { os: 'iOS', osVersion: '18.3' },
+        mockRequest('192.168.1.100'),
+      );
+
+      expect(result.matched).toBe(true);
+      expect(result.receiptValid).toBe(true);
+    });
+
+    it('receiptId가 있고 만료되었으면 receiptValid: false를 반환한다', async () => {
+      mockInvitationService.isReceiptExpired.mockResolvedValue(true);
+
+      await controller.click(
+        {
+          userAgent: IOS_UA,
+          params: { code: 'ABC', receiptId: '99' },
+          path: '/invite',
+        },
+        mockRequest('192.168.1.100'),
+      );
+
+      const result = await controller.match(
+        { os: 'iOS', osVersion: '18.3' },
+        mockRequest('192.168.1.100'),
+      );
+
+      expect(result.matched).toBe(true);
+      expect(result.receiptValid).toBe(false);
+    });
+
+    it('receiptId가 없으면 receiptValid를 포함하지 않는다', async () => {
+      await controller.click(
+        {
+          userAgent: IOS_UA,
+          params: { code: 'ABC' },
+          path: '/invite',
+        },
+        mockRequest('192.168.1.100'),
+      );
+
+      const result = await controller.match(
+        { os: 'iOS', osVersion: '18.3' },
+        mockRequest('192.168.1.100'),
+      );
+
+      expect(result.matched).toBe(true);
+      expect(result).not.toHaveProperty('receiptValid');
     });
   });
 });

@@ -2,7 +2,6 @@ import { Body, Controller, HttpCode, Logger, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { DeeplinkService } from './deeplink.service';
-import { InvitationService } from '../invitation/invitation.service';
 import { ClickRequestDto } from './dto/click.dto';
 import { MatchRequestDto } from './dto/match.dto';
 
@@ -11,10 +10,7 @@ import { MatchRequestDto } from './dto/match.dto';
 export class DeeplinkController {
   private readonly logger = new Logger(DeeplinkController.name);
 
-  constructor(
-    private deeplinkService: DeeplinkService,
-    private invitationService: InvitationService,
-  ) {}
+  constructor(private deeplinkService: DeeplinkService) {}
 
   @Post('click')
   @HttpCode(200)
@@ -25,18 +21,6 @@ export class DeeplinkController {
     const userAgent = dto.userAgent;
 
     this.logger.log(`Click request: ip=${ip}, path=${dto.path}`);
-
-    // receiptId가 있으면 영수증 만료 여부 확인
-    if (dto.params.receiptId) {
-      const receiptId = Number(dto.params.receiptId);
-      const expired = await this.invitationService.isReceiptExpired(receiptId);
-      if (expired) {
-        this.logger.log(
-          `Click rejected: ip=${ip}, receiptId=${receiptId}, reason=receipt_expired`,
-        );
-        return { recorded: false, reason: 'receipt_expired' };
-      }
-    }
 
     return this.deeplinkService.recordClick(ip, userAgent, dto);
   }

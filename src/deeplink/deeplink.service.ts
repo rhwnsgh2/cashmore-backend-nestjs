@@ -11,6 +11,7 @@ import {
   scoreMatch,
 } from './utils/fingerprint';
 import { SlackService } from '../slack/slack.service';
+import { InvitationService } from '../invitation/invitation.service';
 
 @Injectable()
 export class DeeplinkService {
@@ -20,6 +21,7 @@ export class DeeplinkService {
     @Inject(DEEPLINK_REPOSITORY)
     private deeplinkRepository: IDeeplinkRepository,
     private slackService: SlackService,
+    private invitationService: InvitationService,
   ) {}
 
   /** 웹에서 클릭 시 IP를 키로 시그널 + 파라미터를 저장한다 */
@@ -150,10 +152,19 @@ export class DeeplinkService {
       })
       .catch(() => {});
 
+    // receiptId가 있으면 만료 여부 확인
+    let receiptValid: boolean | undefined;
+    if (clickData.params.receiptId) {
+      const receiptId = Number(clickData.params.receiptId);
+      const expired = await this.invitationService.isReceiptExpired(receiptId);
+      receiptValid = !expired;
+    }
+
     return {
       matched: true,
       params: clickData.params,
       path: clickData.path,
+      ...(receiptValid !== undefined && { receiptValid }),
     };
   }
 }
