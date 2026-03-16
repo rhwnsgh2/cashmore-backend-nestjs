@@ -64,7 +64,6 @@ describe('DeeplinkController', () => {
       expect(result).toEqual({ recorded: true });
       expect(repository.getAll().size).toBe(1);
     });
-
   });
 
   describe('POST /deeplinks/match', () => {
