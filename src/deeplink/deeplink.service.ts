@@ -70,28 +70,10 @@ export class DeeplinkService {
 
   /** 앱 첫 실행 시 IP + 시그널로 매칭한다 */
   async matchClick(ip: string, dto: MatchRequestDto) {
-    this.slackService
-      .reportDeeplinkMatchAttempt({
-        ip,
-        os: dto.os,
-        osVersion: dto.osVersion,
-      })
-      .catch(() => {});
-
     const clickData = await this.deeplinkRepository.findAndDeleteByIp(ip);
 
     if (!clickData) {
       this.logger.log(`Match miss: ip=${ip}, no click data found`);
-
-      this.slackService
-        .reportDeeplinkMatchMiss({
-          ip,
-          os: dto.os,
-          osVersion: dto.osVersion,
-          reason: 'No click data found for IP',
-        })
-        .catch(() => {});
-
       return { matched: false };
     }
 
@@ -120,16 +102,6 @@ export class DeeplinkService {
       this.logger.log(
         `Match miss: ip=${ip}, score=${result.score}, details=${result.details.join(', ')}`,
       );
-
-      this.slackService
-        .reportDeeplinkMatchMiss({
-          ip,
-          os: dto.os,
-          osVersion: dto.osVersion,
-          reason: result.details.join(', '),
-          score: result.score,
-        })
-        .catch(() => {});
 
       return { matched: false };
     }

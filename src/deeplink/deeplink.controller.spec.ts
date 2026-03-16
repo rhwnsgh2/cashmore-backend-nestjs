@@ -6,6 +6,7 @@ import { DEEPLINK_REPOSITORY } from './interfaces/deeplink-repository.interface'
 import { StubDeeplinkRepository } from './repositories/stub-deeplink.repository';
 import { SlackService } from '../slack/slack.service';
 import { InvitationService } from '../invitation/invitation.service';
+import { AmplitudeService } from '../amplitude/amplitude.service';
 
 describe('DeeplinkController', () => {
   let controller: DeeplinkController;
@@ -36,13 +37,15 @@ describe('DeeplinkController', () => {
           useValue: {
             reportDeeplinkClick: vi.fn().mockResolvedValue(undefined),
             reportDeeplinkMatch: vi.fn().mockResolvedValue(undefined),
-            reportDeeplinkMatchAttempt: vi.fn().mockResolvedValue(undefined),
-            reportDeeplinkMatchMiss: vi.fn().mockResolvedValue(undefined),
           },
         },
         {
           provide: InvitationService,
           useValue: mockInvitationService,
+        },
+        {
+          provide: AmplitudeService,
+          useValue: { track: vi.fn() },
         },
       ],
     }).compile();

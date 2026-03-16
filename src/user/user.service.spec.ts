@@ -7,6 +7,7 @@ import { StubUserRepository } from './repositories/stub-user.repository';
 import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
 import { InvitationService } from '../invitation/invitation.service';
+import { AmplitudeService } from '../amplitude/amplitude.service';
 
 const mockInvitationService = {
   processInvitationReward: vi.fn(),
@@ -38,6 +39,10 @@ describe('UserService', () => {
         {
           provide: InvitationService,
           useValue: mockInvitationService,
+        },
+        {
+          provide: AmplitudeService,
+          useValue: { track: vi.fn() },
         },
       ],
     }).compile();
