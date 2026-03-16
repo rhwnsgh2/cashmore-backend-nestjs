@@ -1,47 +1,104 @@
-CloudWatch 로그를 조회합니다.
+서버 로그를 조회하고 분석합니다. 프로덕션 서버의 에러, API 요청 로그, 배포 후 상태 확인, 장애 조사 등에 사용합니다. 사용자가 "로그 확인해줘", "서버 에러 있어?", "배포 후 괜찮아?", "500 에러 확인", "API 응답 상태", "최근 에러", "장애 원인 파악" 같은 요청을 하면 이 스킬을 사용하세요. 특정 API 경로나 에러 타입을 언급하지 않더라도, 서버 상태나 운영 이슈에 대한 질문이면 이 스킬을 트리거하세요.
 
-## 설정
+## 환경
 
-- 로그 그룹: `/ecs/cashmore`
-- 리전: `ap-northeast-2`
-- 보존 기간: 2주
+- **로그 그룹**: `/ecs/cashmore`
+- **리전**: `ap-northeast-2`
+- **보존 기간**: 2주
+- **도구**: AWS CLI (`aws logs filter-log-events`)
 
-## 로그 종류
+## 로그 포맷
 
-1. **morgan 로그** (HTTP 요청): `combined` 포맷
-   - 형식: `{IP} - - [{날짜}] "{METHOD} {PATH} HTTP/1.1" {STATUS_CODE} {SIZE} ...`
-   - 예: `118.46.216.94 - - [11/Mar/2026:04:37:22 +0000] "GET /buzzvil/ads?... HTTP/1.1" 200 - "-" "okhttp/4.12.0"`
+### 1. Morgan 로그 (HTTP 요청)
 
-2. **NestJS 로그** (앱 로그): `[Nest]` 프리픽스
-   - 형식: `[Nest] 1  - {날짜}  {LEVEL} [{Context}] {메시지}`
-   - 예: `[Nest] 1  - 03/11/2026, 4:39:17 AM   ERROR [ExceptionsHandler] AxiosError: Request failed with status code 503`
-   - AxiosError 등의 스택 트레이스는 **여러 로그 이벤트로 분리**됨에 주의
+`combined` 포맷. API 요청/응답 확인에 사용.
 
-## filter-pattern 규칙 (AWS CloudWatch)
+```
+{IP} - - [{날짜}] "{METHOD} {PATH} HTTP/1.1" {STATUS_CODE} {SIZE} "{REFERER}" "{USER_AGENT}"
+```
 
-- 여러 term을 쓰면 AND 조건 (한 로그 이벤트에 모든 term 포함 시 매칭)
-- 대소문자 구분함
-- **주의**: NestJS 에러 스택 트레이스가 여러 이벤트로 쪼개지므로, `'"keyword" "500"'` 같은 복합 필터는 스택 트레이스 줄까지 매칭되어 중복 카운트될 수 있음
+예시:
+```
+118.46.216.94 - - [11/Mar/2026:04:37:22 +0000] "GET /buzzvil/ads?ifa=xxx HTTP/1.1" 200 - "-" "okhttp/4.12.0"
+```
 
-## 정확한 쿼리 방법
+### 2. NestJS 로그 (앱 로그)
 
-### HTTP 요청 로그 조회 (morgan)
+`[Nest]` 프리픽스. 앱 에러, 서비스 로직 확인에 사용.
 
-morgan 로그를 정확히 매칭하려면 `"{METHOD} {PATH}"` 패턴을 사용:
+```
+[Nest] 1  - {날짜}  {LEVEL} [{Context}] {메시지}
+```
+
+예시:
+```
+[Nest] 1  - 03/11/2026, 4:39:17 AM   ERROR [ExceptionsHandler] AxiosError: Request failed with status code 503
+```
+
+**주의**: 에러 스택 트레이스는 여러 로그 이벤트로 분리됨.
+
+## 사용자 요청 → AWS CLI 변환 가이드
+
+사용자의 자연어 요청을 아래 패턴에 따라 AWS CLI 명령으로 변환한다.
+
+### Step 1: filter-pattern 결정
+
+| 사용자 요청 | filter-pattern |
+|-------------|---------------|
+| "에러 확인해줘", "500 에러" | `'"POST \|GET "' ` (morgan 로그 전체 → python 후처리로 상태코드 필터) |
+| "buzzvil ads 로그" | `'"GET /buzzvil/ads"'` |
+| "participate 요청" | `'"POST /buzzvil/participate"'` |
+| "postback 로그" | `'"POST /buzzvil/postback"'` |
+| "AxiosError", "외부 API 에러" | `'"[ExceptionsHandler] AxiosError"'` |
+| "특정 서비스 로그" (예: Buzzvil) | `'"[BuzzvilService]"'` |
+| "배포 후 상태 확인" | filter-pattern 없이 최근 로그 전체 조회 후 에러 비율 분석 |
+| "Postback 처리 결과" | `'"Postback processed"'` |
+| 특정 경로 전체 | `'"/{경로}/"'` |
+
+### Step 2: 시간 범위 결정
+
+```bash
+# 최근 N시간
+--start-time $(date -v-{N}H +%s000)
+
+# 최근 N일
+--start-time $(date -v-{N}d +%s000)
+
+# 특정 날짜 (KST 기준) — 반드시 python3 사용 (macOS date 타임존 이슈 방지)
+--start-time $(python3 -c "from datetime import datetime, timezone, timedelta; kst=timezone(timedelta(hours=9)); print(int(datetime(2026,3,11,tzinfo=kst).timestamp()*1000))") \
+--end-time $(python3 -c "from datetime import datetime, timezone, timedelta; kst=timezone(timedelta(hours=9)); print(int(datetime(2026,3,12,tzinfo=kst).timestamp()*1000))")
+```
+
+사용자가 시간을 명시하지 않으면 **최근 1시간**을 기본값으로 사용.
+
+### Step 3: 명령 조립 및 실행
 
 ```bash
 aws logs filter-log-events \
   --log-group-name "/ecs/cashmore" \
-  --filter-pattern '"POST /buzzvil/participate"' \
-  --start-time $(date -v-1d +%s000) \
+  --filter-pattern '{위에서 결정한 패턴}' \
+  --start-time {위에서 결정한 시간} \
   --region ap-northeast-2 \
   --output json
 ```
 
-상태코드 필터링은 filter-pattern 대신 **python3 후처리**로 정확하게 분류:
+**주의사항**:
+- `--limit` 없이 실행하면 대량 결과 반환 가능. 먼저 `--limit 50`으로 시작해서 규모 파악
+- `nextToken`이 응답에 있으면 더 많은 결과가 있다는 의미
+- 대소문자 구분됨
+
+### Step 4: 결과 분석 (python3 후처리)
+
+상태코드별/시간대별 분석이 필요하면 결과를 python3로 파이프:
 
 ```bash
-... | python3 -c "
+aws logs filter-log-events \
+  --log-group-name "/ecs/cashmore" \
+  --filter-pattern '"GET /buzzvil/ads"' \
+  --start-time $(date -v-6H +%s000) \
+  --region ap-northeast-2 \
+  --output json \
+| python3 -c "
 import json, sys, re
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
@@ -77,50 +134,22 @@ if timestamps:
 "
 ```
 
-### NestJS 앱 로그 조회
+### 에러 조사 시 접근 방법
 
-```bash
-# 특정 에러 타입
---filter-pattern '"[ExceptionsHandler] AxiosError"'
+"에러 확인해줘" 같은 포괄적 요청에는 다음 순서로 진행:
 
-# 특정 서비스 로그
---filter-pattern '"[BuzzvilService]"'
-```
+1. **NestJS ERROR 로그 먼저 확인**: `--filter-pattern '"ERROR"' --limit 20`
+2. **에러가 있으면 관련 HTTP 요청 상태코드 확인**: 해당 경로의 morgan 로그 조회
+3. **시간대별 에러 분포 파악**: python3 후처리로 추세 분석
+4. **결과를 KST 기준으로 요약 보고**
 
-### 날짜 지정
+## filter-pattern 규칙 (AWS CloudWatch)
 
-**주의**: macOS `date -j -f`는 로컬 타임존(KST)을 적용하여 타임스탬프가 밀릴 수 있음. 특정 날짜는 반드시 python3으로 계산:
-
-```bash
-# 특정 날짜 (하루, UTC 기준) - python3으로 정확한 epoch 계산
---start-time $(python3 -c "from datetime import datetime; print(int(datetime(2026,3,11).timestamp()*1000))") \
---end-time $(python3 -c "from datetime import datetime; print(int(datetime(2026,3,12).timestamp()*1000))")
-
-# 최근 N시간 (상대 시간은 date -v 사용 가능)
---start-time $(date -v-6H +%s000)
-
-# 최근 N일
---start-time $(date -v-7d +%s000)
-```
-
-### 자주 쓰는 쿼리
-
-| 목적 | filter-pattern |
-|------|---------------|
-| buzzvil ads 요청 | `'"GET /buzzvil/ads"'` |
-| buzzvil participate 요청 | `'"POST /buzzvil/participate"'` |
-| postback 수신 | `'"POST /buzzvil/postback"'` |
-| 특정 경로 전체 | `'"/buzzvil/"'` |
-| AxiosError 상세 | `'"[ExceptionsHandler] AxiosError"'` |
-| Postback 처리 로그 | `'"Postback processed"'` |
-
-### 주의사항
-
-- `--limit` 없이 실행하면 전체 결과 반환 (대량일 수 있음)
-- `nextForwardToken`이 있으면 페이지네이션 필요할 수 있음
-- 시간은 UTC 기준 (KST = UTC+9), python 후처리 시 변환 필요
-- 복합 필터 대신 단일 경로 패턴 + python 후처리 조합이 가장 정확
+- 여러 term을 쓰면 AND 조건 (한 로그 이벤트에 모든 term 포함 시 매칭)
+- 대소문자 구분함
+- NestJS 에러 스택 트레이스가 여러 이벤트로 쪼개지므로, 복합 필터 사용 시 중복 매칭 주의
+- 복합 필터보다 **단일 패턴 + python3 후처리** 조합이 더 정확
 
 ## 인자
 
-$ARGUMENTS - 검색할 키워드, 경로, 또는 조건 (예: "buzzvil/ads 에러", "participate 3월 11일", "postback 최근 1시간")
+$ARGUMENTS - 검색할 키워드, 경로, 또는 조건 (예: "buzzvil/ads 에러", "participate 3월 11일", "postback 최근 1시간", "배포 후 상태 확인", "최근 500 에러")

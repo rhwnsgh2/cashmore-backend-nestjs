@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
 import {
   DEEPLINK_REPOSITORY,
   type IDeeplinkRepository,
@@ -12,6 +13,7 @@ import {
 } from './utils/fingerprint';
 import { SlackService } from '../slack/slack.service';
 import { InvitationService } from '../invitation/invitation.service';
+import { AmplitudeService } from '../amplitude/amplitude.service';
 
 @Injectable()
 export class DeeplinkService {
@@ -22,6 +24,7 @@ export class DeeplinkService {
     private deeplinkRepository: IDeeplinkRepository,
     private slackService: SlackService,
     private invitationService: InvitationService,
+    private amplitudeService: AmplitudeService,
   ) {}
 
   /** 웹에서 클릭 시 IP를 키로 시그널 + 파라미터를 저장한다 */
@@ -151,6 +154,26 @@ export class DeeplinkService {
         details: result.details,
       })
       .catch(() => {});
+
+    // Amplitude: track match success (fire-and-forget)
+    const anonUserId = `anon_${createHash('sha256').update(ip).digest('hex').substring(0, 8)}`;
+    const confidence =
+      result.score >= 2 ? 'HIGH' : result.score >= 1 ? 'MED' : 'LOW';
+    const matchDurationSec = Math.round(
+      (Date.now() - new Date(clickData.createdAt).getTime()) / 1000,
+    );
+    this.amplitudeService.track('deeplink_match_success', anonUserId, {
+      score: result.score,
+      confidence,
+      code: clickData.params.code ?? null,
+      receiptId: clickData.params.receiptId
+        ? Number(clickData.params.receiptId)
+        : null,
+      matchDurationSec,
+      os: dto.os,
+      osVersion: dto.osVersion,
+    });
+    // TODO: deeplink_signup 이벤트는 유저 생성 시점(auth 모듈)에서 트래킹 필요
 
     // receiptId가 있으면 만료 여부 확인
     let receiptValid: boolean | undefined;

@@ -8,6 +8,7 @@ import { USER_REPOSITORY } from './interfaces/user-repository.interface';
 import type { IUserModalRepository } from '../user-modal/interfaces/user-modal-repository.interface';
 import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 import { InvitationService } from '../invitation/invitation.service';
+import { AmplitudeService } from '../amplitude/amplitude.service';
 import { SignupType } from './dto/create-user.dto';
 
 export interface UserInfoResponse {
@@ -238,6 +239,7 @@ export class UserService {
     @Inject(USER_MODAL_REPOSITORY)
     private userModalRepository: IUserModalRepository,
     private invitationService: InvitationService,
+    private amplitudeService: AmplitudeService,
   ) {}
 
   async getUserInfo(userId: string): Promise<UserInfoResponse | null> {
@@ -306,8 +308,15 @@ export class UserService {
     }
 
     // 6. 온보딩 처리
+    let onboardingPoint: number | undefined;
     if (params.deviceId && params.onboardingCompleted) {
-      await this.processOnboarding(params.deviceId, userId);
+      const onboardingResult = await this.processOnboarding(
+        params.deviceId,
+        userId,
+      );
+      if (onboardingResult.success) {
+        onboardingPoint = onboardingResult.pointAmount;
+      }
     }
 
     // 7. signupContext에 따른 분기 처리
@@ -320,6 +329,18 @@ export class UserService {
       );
     } else {
       await this.handleInviteRewardModal(userId);
+    }
+
+    // Amplitude: 딥링크 가입 추적 (handleSignupContext 이후 — 포인트 정보 포함)
+    if (params.signupContext) {
+      this.amplitudeService.track('deeplink_signup', String(userId), {
+        type: params.signupContext.type,
+        invitationCode: params.signupContext.invitationCode || null,
+        receiptId: params.signupContext.receiptId ?? null,
+        rewardPoint: invitationReward?.rewardPoint ?? null,
+        receiptPoint: invitationReward?.receiptPoint ?? null,
+        onboardingPoint: onboardingPoint ?? null,
+      });
     }
 
     return { success: true, userId, nickname, invitationReward };
