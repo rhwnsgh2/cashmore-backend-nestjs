@@ -26,8 +26,8 @@ export class DeeplinkController {
 
     this.logger.log(`Click request: ip=${ip}, path=${dto.path}`);
 
-    // invitation_receipt 타입이면 영수증 만료 여부 확인
-    if (dto.path === '/invitation_receipt' && dto.params.receiptId) {
+    // receiptId가 있으면 영수증 만료 여부 확인
+    if (dto.params.receiptId) {
       const receiptId = Number(dto.params.receiptId);
       const expired = await this.invitationService.isReceiptExpired(receiptId);
       if (expired) {

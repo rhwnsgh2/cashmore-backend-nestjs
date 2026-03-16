@@ -72,7 +72,7 @@ describe('DeeplinkController', () => {
         {
           userAgent: IOS_UA,
           params: { receiptId: '99' },
-          path: '/invitation_receipt',
+          path: '/invite',
         },
         mockRequest('192.168.1.100'),
       );
@@ -88,7 +88,7 @@ describe('DeeplinkController', () => {
         {
           userAgent: IOS_UA,
           params: { receiptId: '99' },
-          path: '/invitation_receipt',
+          path: '/invite',
         },
         mockRequest('192.168.1.100'),
       );
