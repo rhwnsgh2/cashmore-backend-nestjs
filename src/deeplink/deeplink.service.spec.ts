@@ -340,6 +340,35 @@ describe('fingerprint utils', () => {
       expect(result.score).toBeGreaterThanOrEqual(2);
     });
 
+    it('OS match + screen within ±2px tolerance → score 2', () => {
+      const result = scoreMatch(
+        { os: 'Android', osVersion: '16', screenWidth: 412, screenHeight: 892 },
+        {
+          os: 'Android',
+          osVersion: '16',
+          screenWidth: 411.43,
+          screenHeight: 891.43,
+        },
+      );
+      expect(result.matched).toBe(true);
+      expect(result.score).toBeGreaterThanOrEqual(2);
+    });
+
+    it('OS match + screen beyond ±2px tolerance → screen mismatch', () => {
+      const result = scoreMatch(
+        { os: 'Android', osVersion: '16', screenWidth: 412, screenHeight: 892 },
+        {
+          os: 'Android',
+          osVersion: '16',
+          screenWidth: 409,
+          screenHeight: 892,
+        },
+      );
+      // screen mismatch but version matches → still matched
+      expect(result.matched).toBe(true);
+      expect(result.score).toBe(1); // version only
+    });
+
     it('OS match + version major match → score includes 1', () => {
       const result = scoreMatch(
         { os: 'iOS', osVersion: '18.3' },

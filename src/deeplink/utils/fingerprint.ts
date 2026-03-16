@@ -91,11 +91,12 @@ export function scoreMatch(
     click.screenWidth != null && click.screenHeight != null;
   const matchHasScreen =
     match.screenWidth != null && match.screenHeight != null;
+  const SCREEN_TOLERANCE = 2;
   if (clickHasScreen && matchHasScreen) {
     comparableSignals++;
     if (
-      click.screenWidth === match.screenWidth &&
-      click.screenHeight === match.screenHeight
+      Math.abs(click.screenWidth! - match.screenWidth!) <= SCREEN_TOLERANCE &&
+      Math.abs(click.screenHeight! - match.screenHeight!) <= SCREEN_TOLERANCE
     ) {
       score += 2;
       matchedSignals++;
