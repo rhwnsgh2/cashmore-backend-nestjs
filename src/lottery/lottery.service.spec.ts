@@ -258,6 +258,40 @@ describe('LotteryService', () => {
     });
   });
 
+  describe('getGoldenLotteryAvailability', () => {
+    const userId = 'test-user-id';
+
+    beforeEach(() => {
+      repository.clear();
+    });
+
+    it('황금 복권을 받은 적 없으면 isAvailable이 true이다', async () => {
+      const result = await service.getGoldenLotteryAvailability(userId);
+
+      expect(result.isAvailable).toBe(true);
+      expect(result.nextAvailableAt).toBeNull();
+    });
+
+    it('오늘 이미 황금 복권을 받았으면 isAvailable이 false이다', async () => {
+      await service.issueLottery(userId, 'MAX_1000', '황금 복권');
+
+      const result = await service.getGoldenLotteryAvailability(userId);
+
+      expect(result.isAvailable).toBe(false);
+      expect(result.nextAvailableAt).toBeDefined();
+      expect(result.nextAvailableAt).not.toBeNull();
+    });
+
+    it('다른 reason으로 발급받아도 황금 복권 가용성에 영향 없다', async () => {
+      await service.issueLottery(userId, 'MAX_500', 'other_reason');
+
+      const result = await service.getGoldenLotteryAvailability(userId);
+
+      expect(result.isAvailable).toBe(true);
+      expect(result.nextAvailableAt).toBeNull();
+    });
+  });
+
   describe('useLottery', () => {
     const userId = 'test-user-id';
 

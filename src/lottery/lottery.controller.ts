@@ -28,6 +28,7 @@ import {
   UseLotteryResponseDto,
 } from './dto/use-lottery.dto';
 import { MaxRewardUserDto } from './dto/max-reward-users.dto';
+import { GoldenLotteryAvailabilityDto } from './dto/golden-lottery-availability.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { LotteryType } from './interfaces/lottery-repository.interface';
@@ -135,6 +136,27 @@ export class LotteryController {
     @Body() dto: UseLotteryRequestDto,
   ): Promise<UseLotteryResponseDto> {
     return this.lotteryService.useLottery(userId, dto.lotteryId);
+  }
+
+  @Get('golden/availability')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '황금 복권 발급 가능 여부 조회',
+    description:
+      '오늘 황금 복권을 받을 수 있는지 확인합니다. 하루 1회 제한.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '황금 복권 가용 여부',
+    type: GoldenLotteryAvailabilityDto,
+  })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async getGoldenLotteryAvailability(
+    @CurrentUser('userId') userId: string,
+  ): Promise<GoldenLotteryAvailabilityDto> {
+    return this.lotteryService.getGoldenLotteryAvailability(userId);
   }
 
   @Get('max-reward-users')

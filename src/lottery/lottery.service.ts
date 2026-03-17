@@ -286,6 +286,32 @@ export class LotteryService {
     };
   }
 
+  async getGoldenLotteryAvailability(
+    userId: string,
+  ): Promise<{ isAvailable: boolean; nextAvailableAt: string | null }> {
+    const todayStart = dayjs().tz('Asia/Seoul').startOf('day').toISOString();
+    const todayEnd = dayjs().tz('Asia/Seoul').endOf('day').toISOString();
+
+    const alreadyIssued =
+      await this.lotteryRepository.existsByUserIdAndReasonToday(
+        userId,
+        '황금 복권',
+        todayStart,
+        todayEnd,
+      );
+
+    if (alreadyIssued) {
+      const nextAvailableAt = dayjs()
+        .tz('Asia/Seoul')
+        .add(1, 'day')
+        .startOf('day')
+        .format('YYYY-MM-DDTHH:mm:ssZ');
+      return { isAvailable: false, nextAvailableAt };
+    }
+
+    return { isAvailable: true, nextAvailableAt: null };
+  }
+
   async getMaxRewardUsers(limit: number): Promise<MaxRewardUserResponse[]> {
     const lotteries: MaxRewardLottery[] =
       await this.lotteryRepository.findMaxRewardLotteries(limit);
