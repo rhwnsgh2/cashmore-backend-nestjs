@@ -105,6 +105,34 @@ export class FcmService implements OnModuleInit {
     }
   }
 
+  async sendDataMessage(
+    userId: string,
+    data: Record<string, string>,
+  ): Promise<void> {
+    if (!this.isInitialized) {
+      return;
+    }
+
+    const fcmToken = await this.fcmRepository.findFcmToken(userId);
+
+    if (!fcmToken) {
+      console.warn(`[FCM] No FCM token found for user: ${userId}`);
+      return;
+    }
+
+    try {
+      await firebaseAdmin.messaging().send({
+        token: fcmToken,
+        data,
+      });
+    } catch (error) {
+      console.error(
+        `[FCM] Failed to send data message to user ${userId}:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
   async pushNotification(
     userId: string,
     title: string,

@@ -143,7 +143,13 @@ export class BuzzvilService {
       `Postback processed: auth_id=${dto.user_id}, user_id=${userId}, point=${pointAmount}, campaign_id=${dto.campaign_id}`,
     );
 
+    // TODO: 앱 배포 후 sendRefreshMessage 제거
     void this.fcmService.sendRefreshMessage(userId, 'point_update');
+    void this.fcmService.sendDataMessage(userId, {
+      type: 'buzzvil_reward',
+      point: String(pointAmount),
+      campaign_id: dto.campaign_id,
+    });
 
     return { message: 'OK' };
   }

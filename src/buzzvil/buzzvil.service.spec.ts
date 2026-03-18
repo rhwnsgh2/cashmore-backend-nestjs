@@ -40,7 +40,7 @@ describe('BuzzvilService', () => {
         BuzzvilService,
         { provide: BuzzvilApiService, useValue: {} },
         { provide: AuthService, useValue: mockAuthService },
-        { provide: FcmService, useValue: { sendRefreshMessage: vi.fn() } },
+        { provide: FcmService, useValue: { sendRefreshMessage: vi.fn(), sendDataMessage: vi.fn() } },
         { provide: BUZZVIL_REPOSITORY, useValue: stubRepository },
       ],
     }).compile();
