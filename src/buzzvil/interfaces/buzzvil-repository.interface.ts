@@ -1,7 +1,7 @@
 export interface BuzzvilReward {
   user_id: string;
   point_amount: number;
-  campaign_id: number;
+  campaign_id: number | null;
   transaction_id: string;
   title: string;
 }
@@ -13,7 +13,7 @@ export interface InsertBuzzvilPointAction {
   status: 'done';
   additional_data: {
     transaction_id: string;
-    campaign_id: number;
+    campaign_id: number | null;
     action_type: string;
     revenue_type: string;
     title: string;

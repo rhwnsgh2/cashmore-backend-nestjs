@@ -44,10 +44,12 @@ export class PostbackBodyDto {
   @IsString()
   revenue_type?: string;
 
-  @ApiProperty({ description: '캠페인 ID' })
+  @ApiPropertyOptional({
+    description: '캠페인 ID (럭키박스/미션팩 등 허브프로모션은 미포함)',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  campaign_id: string;
+  campaign_id?: string;
 
   @ApiPropertyOptional({ description: '추가 데이터 (JSON 문자열)' })
   @IsOptional()

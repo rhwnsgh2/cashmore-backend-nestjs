@@ -130,7 +130,7 @@ export class BuzzvilService {
       status: 'done',
       additional_data: {
         transaction_id: dto.transaction_id,
-        campaign_id: Number(dto.campaign_id),
+        campaign_id: dto.campaign_id ? Number(dto.campaign_id) : null,
         action_type: dto.action_type || '',
         revenue_type: dto.revenue_type || '',
         title: dto.title || '',
@@ -148,7 +148,7 @@ export class BuzzvilService {
     void this.fcmService.sendDataMessage(userId, {
       type: 'buzzvil_reward',
       point: String(pointAmount),
-      campaign_id: dto.campaign_id,
+      campaign_id: dto.campaign_id || '',
     });
 
     return { message: 'OK' };

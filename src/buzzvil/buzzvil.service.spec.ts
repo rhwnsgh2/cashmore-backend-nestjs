@@ -40,7 +40,10 @@ describe('BuzzvilService', () => {
         BuzzvilService,
         { provide: BuzzvilApiService, useValue: {} },
         { provide: AuthService, useValue: mockAuthService },
-        { provide: FcmService, useValue: { sendRefreshMessage: vi.fn(), sendDataMessage: vi.fn() } },
+        {
+          provide: FcmService,
+          useValue: { sendRefreshMessage: vi.fn(), sendDataMessage: vi.fn() },
+        },
         { provide: BUZZVIL_REPOSITORY, useValue: stubRepository },
       ],
     }).compile();
@@ -79,6 +82,18 @@ describe('BuzzvilService', () => {
       expect(ad.title).toBe('11번가 신선밥상');
       expect(ad.unit_id).toBe('321273326536299');
       expect(ad.event_at).toBe(1700000000);
+    });
+
+    it('campaign_id 없는 포스트백 (럭키박스/미션팩) → 정상 저장', async () => {
+      const result = await service.handlePostback(
+        buildPostbackDto({ campaign_id: undefined }),
+      );
+
+      expect(result).toEqual({ message: 'OK' });
+
+      const saved = stubRepository.getAll();
+      expect(saved).toHaveLength(1);
+      expect(saved[0].additional_data.campaign_id).toBeNull();
     });
 
     it('중복 transaction_id → ConflictException', async () => {
