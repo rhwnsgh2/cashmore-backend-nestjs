@@ -14,6 +14,12 @@ export class CheckInResponseDto {
   weeklyBonusEarned: boolean;
 
   @ApiProperty({
+    description: '지급된 포인트 (출석 포인트 + 주간 개근 보너스 포함)',
+    example: 2,
+  })
+  point: number;
+
+  @ApiProperty({
     description: '실패 사유 (이미 출석한 경우)',
     example: 'Already attended today',
     required: false,

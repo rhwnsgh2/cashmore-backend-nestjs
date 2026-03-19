@@ -272,6 +272,7 @@ describe('AttendanceService', () => {
 
       expect(result.success).toBe(true);
       expect(result.weeklyBonusEarned).toBe(false);
+      expect(result.point).toBe(2);
       expect(result.reason).toBeUndefined();
     });
 
@@ -291,7 +292,7 @@ describe('AttendanceService', () => {
       expect(pointActions[0].additionalData).toHaveProperty('attendance_id');
     });
 
-    it('이미 출석한 경우 실패를 반환한다', async () => {
+    it('이미 출석한 경우 실패를 반환하고 포인트는 0이다', async () => {
       await service.checkIn(userId);
 
       const result = await service.checkIn(userId);
@@ -299,6 +300,7 @@ describe('AttendanceService', () => {
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Already attended today');
       expect(result.weeklyBonusEarned).toBe(false);
+      expect(result.point).toBe(0);
     });
 
     it('주간 개근 시 보너스 포인트 5P가 지급된다', async () => {
@@ -339,6 +341,7 @@ describe('AttendanceService', () => {
 
       expect(result.success).toBe(true);
       expect(result.weeklyBonusEarned).toBe(true);
+      expect(result.point).toBe(7);
 
       const pointActions = repository.getInsertedPointActions();
       const bonusAction = pointActions.find(

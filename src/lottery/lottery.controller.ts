@@ -144,8 +144,7 @@ export class LotteryController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '황금 복권 발급 가능 여부 조회',
-    description:
-      '오늘 황금 복권을 받을 수 있는지 확인합니다. 하루 1회 제한.',
+    description: '오늘 황금 복권을 받을 수 있는지 확인합니다. 하루 1회 제한.',
   })
   @ApiResponse({
     status: 200,

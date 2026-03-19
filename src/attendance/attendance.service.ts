@@ -11,6 +11,7 @@ const WEEKLY_COMPLETION_BONUS = 5;
 export interface CheckInResult {
   success: boolean;
   weeklyBonusEarned: boolean;
+  point: number;
   reason?: string;
 }
 
@@ -63,6 +64,7 @@ export class AttendanceService {
       return {
         success: false,
         weeklyBonusEarned: false,
+        point: 0,
         reason: 'Already attended today',
       };
     }
@@ -77,6 +79,7 @@ export class AttendanceService {
       return {
         success: false,
         weeklyBonusEarned: false,
+        point: 0,
         reason: 'Already attended today',
       };
     }
@@ -91,7 +94,11 @@ export class AttendanceService {
     const weeklyBonusEarned =
       await this.checkAndAssignWeeklyCompletionBonus(userId);
 
-    return { success: true, weeklyBonusEarned };
+    const point = weeklyBonusEarned
+      ? POINT_AMOUNT + WEEKLY_COMPLETION_BONUS
+      : POINT_AMOUNT;
+
+    return { success: true, weeklyBonusEarned, point };
   }
 
   private async checkAndAssignWeeklyCompletionBonus(

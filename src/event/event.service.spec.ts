@@ -1,3 +1,5 @@
+import { describe, it, expect, beforeEach, type Mock } from 'vitest';
+import { vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventService } from './event.service';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -11,20 +13,20 @@ dayjs.extend(timezone);
 describe('EventService', () => {
   let service: EventService;
   let mockSupabaseService: {
-    getClient: jest.fn;
+    getClient: Mock;
   };
-  let mockSingle: jest.Mock;
+  let mockSingle: Mock;
 
   beforeEach(async () => {
-    mockSingle = jest.fn();
-    const mockSelect = jest.fn().mockReturnValue({
-      eq: jest.fn().mockReturnValue({
+    mockSingle = vi.fn();
+    const mockSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
         single: mockSingle,
       }),
     });
     mockSupabaseService = {
-      getClient: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
+      getClient: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
           select: mockSelect,
         }),
       }),
