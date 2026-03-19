@@ -16,11 +16,14 @@ export class EventService {
   async isDoublePointActive(userId: string): Promise<boolean> {
     const client = this.supabaseService.getClient();
 
-    const { data, error } = await client
+    const { data, error } = (await client
       .from('user')
       .select('created_at')
       .eq('id', userId)
-      .single();
+      .single()) as {
+      data: { created_at: string } | null;
+      error: { message: string } | null;
+    };
 
     if (error || !data) {
       this.logger.error(
