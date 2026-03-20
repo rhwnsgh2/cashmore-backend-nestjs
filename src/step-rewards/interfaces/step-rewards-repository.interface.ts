@@ -1,5 +1,5 @@
 export interface StepLevelClaim {
-  id: string;
+  id: number;
   user_id: string;
   claim_date: string;
   level: number;

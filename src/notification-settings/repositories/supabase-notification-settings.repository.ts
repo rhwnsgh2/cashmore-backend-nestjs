@@ -43,7 +43,7 @@ export class SupabaseNotificationSettingsRepository implements INotificationSett
           type,
           is_enabled: isEnabled,
           updated_at: new Date().toISOString(),
-        } as never,
+        },
         { onConflict: 'user_id,type' },
       );
 
@@ -62,7 +62,7 @@ export class SupabaseNotificationSettingsRepository implements INotificationSett
       .update({
         marketing_info: marketingInfo,
         marketing_info_updated_at: new Date().toISOString(),
-      } as never)
+      })
       .eq('id', userId);
 
     if (error) {

@@ -1,6 +1,7 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { UserProvider } from 'src/user/interfaces/user-repository.interface';
+import type { Database } from '../../src/supabase/database.types';
 
 export interface TestUser {
   id: string;
@@ -17,7 +18,7 @@ export interface TestUser {
  * 2. user 테이블에 생성
  */
 export async function createTestUser(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   overrides: Partial<TestUser> = {},
 ): Promise<TestUser> {
   const email = overrides.email ?? `test-${Date.now()}@test.com`;
@@ -57,7 +58,7 @@ export async function createTestUser(
  * 여러 테스트 유저 생성
  */
 export async function createTestUsers(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   count: number,
 ): Promise<TestUser[]> {
   const users: TestUser[] = [];
@@ -76,7 +77,7 @@ export async function createTestUsers(
  * 특정 테스트 유저 삭제
  */
 export async function deleteTestUser(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   userId: string,
 ): Promise<void> {
   const { error } = await supabase.from('user').delete().eq('id', userId);
@@ -90,7 +91,7 @@ export async function deleteTestUser(
  * 모든 테스트 유저 삭제
  */
 export async function deleteAllTestUsers(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
 ): Promise<void> {
   const { error } = await supabase.from('user').delete().neq('id', '');
 

@@ -141,7 +141,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
         status: 'pending',
         point: 0,
         position: params.position,
-      } as any)
+      })
       .select('id')
       .single<{ id: number }>();
 
@@ -189,7 +189,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-      } as unknown as never)
+      })
       .eq('id', receiptId);
 
     if (error) {
@@ -204,7 +204,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
       .update({
         status: 'rejected',
         rejected_reason: reason,
-      } as unknown as never)
+      })
       .eq('id', receiptId);
 
     if (error) {
@@ -216,7 +216,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     const { error } = await this.supabaseService
       .getClient()
       .from('every_receipt')
-      .update({ point } as unknown as never)
+      .update({ point })
       .eq('id', receiptId);
 
     if (error) {
@@ -255,7 +255,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
         point_amount: point,
         status: 'done',
         additional_data: { every_receipt_id: receiptId },
-      } as any);
+      });
 
     if (error) {
       throw error;

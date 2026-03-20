@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from './database.types';
 
 @Injectable()
 export class SupabaseService {
-  private client: ReturnType<typeof createClient>;
+  private client: SupabaseClient<Database>;
 
   constructor(private configService: ConfigService) {
     const url = this.configService.get<string>('supabase.url');
@@ -16,10 +17,10 @@ export class SupabaseService {
       throw new Error('Supabase configuration is missing');
     }
 
-    this.client = createClient(url, serviceRoleKey);
+    this.client = createClient<Database>(url, serviceRoleKey);
   }
 
-  getClient() {
+  getClient(): SupabaseClient<Database> {
     return this.client;
   }
 }

@@ -85,7 +85,7 @@ export class SupabaseStepRewardsRepository implements IStepRewardsRepository {
     const { data: inserted, error } = await this.supabaseService
       .getClient()
       .from('step_level_claims')
-      .insert(data as any)
+      .insert(data)
       .select()
       .single();
 

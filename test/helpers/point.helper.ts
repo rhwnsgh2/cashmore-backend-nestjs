@@ -1,4 +1,5 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database, Json } from '../../src/supabase/database.types';
 
 export type PointActionType =
   | 'EVERY_RECEIPT'
@@ -25,6 +26,10 @@ export interface TestPointAction {
   additional_data?: Record<string, unknown>;
 }
 
+export interface CreatedPointAction extends TestPointAction {
+  id: number;
+}
+
 export interface TestUserPointSnapshot {
   id?: number;
   user_id: string;
@@ -44,16 +49,16 @@ export interface TestMonthlyEarnedPoint {
  * 포인트 액션 생성
  */
 export async function createPointAction(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   data: TestPointAction,
-): Promise<TestPointAction> {
+): Promise<CreatedPointAction> {
   const pointAction = {
     user_id: data.user_id,
     type: data.type,
     point_amount: data.point_amount,
     status: data.status ?? 'done',
     created_at: data.created_at ?? new Date().toISOString(),
-    additional_data: data.additional_data ?? {},
+    additional_data: (data.additional_data ?? {}) as Json,
   };
 
   const { data: result, error } = await supabase
@@ -66,23 +71,23 @@ export async function createPointAction(
     throw new Error(`Failed to create point action: ${error.message}`);
   }
 
-  return result;
+  return result as unknown as CreatedPointAction;
 }
 
 /**
  * 여러 포인트 액션 생성
  */
 export async function createPointActions(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   actions: TestPointAction[],
-): Promise<TestPointAction[]> {
+): Promise<CreatedPointAction[]> {
   const pointActions = actions.map((action) => ({
     user_id: action.user_id,
     type: action.type,
     point_amount: action.point_amount,
     status: action.status ?? 'done',
     created_at: action.created_at ?? new Date().toISOString(),
-    additional_data: action.additional_data ?? {},
+    additional_data: (action.additional_data ?? {}) as Json,
   }));
 
   const { data: result, error } = await supabase
@@ -94,14 +99,14 @@ export async function createPointActions(
     throw new Error(`Failed to create point actions: ${error.message}`);
   }
 
-  return result;
+  return result as unknown as CreatedPointAction[];
 }
 
 /**
  * 유저 포인트 스냅샷 생성
  */
 export async function createUserPointSnapshot(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   data: TestUserPointSnapshot,
 ): Promise<TestUserPointSnapshot> {
   const snapshot = {
@@ -120,14 +125,14 @@ export async function createUserPointSnapshot(
     throw new Error(`Failed to create user point snapshot: ${error.message}`);
   }
 
-  return result;
+  return result as unknown as TestUserPointSnapshot;
 }
 
 /**
  * 월별 적립 포인트 생성
  */
 export async function createMonthlyEarnedPoint(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   data: TestMonthlyEarnedPoint,
 ): Promise<TestMonthlyEarnedPoint> {
   const monthlyPoint = {
@@ -147,7 +152,7 @@ export async function createMonthlyEarnedPoint(
     throw new Error(`Failed to create monthly earned point: ${error.message}`);
   }
 
-  return result;
+  return result as unknown as TestMonthlyEarnedPoint;
 }
 
 /**

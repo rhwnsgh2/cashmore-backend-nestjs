@@ -10,15 +10,16 @@ export class SupabaseStreakRepository implements IStreakRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async findStreaks(userId: string, days?: number): Promise<Streak[]> {
-    const params: Record<string, unknown> = { p_user_id: userId };
+    const params: { p_user_id: string; p_days?: number } = {
+      p_user_id: userId,
+    };
     if (days !== undefined) {
       params.p_days = days;
     }
 
-    const { data, error } = await (this.supabaseService.getClient() as any).rpc(
-      'get_user_streaks',
-      params,
-    );
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .rpc('get_user_streaks', params);
 
     if (error) {
       throw error;

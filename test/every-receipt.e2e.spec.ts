@@ -255,7 +255,7 @@ describe('EveryReceipt API (e2e)', () => {
       });
 
       await request(app.getHttpServer())
-        .get(`/every_receipt/${(receipt as any).id}`)
+        .get(`/every_receipt/${receipt.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(404);
     });
@@ -272,11 +272,11 @@ describe('EveryReceipt API (e2e)', () => {
       });
 
       const response = await request(app.getHttpServer())
-        .get(`/every_receipt/${(receipt as any).id}`)
+        .get(`/every_receipt/${receipt.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body.id).toBe((receipt as any).id);
+      expect(response.body.id).toBe(receipt.id);
       expect(response.body.pointAmount).toBe(25);
       expect(response.body.status).toBe('completed');
       expect(response.body.imageUrl).toBe('https://example.com/receipt.jpg');
@@ -311,7 +311,7 @@ describe('EveryReceipt API (e2e)', () => {
       });
 
       const response = await request(app.getHttpServer())
-        .get(`/every_receipt/${(receipt as any).id}`)
+        .get(`/every_receipt/${receipt.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -334,12 +334,12 @@ describe('EveryReceipt API (e2e)', () => {
       });
 
       await createReceiptReReview(supabase, {
-        every_receipt_id: (receipt as any).id,
+        every_receipt_id: receipt.id,
         status: 'pending',
       });
 
       const response = await request(app.getHttpServer())
-        .get(`/every_receipt/${(receipt as any).id}`)
+        .get(`/every_receipt/${receipt.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -503,7 +503,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(404);
     });
 
@@ -519,7 +519,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(404);
     });
 
@@ -535,7 +535,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       const response = await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -544,7 +544,7 @@ describe('EveryReceipt API (e2e)', () => {
       const { data: updatedReceipt } = await supabase
         .from('every_receipt')
         .select('status, completed_at')
-        .eq('id', (receipt as any).id)
+        .eq('id', receipt.id)
         .single();
 
       expect(updatedReceipt!.status).toBe('completed');
@@ -563,7 +563,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       // point_actions 테이블에서 확인
@@ -578,7 +578,7 @@ describe('EveryReceipt API (e2e)', () => {
       expect(pointActions![0].status).toBe('done');
       expect(pointActions![0].additional_data).toEqual(
         expect.objectContaining({
-          every_receipt_id: (receipt as any).id,
+          every_receipt_id: receipt.id,
         }),
       );
     });
@@ -600,7 +600,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       const response = await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -609,7 +609,7 @@ describe('EveryReceipt API (e2e)', () => {
       const { data: updatedReceipt } = await supabase
         .from('every_receipt')
         .select('status, rejected_reason')
-        .eq('id', (receipt as any).id)
+        .eq('id', receipt.id)
         .single();
 
       expect(updatedReceipt!.status).toBe('rejected');
@@ -633,7 +633,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       // point_actions 테이블에 레코드가 없어야 함
@@ -660,14 +660,14 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       // DB에서 포인트 확인
       const { data: updatedReceipt } = await supabase
         .from('every_receipt')
         .select('point')
-        .eq('id', (receipt as any).id)
+        .eq('id', receipt.id)
         .single();
 
       expect(updatedReceipt!.point).toBe(50);
@@ -696,14 +696,14 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       // DB에서 포인트 확인
       const { data: updatedReceipt } = await supabase
         .from('every_receipt')
         .select('point')
-        .eq('id', (receipt as any).id)
+        .eq('id', receipt.id)
         .single();
 
       expect(updatedReceipt!.point).toBe(60);
@@ -721,7 +721,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       expect(stubFcmService.sendRefreshMessage).toHaveBeenCalledWith(
@@ -742,7 +742,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       expect(stubFcmService.pushNotification).toHaveBeenCalledWith(
@@ -770,7 +770,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       expect(stubFcmService.pushNotification).not.toHaveBeenCalled();
@@ -793,7 +793,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(200);
 
       expect(stubFcmService.sendRefreshMessage).toHaveBeenCalledWith(
@@ -814,7 +814,7 @@ describe('EveryReceipt API (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/every_receipt/complete')
-        .send({ everyReceiptId: (receipt as any).id })
+        .send({ everyReceiptId: receipt.id })
         .expect(404);
     });
   });

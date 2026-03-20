@@ -1,9 +1,9 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database, Json } from '../../src/supabase/database.types';
 
 export type ReceiptStatus = 'completed' | 'pending' | 'rejected';
 
 export interface TestReceiptSubmission {
-  id?: string;
   user_id: string;
   created_at?: string;
   status?: ReceiptStatus;
@@ -12,14 +12,25 @@ export interface TestReceiptSubmission {
   score_data?: Record<string, unknown> | null;
 }
 
+export interface CreatedReceipt extends TestReceiptSubmission {
+  id: number;
+}
+
 /**
  * 영수증 제출 생성
  */
 export async function createReceiptSubmission(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   data: TestReceiptSubmission,
-): Promise<TestReceiptSubmission> {
-  const submission: Record<string, unknown> = {
+): Promise<CreatedReceipt> {
+  const submission: {
+    user_id: string;
+    created_at: string;
+    status: string;
+    point: number;
+    image_url: string;
+    score_data?: Json;
+  } = {
     user_id: data.user_id,
     created_at: data.created_at ?? new Date().toISOString(),
     status: data.status ?? 'completed',
@@ -28,7 +39,7 @@ export async function createReceiptSubmission(
   };
 
   if (data.score_data !== undefined) {
-    submission.score_data = data.score_data;
+    submission.score_data = data.score_data as Json;
   }
 
   const { data: result, error } = await supabase
@@ -41,19 +52,26 @@ export async function createReceiptSubmission(
     throw new Error(`Failed to create receipt submission: ${error.message}`);
   }
 
-  return result;
+  return result as unknown as CreatedReceipt;
 }
 
 /**
  * 여러 영수증 제출 생성 (배치 처리)
  */
 export async function createReceiptSubmissions(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   submissions: TestReceiptSubmission[],
 ): Promise<void> {
   const BATCH_SIZE = 500;
   const data = submissions.map((s) => {
-    const row: Record<string, unknown> = {
+    const row: {
+      user_id: string;
+      created_at: string;
+      status: string;
+      point: number;
+      image_url: string;
+      score_data?: Json;
+    } = {
       user_id: s.user_id,
       created_at: s.created_at ?? new Date().toISOString(),
       status: s.status ?? 'completed',
@@ -61,7 +79,7 @@ export async function createReceiptSubmissions(
       image_url: s.image_url ?? '',
     };
     if (s.score_data !== undefined) {
-      row.score_data = s.score_data;
+      row.score_data = s.score_data as Json;
     }
     return row;
   });
@@ -80,7 +98,7 @@ export async function createReceiptSubmissions(
  * 영수증 재검수 레코드 생성
  */
 export async function createReceiptReReview(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   data: {
     every_receipt_id: number;
     status: 'pending' | 'completed' | 'rejected';

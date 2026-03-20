@@ -6,6 +6,7 @@ import {
   UserModalType,
   UserModalStatus,
 } from '../interfaces/user-modal-repository.interface';
+import type { Json } from '../../supabase/database.types';
 
 interface UserModalRow {
   id: number;
@@ -60,20 +61,25 @@ export class SupabaseUserModalRepository implements IUserModalRepository {
     name: UserModalType,
     additionalData?: Record<string, unknown>,
   ): Promise<void> {
-    const insertData: Record<string, unknown> = {
+    const insertData: {
+      user_id: string;
+      name: string;
+      status: string;
+      additional_data?: Json;
+    } = {
       user_id: userId,
       name,
       status: 'pending',
     };
 
     if (additionalData) {
-      insertData.additional_data = additionalData;
+      insertData.additional_data = additionalData as Json;
     }
 
     const { error } = await this.supabase
       .getClient()
       .from('modal_shown')
-      .insert(insertData as any);
+      .insert(insertData);
 
     if (error) {
       throw error;

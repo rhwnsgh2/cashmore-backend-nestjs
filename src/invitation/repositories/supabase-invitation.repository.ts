@@ -7,6 +7,7 @@ import type {
   StepRewardAction,
 } from '../interfaces/invitation-repository.interface';
 import { generateUniqueCode } from '../utils/generate-code';
+import type { Json } from '../../supabase/database.types';
 
 interface InvitationRow {
   id: number;
@@ -58,7 +59,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
         identifier,
         status: 'pending',
         type,
-      } as any)
+      })
       .select('id, sender_id, created_at, identifier, status')
       .single<InvitationRow>();
 
@@ -165,7 +166,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       .select('id')
       .eq('type', 'INVITE_STEP_REWARD')
       .eq('user_id', userId)
-      .eq('additional_data->>step_count', stepCount)
+      .eq('additional_data->>step_count', String(stepCount))
       .returns<{ id: number }[]>();
 
     if (error || !data) {
@@ -191,7 +192,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
         step_count: stepCount,
         step_name: stepName,
       },
-    } as any);
+    });
 
     if (error) {
       throw error;
@@ -263,7 +264,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       device_id: deviceId,
       event_name: eventName,
       user_id: userId,
-    } as any);
+    });
 
     if (error) {
       throw error;
@@ -306,7 +307,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
         user_id: userId,
         type,
         source_receipt_id: sourceReceiptId ?? null,
-      } as any)
+      })
       .select('id')
       .single<{ id: number }>();
 
@@ -329,8 +330,8 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       user_id: userId,
       type,
       point_amount: pointAmount,
-      additional_data: additionalData,
-    } as any);
+      additional_data: additionalData as Json,
+    });
 
     if (error) {
       throw error;

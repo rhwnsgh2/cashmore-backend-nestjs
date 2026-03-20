@@ -10,6 +10,7 @@ import type {
   LotteryStatus,
   MaxRewardLottery,
 } from '../interfaces/lottery-repository.interface';
+import type { Json } from '../../supabase/database.types';
 
 @Injectable()
 export class SupabaseLotteryRepository implements ILotteryRepository {
@@ -61,7 +62,7 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
     const { data: result, error } = await this.supabaseService
       .getClient()
       .from('lotteries')
-      .insert(data as any)
+      .insert(data)
       .select()
       .single();
 
@@ -80,7 +81,7 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
     const { error } = await this.supabaseService
       .getClient()
       .from('lotteries')
-      .update({ status, used_at: usedAt } as unknown as never)
+      .update({ status, used_at: usedAt })
       .eq('id', lotteryId);
 
     if (error) {
@@ -92,7 +93,7 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
     const { error } = await this.supabaseService
       .getClient()
       .from('point_actions')
-      .insert(data as any);
+      .insert({ ...data, additional_data: data.additional_data as Json });
 
     if (error) {
       throw error;
@@ -103,7 +104,7 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
     const { error } = await this.supabaseService
       .getClient()
       .from('ad_lottery_slots')
-      .insert(data as any);
+      .insert({ ...data, reward_metadata: data.reward_metadata as Json });
 
     if (error) {
       throw error;

@@ -51,7 +51,7 @@ export class SupabaseExchangePointRepository implements IExchangePointRepository
     const { data: result, error } = await this.supabaseService
       .getClient()
       .from('point_actions')
-      .insert(data as any)
+      .insert(data)
       .select('id')
       .single();
 
@@ -92,7 +92,7 @@ export class SupabaseExchangePointRepository implements IExchangePointRepository
           rejected_at: null,
           cancelled_at: new Date().toISOString(),
         },
-      } as unknown as never)
+      })
       .eq('id', id)
       .eq('user_id', userId);
 

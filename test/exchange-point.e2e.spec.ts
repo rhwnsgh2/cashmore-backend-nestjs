@@ -160,7 +160,7 @@ describe('ExchangePoint API (e2e) - Real DB', () => {
       const response = await request(app.getHttpServer())
         .delete('/exchange-point-to-cash')
         .set('Authorization', `Bearer ${token}`)
-        .send({ id: (pointAction as any).id })
+        .send({ id: pointAction.id })
         .expect(200);
 
       expect(response.body).toEqual({ success: true });
@@ -191,7 +191,7 @@ describe('ExchangePoint API (e2e) - Real DB', () => {
       await request(app.getHttpServer())
         .delete('/exchange-point-to-cash')
         .set('Authorization', `Bearer ${token}`)
-        .send({ id: (pointAction as any).id })
+        .send({ id: pointAction.id })
         .expect(400);
     });
   });

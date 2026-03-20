@@ -312,7 +312,7 @@ describe('PgPointBatchRepository.calculateMonthlyEarnedPoints + upsertMonthlyEar
         },
         {
           user_id: user.id,
-          type: 'POINT_EXPIRATION' as any,
+          type: 'POINT_EXPIRATION',
           point_amount: -300,
           created_at: '2025-12-15T12:00:00+09:00',
         },

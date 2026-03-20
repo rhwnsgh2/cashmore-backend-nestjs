@@ -5,6 +5,7 @@ import type {
   AttendanceRecord,
   AttendancePointAction,
 } from '../interfaces/attendance-repository.interface';
+import type { Json } from '../../supabase/database.types';
 
 interface AttendanceRow {
   id: number;
@@ -115,7 +116,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('attendance')
-      .insert({ user_id: userId, created_at_date: date } as any)
+      .insert({ user_id: userId, created_at_date: date })
       .select('id, user_id, created_at_date, created_at')
       .single<AttendanceRow>();
 
@@ -144,8 +145,8 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         user_id: userId,
         type,
         point_amount: pointAmount,
-        additional_data: additionalData,
-      } as any);
+        additional_data: additionalData as Json,
+      });
 
     if (error) {
       throw error;

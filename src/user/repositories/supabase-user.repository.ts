@@ -7,6 +7,7 @@ import type {
   User,
   UserProvider,
 } from '../interfaces/user-repository.interface';
+import type { Json } from '../../supabase/database.types';
 
 @Injectable()
 export class SupabaseUserRepository implements IUserRepository {
@@ -33,7 +34,7 @@ export class SupabaseUserRepository implements IUserRepository {
     const { error } = await this.supabaseService
       .getClient()
       .from('user')
-      .update({ nickname } as never)
+      .update({ nickname })
       .eq('id', userId);
 
     if (error) {
@@ -86,7 +87,7 @@ export class SupabaseUserRepository implements IUserRepository {
         marketing_info: userData.marketingAgreement,
         device_id: userData.deviceId || null,
         provider: userData.provider,
-      } as any)
+      })
       .select('id')
       .single<{ id: string }>();
 
@@ -139,7 +140,7 @@ export class SupabaseUserRepository implements IUserRepository {
         device_id: deviceId,
         event_name: eventName,
         user_id: userId,
-      } as any);
+      });
 
     if (error) {
       throw error;
@@ -159,8 +160,8 @@ export class SupabaseUserRepository implements IUserRepository {
         user_id: userId,
         type,
         point_amount: pointAmount,
-        additional_data: additionalData,
-      } as any);
+        additional_data: additionalData as Json,
+      });
 
     if (error) {
       throw error;

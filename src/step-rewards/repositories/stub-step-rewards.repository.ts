@@ -14,7 +14,7 @@ export class StubStepRewardsRepository implements IStepRewardsRepository {
   addClaim(claim: Omit<StepLevelClaim, 'id' | 'created_at'>): StepLevelClaim {
     const newClaim: StepLevelClaim = {
       ...claim,
-      id: `stub-claim-${this.idCounter++}`,
+      id: this.idCounter++,
       created_at: new Date().toISOString(),
     };
     this.claims.push(newClaim);
@@ -72,7 +72,7 @@ export class StubStepRewardsRepository implements IStepRewardsRepository {
   }): Promise<StepLevelClaim> {
     const newClaim: StepLevelClaim = {
       ...data,
-      id: `stub-claim-${this.idCounter++}`,
+      id: this.idCounter++,
       created_at: new Date().toISOString(),
     };
     this.claims.push(newClaim);

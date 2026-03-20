@@ -30,7 +30,7 @@ export class SupabaseBuzzvilRepository implements IBuzzvilRepository {
     const { error } = await this.supabaseService
       .getClient()
       .from('point_actions')
-      .insert(data as any);
+      .insert(data);
 
     if (error) {
       throw error;
