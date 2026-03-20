@@ -224,10 +224,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     }
   }
 
-  async isFirstReceipt(
-    userId: string,
-    receiptId: number,
-  ): Promise<boolean> {
+  async isFirstReceipt(userId: string, receiptId: number): Promise<boolean> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('every_receipt')

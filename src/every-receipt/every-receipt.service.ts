@@ -98,11 +98,10 @@ export class EveryReceiptService {
     );
     let isOnboardingReceipt = false;
     if (isOnboardingToday) {
-      isOnboardingReceipt =
-        await this.everyReceiptRepository.isFirstReceipt(
-          receipt.userId,
-          everyReceiptId,
-        );
+      isOnboardingReceipt = await this.everyReceiptRepository.isFirstReceipt(
+        receipt.userId,
+        everyReceiptId,
+      );
     }
 
     const isDoublePoint = await this.eventService.isDoublePointActive(
@@ -113,10 +112,7 @@ export class EveryReceiptService {
 
     if (isOnboardingReceipt || isDoublePoint) {
       finalPoint = receipt.point * 2;
-      await this.everyReceiptRepository.updatePoint(
-        everyReceiptId,
-        finalPoint,
-      );
+      await this.everyReceiptRepository.updatePoint(everyReceiptId, finalPoint);
     }
 
     // 2. 중복 영수증 판별 → reject
@@ -152,10 +148,7 @@ export class EveryReceiptService {
         : '아쉽지만 포인트를 지급할 수 없어요',
       {},
     );
-    await this.fcmService.sendRefreshMessage(
-      receipt.userId,
-      'receipt_update',
-    );
+    await this.fcmService.sendRefreshMessage(receipt.userId, 'receipt_update');
 
     return { success: true };
   }
