@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   Post,
@@ -23,6 +24,10 @@ import {
   ConfirmUploadRequestDto,
   ConfirmUploadResponseDto,
 } from './dto/confirm-upload.dto';
+import {
+  CompleteReceiptRequestDto,
+  CompleteReceiptResponseDto,
+} from './dto/complete-receipt.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { EveryReceipt } from './interfaces/every-receipt-repository.interface';
@@ -100,6 +105,25 @@ export class EveryReceiptController {
       body.publicUrl,
       body.currentPosition ?? null,
     );
+  }
+
+  @Post('complete')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: '영수증 완료 처리',
+    description:
+      'AI 채점 완료 후 영수증을 최종 완료(또는 중복 reject) 처리하고 포인트를 지급합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '영수증 완료 처리 성공',
+    type: CompleteReceiptResponseDto,
+  })
+  @ApiResponse({ status: 404, description: '영수증을 찾을 수 없음' })
+  async completeReceipt(
+    @Body() body: CompleteReceiptRequestDto,
+  ): Promise<CompleteReceiptResponseDto> {
+    return await this.everyReceiptService.completeReceipt(body.everyReceiptId);
   }
 
   @Get(':id')

@@ -43,6 +43,13 @@ export interface InsertedEveryReceipt {
   id: number;
 }
 
+export interface PendingEveryReceipt {
+  id: number;
+  userId: string;
+  point: number;
+  scoreData: ScoreData;
+}
+
 export interface IEveryReceiptRepository {
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]>;
   findById(
@@ -56,6 +63,18 @@ export interface IEveryReceiptRepository {
     month: number,
   ): Promise<number>;
   insert(params: InsertEveryReceiptParams): Promise<InsertedEveryReceipt>;
+  findPendingWithScoreData(
+    receiptId: number,
+  ): Promise<PendingEveryReceipt | null>;
+  updateToCompleted(receiptId: number): Promise<void>;
+  updateToRejected(receiptId: number, reason: string): Promise<void>;
+  updatePoint(receiptId: number, point: number): Promise<void>;
+  createPointAction(
+    userId: string,
+    receiptId: number,
+    point: number,
+  ): Promise<void>;
+  isFirstReceipt(userId: string, receiptId: number): Promise<boolean>;
 }
 
 export const EVERY_RECEIPT_REPOSITORY = Symbol('EVERY_RECEIPT_REPOSITORY');

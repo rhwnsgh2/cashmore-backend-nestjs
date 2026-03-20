@@ -1,11 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EveryReceiptService } from './every-receipt.service';
 import { EVERY_RECEIPT_REPOSITORY } from './interfaces/every-receipt-repository.interface';
+import type { ScoreData } from './interfaces/every-receipt-repository.interface';
 import { StubEveryReceiptRepository } from './repositories/stub-every-receipt.repository';
 import type { ReceiptQueueMessage } from './receipt-queue.service';
 import { ReceiptQueueService } from './receipt-queue.service';
 import type { AmplitudeEventProperties } from '../amplitude/amplitude.service';
 import { AmplitudeService } from '../amplitude/amplitude.service';
+import { EventService } from '../event/event.service';
+import { OnboardingService } from '../onboarding/onboarding.service';
+import { FcmService } from '../fcm/fcm.service';
 
 interface TrackedEvent {
   eventType: string;
@@ -59,11 +63,95 @@ class StubReceiptQueueService {
   }
 }
 
+class StubEventService {
+  private doublePointActive = false;
+
+  setDoublePointActive(active: boolean): void {
+    this.doublePointActive = active;
+  }
+
+  isDoublePointActive(_userId: string): Promise<boolean> {
+    return Promise.resolve(this.doublePointActive);
+  }
+
+  clear(): void {
+    this.doublePointActive = false;
+  }
+}
+
+class StubOnboardingService {
+  private eventStatus = false;
+
+  setEventStatus(status: boolean): void {
+    this.eventStatus = status;
+  }
+
+  getEventStatus(_userId: string): Promise<boolean> {
+    return Promise.resolve(this.eventStatus);
+  }
+
+  clear(): void {
+    this.eventStatus = false;
+  }
+}
+
+class StubFcmService {
+  private pushNotifications: {
+    userId: string;
+    title: string;
+    body: string;
+  }[] = [];
+  private refreshMessages: { userId: string; type: string }[] = [];
+
+  pushNotification(userId: string, title: string, body: string): Promise<void> {
+    this.pushNotifications.push({ userId, title, body });
+    return Promise.resolve();
+  }
+
+  sendRefreshMessage(userId: string, type: string): Promise<void> {
+    this.refreshMessages.push({ userId, type });
+    return Promise.resolve();
+  }
+
+  getPushNotifications() {
+    return this.pushNotifications;
+  }
+
+  getRefreshMessages() {
+    return this.refreshMessages;
+  }
+
+  clear(): void {
+    this.pushNotifications = [];
+    this.refreshMessages = [];
+  }
+}
+
+function makeScoreData(overrides: Partial<ScoreData> = {}): ScoreData {
+  return {
+    items: { score: 10, reason: 'good' },
+    store_name: { score: 5, reason: 'found' },
+    total_score: 80,
+    receipt_type: { score: 25, reason: 'offline' },
+    date_validity: { score: 15, reason: 'valid' },
+    image_quality: { score: 10, reason: 'clear', image_quality: 5 },
+    store_details: { score: 5, reason: 'found' },
+    payment_amount: { score: 5, reason: 'found' },
+    payment_method: { score: 5, reason: 'found' },
+    is_duplicate_receipt: false,
+    same_store_count_with_in_7_days: { score: 0, reason: 'first' },
+    ...overrides,
+  };
+}
+
 describe('EveryReceiptService', () => {
   let service: EveryReceiptService;
   let repository: StubEveryReceiptRepository;
   let queueService: StubReceiptQueueService;
   let amplitudeService: StubAmplitudeService;
+  let eventService: StubEventService;
+  let onboardingService: StubOnboardingService;
+  let fcmService: StubFcmService;
 
   const userId = 'test-user-id';
 
@@ -71,6 +159,9 @@ describe('EveryReceiptService', () => {
     repository = new StubEveryReceiptRepository();
     queueService = new StubReceiptQueueService();
     amplitudeService = new StubAmplitudeService();
+    eventService = new StubEventService();
+    onboardingService = new StubOnboardingService();
+    fcmService = new StubFcmService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -78,6 +169,9 @@ describe('EveryReceiptService', () => {
         { provide: EVERY_RECEIPT_REPOSITORY, useValue: repository },
         { provide: ReceiptQueueService, useValue: queueService },
         { provide: AmplitudeService, useValue: amplitudeService },
+        { provide: EventService, useValue: eventService },
+        { provide: OnboardingService, useValue: onboardingService },
+        { provide: FcmService, useValue: fcmService },
       ],
     }).compile();
 
@@ -88,6 +182,9 @@ describe('EveryReceiptService', () => {
     repository.clear();
     queueService.clear();
     amplitudeService.clear();
+    eventService.clear();
+    onboardingService.clear();
+    fcmService.clear();
   });
 
   describe('getEveryReceipts', () => {
@@ -343,19 +440,7 @@ describe('EveryReceiptService', () => {
         pointAmount: 30,
         status: 'completed',
         imageUrl: 'https://example.com/image.jpg',
-        scoreData: {
-          items: { score: 10, reason: 'good' },
-          store_name: { score: 5, reason: 'found' },
-          total_score: 80,
-          receipt_type: { score: 25, reason: 'offline' },
-          date_validity: { score: 15, reason: 'valid' },
-          image_quality: { score: 10, reason: 'clear', image_quality: 5 },
-          store_details: { score: 5, reason: 'found' },
-          payment_amount: { score: 5, reason: 'found' },
-          payment_method: { score: 5, reason: 'found' },
-          is_duplicate_receipt: false,
-          same_store_count_with_in_7_days: { score: 0, reason: 'first' },
-        },
+        scoreData: makeScoreData(),
       });
 
       const result = await service.getEveryReceiptDetail(receiptId, userId);
@@ -467,6 +552,362 @@ describe('EveryReceiptService', () => {
         }),
       );
       expect(events[0].properties?.timestamp).toBeDefined();
+    });
+  });
+
+  describe('completeReceipt', () => {
+    const receiptId = 100;
+
+    it('영수증을 찾을 수 없으면 에러를 던진다', async () => {
+      await expect(service.completeReceipt(receiptId)).rejects.toThrow();
+    });
+
+    it('score_data 없는 영수증(=null)은 찾을 수 없다', async () => {
+      // findPendingWithScoreData는 score_data IS NOT NULL 조건으로 조회하므로
+      // score_data가 없으면 null을 반환
+      await expect(service.completeReceipt(999)).rejects.toThrow();
+    });
+
+    it('정상 영수증을 completed 상태로 변경한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const completed = repository.getCompletedReceiptIds();
+      expect(completed).toContain(receiptId);
+    });
+
+    it('완료 처리 후 포인트 액션을 생성한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const pointActions = repository.getPointActions();
+      expect(pointActions).toHaveLength(1);
+      expect(pointActions[0]).toEqual({
+        userId,
+        receiptId,
+        point: 25,
+      });
+    });
+
+    it('중복 영수증(point=0, is_duplicate_receipt=true)은 rejected로 처리한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 0,
+        scoreData: makeScoreData({ is_duplicate_receipt: true }),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const rejected = repository.getRejectedReceipts();
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0]).toEqual({
+        id: receiptId,
+        reason: '중복된 영수증 제출',
+      });
+
+      // completed로 처리되지 않아야 함
+      const completed = repository.getCompletedReceiptIds();
+      expect(completed).toHaveLength(0);
+    });
+
+    it('중복 영수증은 포인트 액션을 생성하지 않는다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 0,
+        scoreData: makeScoreData({ is_duplicate_receipt: true }),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const pointActions = repository.getPointActions();
+      expect(pointActions).toHaveLength(0);
+    });
+
+    it('is_duplicate_receipt가 true여도 point가 0이 아니면 정상 완료한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 15,
+        scoreData: makeScoreData({ is_duplicate_receipt: true }),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const completed = repository.getCompletedReceiptIds();
+      expect(completed).toContain(receiptId);
+
+      const rejected = repository.getRejectedReceipts();
+      expect(rejected).toHaveLength(0);
+    });
+
+    it('point가 0이어도 is_duplicate_receipt가 false이면 정상 완료한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 0,
+        scoreData: makeScoreData({ is_duplicate_receipt: false }),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const completed = repository.getCompletedReceiptIds();
+      expect(completed).toContain(receiptId);
+
+      const rejected = repository.getRejectedReceipts();
+      expect(rejected).toHaveLength(0);
+    });
+
+    it('온보딩 이벤트 기간 + 첫 번째 영수증이면 포인트를 2배로 업데이트한다', async () => {
+      onboardingService.setEventStatus(true);
+      repository.setFirstReceiptId(userId, receiptId);
+
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const pointUpdates = repository.getPointUpdates();
+      expect(pointUpdates).toHaveLength(1);
+      expect(pointUpdates[0]).toEqual({ id: receiptId, point: 50 });
+    });
+
+    it('온보딩 이벤트 기간이지만 첫 번째 영수증이 아니면 2배 적용하지 않는다', async () => {
+      onboardingService.setEventStatus(true);
+      repository.setFirstReceiptId(userId, 999); // 다른 영수증이 첫 번째
+
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const pointUpdates = repository.getPointUpdates();
+      expect(pointUpdates).toHaveLength(0);
+    });
+
+    it('더블 포인트 이벤트 기간이면 포인트를 2배로 업데이트한다', async () => {
+      eventService.setDoublePointActive(true);
+
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 30,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const pointUpdates = repository.getPointUpdates();
+      expect(pointUpdates).toHaveLength(1);
+      expect(pointUpdates[0]).toEqual({ id: receiptId, point: 60 });
+    });
+
+    it('온보딩 + 더블 포인트 둘 다 해당해도 2배만 적용한다 (4배 아님)', async () => {
+      onboardingService.setEventStatus(true);
+      repository.setFirstReceiptId(userId, receiptId);
+      eventService.setDoublePointActive(true);
+
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 20,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const pointUpdates = repository.getPointUpdates();
+      expect(pointUpdates).toHaveLength(1);
+      expect(pointUpdates[0]).toEqual({ id: receiptId, point: 40 });
+    });
+
+    it('이벤트 비활성 시 포인트를 업데이트하지 않는다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const pointUpdates = repository.getPointUpdates();
+      expect(pointUpdates).toHaveLength(0);
+    });
+
+    it('2배 적용 후 포인트 액션도 2배 포인트로 생성한다', async () => {
+      eventService.setDoublePointActive(true);
+
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const pointActions = repository.getPointActions();
+      expect(pointActions).toHaveLength(1);
+      expect(pointActions[0].point).toBe(50);
+    });
+
+    it('완료 후 FCM 푸시 알림을 전송한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const notifications = fcmService.getPushNotifications();
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0].userId).toBe(userId);
+    });
+
+    it('완료 후 receipt_update 리프레시 메시지를 전송한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const refreshMessages = fcmService.getRefreshMessages();
+      expect(refreshMessages).toHaveLength(1);
+      expect(refreshMessages[0]).toEqual({
+        userId,
+        type: 'receipt_update',
+      });
+    });
+
+    it('중복 reject 후에도 receipt_update 리프레시 메시지를 전송한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 0,
+        scoreData: makeScoreData({ is_duplicate_receipt: true }),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const refreshMessages = fcmService.getRefreshMessages();
+      expect(refreshMessages).toHaveLength(1);
+      expect(refreshMessages[0]).toEqual({
+        userId,
+        type: 'receipt_update',
+      });
+    });
+
+    it('중복 reject 시 포인트 푸시 알림은 보내지 않는다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 0,
+        scoreData: makeScoreData({ is_duplicate_receipt: true }),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const notifications = fcmService.getPushNotifications();
+      expect(notifications).toHaveLength(0);
+    });
+
+    it('성공 응답을 반환한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      const result = await service.completeReceipt(receiptId);
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it('중복 reject에도 성공 응답을 반환한다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 0,
+        scoreData: makeScoreData({ is_duplicate_receipt: true }),
+      });
+
+      const result = await service.completeReceipt(receiptId);
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it('푸시 알림이 웹앱과 동일한 포맷으로 전송된다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const notifications = fcmService.getPushNotifications();
+      expect(notifications[0].title).toBe('AI 영수증 분석이 완료됐어요 🤖');
+      expect(notifications[0].body).toBe('바로 25포인트를 지급할게요!');
+    });
+
+    it('2배 적용된 영수증의 푸시 알림에 2배 포인트가 포함된다', async () => {
+      eventService.setDoublePointActive(true);
+
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 25,
+        scoreData: makeScoreData(),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const notifications = fcmService.getPushNotifications();
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0].body).toBe('바로 50포인트를 지급할게요!');
+    });
+
+    it('포인트가 0인 정상 완료 시 알림 body가 다르다', async () => {
+      repository.setPendingReceipt({
+        id: receiptId,
+        userId,
+        point: 0,
+        scoreData: makeScoreData({ is_duplicate_receipt: false }),
+      });
+
+      await service.completeReceipt(receiptId);
+
+      const notifications = fcmService.getPushNotifications();
+      expect(notifications[0].body).toBe('아쉽지만 포인트를 지급할 수 없어요');
     });
   });
 });

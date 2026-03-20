@@ -3,6 +3,7 @@ import { SupabaseService } from '../../supabase/supabase.service';
 import type {
   InsertEveryReceiptParams,
   InsertedEveryReceipt,
+  PendingEveryReceipt,
 } from '../interfaces/every-receipt-repository.interface';
 import {
   IEveryReceiptRepository,
@@ -149,5 +150,118 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     }
 
     return { id: data.id };
+  }
+
+  async findPendingWithScoreData(
+    receiptId: number,
+  ): Promise<PendingEveryReceipt | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .select('id, user_id, point, score_data')
+      .eq('id', receiptId)
+      .not('score_data', 'is', null)
+      .not('status', 'eq', 'completed')
+      .not('status', 'eq', 'rejected')
+      .single<{
+        id: number;
+        user_id: string;
+        point: number;
+        score_data: ScoreData;
+      }>();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      point: data.point,
+      scoreData: data.score_data,
+    };
+  }
+
+  async updateToCompleted(receiptId: number): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      } as any)
+      .eq('id', receiptId);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async updateToRejected(receiptId: number, reason: string): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .update({
+        status: 'rejected',
+        rejected_reason: reason,
+      } as any)
+      .eq('id', receiptId);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async updatePoint(receiptId: number, point: number): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .update({ point } as any)
+      .eq('id', receiptId);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async isFirstReceipt(
+    userId: string,
+    receiptId: number,
+  ): Promise<boolean> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .select('id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single<{ id: number }>();
+
+    if (error || !data) {
+      return false;
+    }
+
+    return data.id === receiptId;
+  }
+
+  async createPointAction(
+    userId: string,
+    receiptId: number,
+    point: number,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .insert({
+        user_id: userId,
+        type: 'EVERY_RECEIPT',
+        point_amount: point,
+        status: 'done',
+        additional_data: { every_receipt_id: receiptId },
+      } as any);
+
+    if (error) {
+      throw error;
+    }
   }
 }

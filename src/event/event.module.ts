@@ -9,5 +9,6 @@ import { AuthModule } from '../auth/auth.module';
   imports: [SupabaseModule, AuthModule],
   controllers: [EventController, DoublePointEventController],
   providers: [EventService],
+  exports: [EventService],
 })
 export class EventModule {}

@@ -5,9 +5,12 @@ import { EVERY_RECEIPT_REPOSITORY } from './interfaces/every-receipt-repository.
 import { SupabaseEveryReceiptRepository } from './repositories/supabase-every-receipt.repository';
 import { AuthModule } from '../auth/auth.module';
 import { ReceiptQueueService } from './receipt-queue.service';
+import { EventModule } from '../event/event.module';
+import { OnboardingModule } from '../onboarding/onboarding.module';
+import { FcmModule } from '../fcm/fcm.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, EventModule, OnboardingModule, FcmModule],
   controllers: [EveryReceiptController],
   providers: [
     EveryReceiptService,
