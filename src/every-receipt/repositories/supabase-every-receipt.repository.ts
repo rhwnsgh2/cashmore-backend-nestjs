@@ -189,7 +189,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-      } as any)
+      } as unknown as never)
       .eq('id', receiptId);
 
     if (error) {
@@ -204,7 +204,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
       .update({
         status: 'rejected',
         rejected_reason: reason,
-      } as any)
+      } as unknown as never)
       .eq('id', receiptId);
 
     if (error) {
@@ -216,7 +216,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     const { error } = await this.supabaseService
       .getClient()
       .from('every_receipt')
-      .update({ point } as any)
+      .update({ point } as unknown as never)
       .eq('id', receiptId);
 
     if (error) {
