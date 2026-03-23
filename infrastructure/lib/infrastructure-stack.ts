@@ -302,7 +302,7 @@ export class InfrastructureStack extends cdk.Stack {
     const service = new ecs.FargateService(this, 'CashmoreService', {
       cluster,
       taskDefinition,
-      desiredCount: 2,
+      desiredCount: 4,
       serviceName: 'cashmore-service',
       circuitBreaker: {
         enable: true,
@@ -389,7 +389,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     // Auto Scaling
     const scaling = service.autoScaleTaskCount({
-      minCapacity: 2,
+      minCapacity: 4,
       maxCapacity: 10,
     });
 
@@ -400,7 +400,7 @@ export class InfrastructureStack extends cdk.Stack {
     // Request Count 기반 스케일링 (응답 지연 전에 미리 스케일 아웃)
     scaling.scaleOnRequestCount('RequestScaling', {
       targetGroup: targetGroup,
-      requestsPerTarget: 3000, // 태스크당 분당 3000개 요청 초과 시 스케일 아웃
+      requestsPerTarget: 6000, // 태스크당 분당 6000개 요청 초과 시 스케일 아웃
     });
 
     // 예약 스케일링: 피크 시간(09, 13, 18, 22시 KST) 10분 전에 미리 태스크 증가
@@ -411,7 +411,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
     scaling.scaleOnSchedule('MorningPeakEnd', {
       schedule: appscaling.Schedule.cron({ hour: '0', minute: '30' }),
-      minCapacity: 2,
+      minCapacity: 4,
     });
 
     // 13시 피크 대비 (12:50 KST = 03:50 UTC)
@@ -421,7 +421,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
     scaling.scaleOnSchedule('LunchPeakEnd', {
       schedule: appscaling.Schedule.cron({ hour: '4', minute: '30' }),
-      minCapacity: 2,
+      minCapacity: 4,
     });
 
     // 18시 피크 대비 (17:50 KST = 08:50 UTC)
@@ -431,7 +431,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
     scaling.scaleOnSchedule('EveningPeakEnd', {
       schedule: appscaling.Schedule.cron({ hour: '9', minute: '30' }),
-      minCapacity: 2,
+      minCapacity: 4,
     });
 
     // 22시 피크 대비 (21:50 KST = 12:50 UTC)
@@ -441,7 +441,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
     scaling.scaleOnSchedule('NightPeakEnd', {
       schedule: appscaling.Schedule.cron({ hour: '13', minute: '30' }),
-      minCapacity: 2,
+      minCapacity: 4,
     });
 
     // SNS Topic for Alarms
@@ -632,10 +632,10 @@ exports.handler = async (event) => {
         period: cdk.Duration.minutes(1),
         statistic: 'Average',
       }),
-      threshold: 2,
+      threshold: 4,
       evaluationPeriods: 1,
       comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
-      alarmDescription: 'Running tasks < 2',
+      alarmDescription: 'Running tasks < 4',
     });
     taskCountAlarm.addAlarmAction(new cw_actions.SnsAction(alarmTopic));
     taskCountAlarm.addOkAction(new cw_actions.SnsAction(alarmTopic));
