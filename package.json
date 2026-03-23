@@ -17,7 +17,8 @@
     "test:all": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "prepare": "husky"
+    "prepare": "husky",
+    "gen:types": "supabase gen types typescript --local --workdir supabase-test > src/supabase/database.types.ts"
   },
   "dependencies": {
     "@amplitude/analytics-node": "^1.5.42",
