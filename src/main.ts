@@ -36,6 +36,7 @@ async function bootstrap() {
 
   // Swagger 설정 (커스텀 헤더 인증)
   const swaggerApiKey = configService.get<string>('BATCH_API_KEY');
+
   if (swaggerApiKey) {
     app.use(
       ['/api-docs', '/api-docs-json'],
