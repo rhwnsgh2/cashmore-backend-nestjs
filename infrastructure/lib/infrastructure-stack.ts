@@ -138,6 +138,13 @@ export class InfrastructureStack extends cdk.Stack {
       'cashmore/slack',
     );
 
+    // Reference Naver Pay secret
+    const naverPaySecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'NaverPaySecret',
+      'cashmore/naver-pay',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 2048,
@@ -224,6 +231,14 @@ export class InfrastructureStack extends cdk.Stack {
         SLACK_INVITATION_WEBHOOK_URL: ecs.Secret.fromSecretsManager(
           slackSecret,
           'invitationWebhookUrl',
+        ),
+        NAVER_CLIENT_ID: ecs.Secret.fromSecretsManager(
+          naverPaySecret,
+          'clientId',
+        ),
+        NAVER_CLIENT_SECRET: ecs.Secret.fromSecretsManager(
+          naverPaySecret,
+          'clientSecret',
         ),
       },
     });
