@@ -1941,7 +1941,7 @@ export type Database = {
           disconnected_at: string | null
           error_code: string | null
           id: string
-          naver_unique_id: string
+          naver_unique_id: string | null
           status: string
           user_id: string
         }
@@ -1953,7 +1953,7 @@ export type Database = {
           disconnected_at?: string | null
           error_code?: string | null
           id?: string
-          naver_unique_id: string
+          naver_unique_id?: string | null
           status: string
           user_id: string
         }
@@ -1965,13 +1965,76 @@ export type Database = {
           disconnected_at?: string | null
           error_code?: string | null
           id?: string
-          naver_unique_id?: string
+          naver_unique_id?: string | null
           status?: string
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "naver_pay_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      naver_pay_exchanges: {
+        Row: {
+          cashmore_point: number
+          created_at: string
+          error_code: string | null
+          exchange_rate: number
+          id: string
+          naver_pay_account_id: string
+          naverpay_point: number
+          partner_tx_no: string | null
+          point_action_id: number | null
+          processed_at: string | null
+          status: string
+          tx_no: string | null
+          user_id: string
+        }
+        Insert: {
+          cashmore_point: number
+          created_at?: string
+          error_code?: string | null
+          exchange_rate: number
+          id?: string
+          naver_pay_account_id: string
+          naverpay_point: number
+          partner_tx_no?: string | null
+          point_action_id?: number | null
+          processed_at?: string | null
+          status: string
+          tx_no?: string | null
+          user_id: string
+        }
+        Update: {
+          cashmore_point?: number
+          created_at?: string
+          error_code?: string | null
+          exchange_rate?: number
+          id?: string
+          naver_pay_account_id?: string
+          naverpay_point?: number
+          partner_tx_no?: string | null
+          point_action_id?: number | null
+          processed_at?: string | null
+          status?: string
+          tx_no?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "naver_pay_exchanges_naver_pay_account_id_fkey"
+            columns: ["naver_pay_account_id"]
+            isOneToOne: false
+            referencedRelation: "naver_pay_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "naver_pay_exchanges_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user"
