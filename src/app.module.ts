@@ -35,6 +35,8 @@ import { DeeplinkModule } from './deeplink/deeplink.module';
 import { EventModule } from './event/event.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { NaverPayModule } from './naver-pay/naver-pay.module';
+import { AdminModule } from './admin/admin.module';
+import { CashbackModule } from './cashback/cashback.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -86,6 +88,8 @@ import configuration from './config/configuration';
     EventModule,
     OnboardingModule,
     NaverPayModule,
+    CashbackModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
