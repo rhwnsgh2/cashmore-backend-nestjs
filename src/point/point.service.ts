@@ -138,4 +138,33 @@ export class PointService {
       withdrawalActions,
     );
   }
+
+  async deductPoint(
+    userId: string,
+    amount: number,
+    type: 'EXCHANGE_POINT_TO_NAVERPAY',
+    additionalData: Record<string, unknown> = {},
+  ): Promise<{ pointActionId: number }> {
+    const result = await this.pointRepository.insertPointAction(
+      userId,
+      -amount,
+      type,
+      'done',
+      additionalData,
+    );
+    return { pointActionId: result.id };
+  }
+
+  async restorePoint(
+    userId: string,
+    amount: number,
+    type: 'EXCHANGE_POINT_TO_NAVERPAY',
+    originalPointActionId: number,
+    additionalData: Record<string, unknown> = {},
+  ): Promise<void> {
+    await this.pointRepository.insertPointAction(userId, amount, type, 'done', {
+      ...additionalData,
+      original_point_action_id: originalPointActionId,
+    });
+  }
 }

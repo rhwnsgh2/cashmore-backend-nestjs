@@ -25,6 +25,7 @@ export const POINT_ADD_TYPES = [
 // 포인트 차감 타입 (status가 "done" 또는 "pending"일 때)
 export const POINT_SUBTRACT_TYPES = [
   'EXCHANGE_POINT_TO_CASH',
+  'EXCHANGE_POINT_TO_NAVERPAY',
   'POINT_EXPIRATION',
 ] as const;
 
@@ -77,6 +78,13 @@ export interface IPointRepository {
     startDate: string,
     endDate: string,
   ): Promise<EarnedPointAction[]>;
+  insertPointAction(
+    userId: string,
+    pointAmount: number,
+    type: string,
+    status?: string,
+    additionalData?: Record<string, unknown>,
+  ): Promise<{ id: number }>;
 }
 
 // DI 토큰

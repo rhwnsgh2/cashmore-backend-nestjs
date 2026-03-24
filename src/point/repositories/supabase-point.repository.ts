@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
+import type { Json } from '../../supabase/database.types';
 import {
   IPointRepository,
   PointAction,
@@ -139,5 +140,32 @@ export class SupabasePointRepository implements IPointRepository {
     }
 
     return (data || []) as EarnedPointAction[];
+  }
+
+  async insertPointAction(
+    userId: string,
+    pointAmount: number,
+    type: string,
+    status = 'done',
+    additionalData: Record<string, unknown> = {},
+  ): Promise<{ id: number }> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .insert({
+        user_id: userId,
+        point_amount: pointAmount,
+        type,
+        status,
+        additional_data: additionalData as unknown as Json,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return { id: (data as { id: number }).id };
   }
 }

@@ -26,9 +26,10 @@ export function calculatePointAmount(pointActions: PointAction[]): number {
     ) {
       totalPoints += action.point_amount || 0;
     }
-    // EXCHANGE_POINT_TO_CASH: status가 "done" 또는 "pending"일 때 계산
+    // EXCHANGE_POINT_TO_CASH / EXCHANGE_POINT_TO_NAVERPAY: status가 "done" 또는 "pending"일 때 계산
     else if (
-      action.type === 'EXCHANGE_POINT_TO_CASH' &&
+      (action.type === 'EXCHANGE_POINT_TO_CASH' ||
+        action.type === 'EXCHANGE_POINT_TO_NAVERPAY') &&
       (action.status === 'done' || action.status === 'pending')
     ) {
       totalPoints += action.point_amount || 0; // point_amount가 음수로 저장됨
@@ -64,9 +65,10 @@ export function calculateExpiringPoints(
   let totalWithdrawn = 0;
 
   for (const action of withdrawalActions) {
-    // EXCHANGE_POINT_TO_CASH: done 또는 pending
+    // EXCHANGE_POINT_TO_CASH / EXCHANGE_POINT_TO_NAVERPAY: done 또는 pending
     if (
-      action.type === 'EXCHANGE_POINT_TO_CASH' &&
+      (action.type === 'EXCHANGE_POINT_TO_CASH' ||
+        action.type === 'EXCHANGE_POINT_TO_NAVERPAY') &&
       (action.status === 'done' || action.status === 'pending')
     ) {
       totalWithdrawn += Math.abs(action.point_amount || 0);
@@ -120,7 +122,8 @@ export function calculateTotalWithdrawnPoints(
 
   for (const action of pointActions) {
     if (
-      action.type === 'EXCHANGE_POINT_TO_CASH' &&
+      (action.type === 'EXCHANGE_POINT_TO_CASH' ||
+        action.type === 'EXCHANGE_POINT_TO_NAVERPAY') &&
       (action.status === 'done' || action.status === 'pending')
     ) {
       totalWithdrawn += Math.abs(action.point_amount || 0);
