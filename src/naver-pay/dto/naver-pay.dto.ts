@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsInt, Min } from 'class-validator';
 
 // --- Request DTOs ---
 
@@ -65,4 +65,65 @@ export class ConnectNaverPaySuccessResponseDto {
 export class DisconnectNaverPayResponseDto {
   @ApiProperty({ description: '성공 여부', example: true })
   success: boolean;
+}
+
+// --- Exchange DTOs ---
+
+export class CreateExchangeRequestDto {
+  @ApiProperty({ description: '전환할 캐시모어 포인트', example: 5000 })
+  @IsInt()
+  @Min(1)
+  point: number;
+}
+
+export class CreateExchangeResponseDto {
+  @ApiProperty({ description: '성공 여부', example: true })
+  success: boolean;
+
+  @ApiProperty({ description: '전환 요청 데이터', required: false })
+  data?: {
+    exchangeId: string;
+    cashmorePoint: number;
+    naverpayPoint: number;
+    status: string;
+  };
+}
+
+export class ExchangeItemDto {
+  @ApiProperty({ description: '전환 요청 ID' })
+  id: string;
+
+  @ApiProperty({ description: '차감 캐시모어 포인트', example: 5000 })
+  cashmorePoint: number;
+
+  @ApiProperty({ description: '전환 네이버페이 포인트', example: 5000 })
+  naverpayPoint: number;
+
+  @ApiProperty({ description: '상태', example: 'pending' })
+  status: string;
+
+  @ApiProperty({ description: '요청 시각' })
+  createdAt: string;
+
+  @ApiProperty({ description: '처리 시각', required: false })
+  processedAt?: string;
+}
+
+export class ExchangeListResponseDto {
+  @ApiProperty({ type: [ExchangeItemDto] })
+  exchanges: ExchangeItemDto[];
+}
+
+export class ExchangeConfigResponseDto {
+  @ApiProperty({ description: '전환 비율', example: 1 })
+  exchangeRate: number;
+
+  @ApiProperty({ description: '최소 전환 포인트', example: 1000 })
+  minPoint: number;
+
+  @ApiProperty({ description: '일일 요청 제한', example: 1 })
+  dailyLimit: number;
+
+  @ApiProperty({ description: '오늘 사용 횟수', example: 0 })
+  todayUsed: number;
 }

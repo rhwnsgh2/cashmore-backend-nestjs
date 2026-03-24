@@ -5,10 +5,14 @@ import { NAVER_PAY_REPOSITORY } from './interfaces/naver-pay-repository.interfac
 import { SupabaseNaverPayRepository } from './repositories/supabase-naver-pay.repository';
 import { DAOU_API_CLIENT } from './interfaces/daou-api-client.interface';
 import { StubDaouApiClient } from './clients/stub-daou-api.client';
+// TODO: 다우 개발서버 방화벽 오픈 후 실제 클라이언트로 교체
+// import { DaouApiClient } from './clients/daou-api.client';
 import { AuthModule } from '../auth/auth.module';
+import { PointModule } from '../point/point.module';
+import { SlackModule } from '../slack/slack.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, PointModule, SlackModule],
   controllers: [NaverPayController],
   providers: [
     NaverPayService,
@@ -17,7 +21,6 @@ import { AuthModule } from '../auth/auth.module';
       useClass: SupabaseNaverPayRepository,
     },
     {
-      // TODO: 다우기술 API 실제 구현체로 교체
       provide: DAOU_API_CLIENT,
       useClass: StubDaouApiClient,
     },
