@@ -17,7 +17,14 @@ export class StubPointRepository implements IPointRepository {
   private pointActions: Map<string, PointAction[]> = new Map();
   private monthlyEarnedPoints: Map<string, MonthlyEarnedPoint[]> = new Map();
   private withdrawalActions: Map<string, WithdrawalAction[]> = new Map();
-  private insertedPointActions: { id: number; userId: string; pointAmount: number; type: string; status: string; additionalData: Record<string, unknown> }[] = [];
+  private insertedPointActions: {
+    id: number;
+    userId: string;
+    pointAmount: number;
+    type: string;
+    status: string;
+    additionalData: Record<string, unknown>;
+  }[] = [];
   private nextPointActionId = 1;
 
   // 데이터 설정 메서드들
@@ -141,7 +148,14 @@ export class StubPointRepository implements IPointRepository {
     additionalData: Record<string, unknown> = {},
   ): Promise<{ id: number }> {
     const id = this.nextPointActionId++;
-    this.insertedPointActions.push({ id, userId, pointAmount, type, status, additionalData });
+    this.insertedPointActions.push({
+      id,
+      userId,
+      pointAmount,
+      type,
+      status,
+      additionalData,
+    });
     return { id };
   }
 }

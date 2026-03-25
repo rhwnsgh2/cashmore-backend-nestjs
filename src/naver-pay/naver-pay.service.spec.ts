@@ -17,7 +17,12 @@ import type {
 class StubPointService {
   private totalPoint = 10000;
   private deductions: { userId: string; amount: number; type: string }[] = [];
-  private restorations: { userId: string; amount: number; type: string; originalPointActionId: number }[] = [];
+  private restorations: {
+    userId: string;
+    amount: number;
+    type: string;
+    originalPointActionId: number;
+  }[] = [];
   private nextPointActionId = 1;
 
   setTotalPoint(point: number): void {
@@ -55,7 +60,12 @@ class StubPointService {
     return { pointActionId };
   }
 
-  async restorePoint(userId: string, amount: number, type: string, originalPointActionId: number) {
+  async restorePoint(
+    userId: string,
+    amount: number,
+    type: string,
+    originalPointActionId: number,
+  ) {
     this.restorations.push({ userId, amount, type, originalPointActionId });
   }
 }
@@ -292,7 +302,7 @@ describe('NaverPayService', () => {
   });
 
   describe('disconnectAccount', () => {
-    it('연결된 계정을 해제한다', async () => {
+    it('연결된 계정을 해제하고 민감정보를 삭제한다', async () => {
       repository.setAccounts([
         createAccount({ id: 'acc-1', user_id: userId, status: 'connected' }),
       ]);
@@ -301,8 +311,18 @@ describe('NaverPayService', () => {
 
       expect(result).toEqual({ success: true });
 
+      // connected 계정은 없어야 함
       const account = await repository.findConnectedAccount(userId);
       expect(account).toBeNull();
+
+      // 민감정보 삭제 확인
+      const allAccounts = repository.getInsertedAccounts();
+      const disconnected = allAccounts.find((a) => a.id === 'acc-1');
+      expect(disconnected?.status).toBe('disconnected');
+      expect(disconnected?.naver_unique_id).toBeNull();
+      expect(disconnected?.dau_user_key).toBeNull();
+      expect(disconnected?.dau_masking_id).toBeNull();
+      expect(disconnected?.disconnected_at).not.toBeNull();
     });
 
     it('연결된 계정이 없으면 NotFoundException', async () => {
@@ -512,12 +532,12 @@ describe('NaverPayService', () => {
         }),
       ]);
 
-      await expect(
-        service.cancelExchange(userId, 'ex-1'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.cancelExchange(userId, 'ex-1'),
-      ).rejects.toThrow('본인의 전환 요청만 취소할 수 있습니다');
+      await expect(service.cancelExchange(userId, 'ex-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.cancelExchange(userId, 'ex-1')).rejects.toThrow(
+        '본인의 전환 요청만 취소할 수 있습니다',
+      );
     });
 
     it('pending이 아닌 상태의 요청은 취소할 수 없다 (approved)', async () => {
@@ -529,12 +549,12 @@ describe('NaverPayService', () => {
         }),
       ]);
 
-      await expect(
-        service.cancelExchange(userId, 'ex-1'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.cancelExchange(userId, 'ex-1'),
-      ).rejects.toThrow('대기 중인 요청만 취소할 수 있습니다');
+      await expect(service.cancelExchange(userId, 'ex-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.cancelExchange(userId, 'ex-1')).rejects.toThrow(
+        '대기 중인 요청만 취소할 수 있습니다',
+      );
     });
 
     it('pending이 아닌 상태의 요청은 취소할 수 없다 (completed)', async () => {
@@ -546,9 +566,9 @@ describe('NaverPayService', () => {
         }),
       ]);
 
-      await expect(
-        service.cancelExchange(userId, 'ex-1'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.cancelExchange(userId, 'ex-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('pending이 아닌 상태의 요청은 취소할 수 없다 (cancelled)', async () => {
@@ -560,9 +580,9 @@ describe('NaverPayService', () => {
         }),
       ]);
 
-      await expect(
-        service.cancelExchange(userId, 'ex-1'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.cancelExchange(userId, 'ex-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('pending이 아닌 상태의 요청은 취소할 수 없다 (rejected)', async () => {
@@ -574,9 +594,9 @@ describe('NaverPayService', () => {
         }),
       ]);
 
-      await expect(
-        service.cancelExchange(userId, 'ex-1'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.cancelExchange(userId, 'ex-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('pending이 아닌 상태의 요청은 취소할 수 없다 (failed)', async () => {
@@ -588,9 +608,9 @@ describe('NaverPayService', () => {
         }),
       ]);
 
-      await expect(
-        service.cancelExchange(userId, 'ex-1'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.cancelExchange(userId, 'ex-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -635,9 +655,7 @@ describe('NaverPayService', () => {
     });
 
     it('다른 유저의 전환 내역은 포함하지 않는다', async () => {
-      repository.setExchanges([
-        createExchange({ user_id: 'other-user' }),
-      ]);
+      repository.setExchanges([createExchange({ user_id: 'other-user' })]);
 
       const result = await service.getExchanges(userId);
 
@@ -659,7 +677,7 @@ describe('NaverPayService', () => {
       expect(first.success).toBe(true);
 
       // 취소
-      await service.cancelExchange(userId, first.data!.exchangeId);
+      await service.cancelExchange(userId, first.data.exchangeId);
 
       // 재요청 가능
       const second = await service.createExchange(userId, 3000);
@@ -714,13 +732,22 @@ describe('NaverPayService', () => {
 
     it('pending 상태의 요청을 승인하고 다우 API 호출 성공 시 completed', async () => {
       repository.setExchanges([
-        createExchange({ id: 'ex-1', user_id: userId, status: 'pending', naverpay_point: 5050 }),
+        createExchange({
+          id: 'ex-1',
+          user_id: userId,
+          status: 'pending',
+          naverpay_point: 5050,
+        }),
       ]);
       daouClient.setEarnSuccess('daou-tx-001');
 
       const result = await service.approveExchange('ex-1');
 
-      expect(result).toEqual({ success: true, status: 'completed', txNo: 'daou-tx-001' });
+      expect(result).toEqual({
+        success: true,
+        status: 'completed',
+        txNo: 'daou-tx-001',
+      });
 
       const exchange = await repository.findExchangeById('ex-1');
       expect(exchange?.status).toBe('completed');

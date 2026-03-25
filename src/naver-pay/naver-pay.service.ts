@@ -359,10 +359,7 @@ export class NaverPayService {
       );
     }
 
-    await this.naverPayRepository.updateExchangeStatus(
-      exchangeId,
-      'failed',
-    );
+    await this.naverPayRepository.updateExchangeStatus(exchangeId, 'failed');
     await this.naverPayRepository.updateExchangeErrorCode(
       exchangeId,
       result.errorCode,

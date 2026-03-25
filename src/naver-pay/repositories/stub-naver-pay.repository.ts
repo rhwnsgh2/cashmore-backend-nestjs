@@ -78,6 +78,9 @@ export class StubNaverPayRepository implements INaverPayRepository {
     if (account) {
       account.status = 'disconnected';
       account.disconnected_at = new Date().toISOString();
+      account.naver_unique_id = null as any;
+      account.dau_user_key = null;
+      account.dau_masking_id = null;
     }
   }
 

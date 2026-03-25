@@ -36,9 +36,7 @@ describe('NaverPay API (e2e) - Real DB', () => {
 
   describe('GET /naverpay/account', () => {
     it('토큰 없이 요청하면 401을 반환한다', async () => {
-      await request(app.getHttpServer())
-        .get('/naverpay/account')
-        .expect(401);
+      await request(app.getHttpServer()).get('/naverpay/account').expect(401);
     });
 
     it('연결된 계정이 없으면 connected: false를 반환한다', async () => {

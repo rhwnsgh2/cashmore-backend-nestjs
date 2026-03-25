@@ -86,10 +86,7 @@ export interface INaverPayRepository {
     partnerTxNo: string,
   ): Promise<void>;
   updateExchangeTxNo(exchangeId: string, txNo: string): Promise<void>;
-  updateExchangeErrorCode(
-    exchangeId: string,
-    errorCode: string,
-  ): Promise<void>;
+  updateExchangeErrorCode(exchangeId: string, errorCode: string): Promise<void>;
 }
 
 export const NAVER_PAY_REPOSITORY = Symbol('NAVER_PAY_REPOSITORY');

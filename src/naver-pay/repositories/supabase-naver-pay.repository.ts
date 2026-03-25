@@ -107,9 +107,7 @@ export class SupabaseNaverPayRepository implements INaverPayRepository {
     return result as NaverPayExchange;
   }
 
-  async findExchangeById(
-    exchangeId: string,
-  ): Promise<NaverPayExchange | null> {
+  async findExchangeById(exchangeId: string): Promise<NaverPayExchange | null> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('naver_pay_exchanges')
