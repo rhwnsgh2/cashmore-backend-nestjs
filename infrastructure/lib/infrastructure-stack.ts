@@ -145,6 +145,20 @@ export class InfrastructureStack extends cdk.Stack {
       'cashmore/naver-pay',
     );
 
+    // Reference Daou secret
+    const daouSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'DaouSecret',
+      'cashmore/daou',
+    );
+
+    // Reference Coupang secret
+    const coupangSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'CoupangSecret',
+      'cashmore/coupang',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 2048,
@@ -239,6 +253,30 @@ export class InfrastructureStack extends cdk.Stack {
         NAVER_CLIENT_SECRET: ecs.Secret.fromSecretsManager(
           naverPaySecret,
           'clientSecret',
+        ),
+        DAOU_PARTNER_CODE: ecs.Secret.fromSecretsManager(
+          daouSecret,
+          'DAOU_PARTNER_CODE',
+        ),
+        DAOU_API_KEY: ecs.Secret.fromSecretsManager(
+          daouSecret,
+          'DAOU_API_KEY',
+        ),
+        DAOU_ENC_KEY: ecs.Secret.fromSecretsManager(
+          daouSecret,
+          'DAOU_ENC_KEY',
+        ),
+        DAOU_API_URL: ecs.Secret.fromSecretsManager(
+          daouSecret,
+          'DAOU_API_URL',
+        ),
+        COUPANG_ACCESS_KEY: ecs.Secret.fromSecretsManager(
+          coupangSecret,
+          'accessKey',
+        ),
+        COUPANG_SECRET_KEY: ecs.Secret.fromSecretsManager(
+          coupangSecret,
+          'secretKey',
         ),
       },
     });
