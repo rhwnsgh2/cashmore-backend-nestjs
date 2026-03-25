@@ -62,7 +62,7 @@ export class CashbackService {
       // point_actions
       ...pointActions.map((item) => ({
         id: `pointAction-${item.id}`,
-        type: POINT_ACTION_TYPE_MAP[item.type] || 'invitationReward' as const,
+        type: POINT_ACTION_TYPE_MAP[item.type] || ('invitationReward' as const),
         createdAt: item.created_at,
         amount: item.point_amount || 0,
         status: item.status ?? undefined,

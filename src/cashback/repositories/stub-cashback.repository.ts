@@ -16,7 +16,8 @@ export class StubCashbackRepository implements ICashbackRepository {
   private stepRewards: Map<string, RawStepReward[]> = new Map();
   private affiliateData: Map<string, RawAffiliateData[]> = new Map();
   private attendances: Map<string, RawAttendance[]> = new Map();
-  private attendancePointActions: Map<string, RawAttendancePointAction[]> = new Map();
+  private attendancePointActions: Map<string, RawAttendancePointAction[]> =
+    new Map();
   private claims: Map<string, RawClaim[]> = new Map();
   private naverPayExchanges: Map<string, RawNaverPayExchange[]> = new Map();
 
@@ -41,7 +42,10 @@ export class StubCashbackRepository implements ICashbackRepository {
     this.attendances.set(userId, data);
   }
 
-  setAttendancePointActions(userId: string, data: RawAttendancePointAction[]): void {
+  setAttendancePointActions(
+    userId: string,
+    data: RawAttendancePointAction[],
+  ): void {
     this.attendancePointActions.set(userId, data);
   }
 
@@ -71,7 +75,8 @@ export class StubCashbackRepository implements ICashbackRepository {
     limit: number,
   ): T[] {
     let filtered = [...items].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
     if (cursor) {
       filtered = filtered.filter((item) => item.created_at < cursor);
@@ -124,7 +129,9 @@ export class StubCashbackRepository implements ICashbackRepository {
     return Promise.resolve(this.applyPagination(data, cursor, limit));
   }
 
-  findAttendancePointActions(userId: string): Promise<RawAttendancePointAction[]> {
+  findAttendancePointActions(
+    userId: string,
+  ): Promise<RawAttendancePointAction[]> {
     return Promise.resolve(this.attendancePointActions.get(userId) || []);
   }
 

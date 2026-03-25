@@ -26,7 +26,8 @@ export async function createEveryReceipt(
     .select()
     .single();
 
-  if (error) throw new Error(`Failed to create every_receipt: ${error.message}`);
+  if (error)
+    throw new Error(`Failed to create every_receipt: ${error.message}`);
   return result;
 }
 
@@ -92,7 +93,8 @@ export async function createAffiliateData(
     .select()
     .single();
 
-  if (error) throw new Error(`Failed to create affiliate_data: ${error.message}`);
+  if (error)
+    throw new Error(`Failed to create affiliate_data: ${error.message}`);
   return result;
 }
 
@@ -115,7 +117,8 @@ export async function createLocationInfo(
     .select()
     .single();
 
-  if (error) throw new Error(`Failed to create location_info: ${error.message}`);
+  if (error)
+    throw new Error(`Failed to create location_info: ${error.message}`);
   return result;
 }
 

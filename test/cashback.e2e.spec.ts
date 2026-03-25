@@ -85,7 +85,9 @@ describe('Cashback API (e2e) - Real DB', () => {
         expect(response.body.items).toHaveLength(1);
         expect(response.body.items[0].type).toBe('everyReceipt');
         expect(response.body.items[0].amount).toBe(100);
-        expect(response.body.items[0].data.imageUrl).toBe('https://example.com/img.jpg');
+        expect(response.body.items[0].data.imageUrl).toBe(
+          'https://example.com/img.jpg',
+        );
       });
 
       it('pointActions 데이터를 타입 매핑하여 반환한다', async () => {
@@ -297,7 +299,9 @@ describe('Cashback API (e2e) - Real DB', () => {
 
         // 두 번째 페이지 - cursor 인코딩
         const page2 = await request(app.getHttpServer())
-          .get(`/cashback/list?limit=2&cursor=${encodeURIComponent(page1.body.nextCursor)}`)
+          .get(
+            `/cashback/list?limit=2&cursor=${encodeURIComponent(page1.body.nextCursor)}`,
+          )
           .set('Authorization', `Bearer ${token}`)
           .expect(200);
 

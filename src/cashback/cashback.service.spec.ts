@@ -63,7 +63,13 @@ describe('CashbackService', () => {
 
     it('everyReceipt의 point가 null이면 0으로 처리한다', async () => {
       repository.setEveryReceipts(userId, [
-        { id: 1, created_at: '2026-03-24T10:00:00Z', point: null, status: null, image_url: null },
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point: null,
+          status: null,
+          image_url: null,
+        },
       ]);
 
       const result = await service.getCashbackList(userId, null, 20);
@@ -166,7 +172,12 @@ describe('CashbackService', () => {
 
     it('stepRewards 데이터를 올바르게 변환한다', async () => {
       repository.setStepRewards(userId, [
-        { id: 5, created_at: '2026-03-24T07:00:00Z', point_amount: 30, step_count: 5000 },
+        {
+          id: 5,
+          created_at: '2026-03-24T07:00:00Z',
+          point_amount: 30,
+          step_count: 5000,
+        },
       ]);
 
       const result = await service.getCashbackList(userId, null, 20);
@@ -233,7 +244,11 @@ describe('CashbackService', () => {
 
     it('attendance 데이터를 point_actions와 매칭하여 포인트를 가져온다', async () => {
       repository.setAttendances(userId, [
-        { id: 100, created_at: '2026-03-24T08:00:00Z', created_at_date: '2026-03-24' },
+        {
+          id: 100,
+          created_at: '2026-03-24T08:00:00Z',
+          created_at_date: '2026-03-24',
+        },
       ]);
       repository.setAttendancePointActions(userId, [
         {
@@ -257,7 +272,11 @@ describe('CashbackService', () => {
 
     it('attendance에 매칭되는 point_action이 없으면 amount는 0이다', async () => {
       repository.setAttendances(userId, [
-        { id: 101, created_at: '2026-03-24T08:00:00Z', created_at_date: '2026-03-24' },
+        {
+          id: 101,
+          created_at: '2026-03-24T08:00:00Z',
+          created_at_date: '2026-03-24',
+        },
       ]);
       repository.setAttendancePointActions(userId, []);
 
@@ -299,10 +318,21 @@ describe('CashbackService', () => {
 
     it('여러 테이블 데이터를 created_at 내림차순으로 정렬한다', async () => {
       repository.setEveryReceipts(userId, [
-        { id: 1, created_at: '2026-03-24T10:00:00Z', point: 100, status: 'done', image_url: null },
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point: 100,
+          status: 'done',
+          image_url: null,
+        },
       ]);
       repository.setStepRewards(userId, [
-        { id: 2, created_at: '2026-03-24T12:00:00Z', point_amount: 30, step_count: 3000 },
+        {
+          id: 2,
+          created_at: '2026-03-24T12:00:00Z',
+          point_amount: 30,
+          step_count: 3000,
+        },
       ]);
       repository.setPointActions(userId, [
         {
@@ -326,12 +356,34 @@ describe('CashbackService', () => {
     it('여러 소스에서 limit 초과 데이터가 합쳐지면 nextCursor를 설정한다', async () => {
       // 각 소스에서 limit(2)개씩 가져와 합치면 총 4개 → limit 초과
       repository.setEveryReceipts(userId, [
-        { id: 1, created_at: '2026-03-24T10:00:00Z', point: 100, status: 'done', image_url: null },
-        { id: 2, created_at: '2026-03-24T08:00:00Z', point: 50, status: 'done', image_url: null },
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point: 100,
+          status: 'done',
+          image_url: null,
+        },
+        {
+          id: 2,
+          created_at: '2026-03-24T08:00:00Z',
+          point: 50,
+          status: 'done',
+          image_url: null,
+        },
       ]);
       repository.setStepRewards(userId, [
-        { id: 3, created_at: '2026-03-24T09:00:00Z', point_amount: 30, step_count: 3000 },
-        { id: 4, created_at: '2026-03-24T07:00:00Z', point_amount: 20, step_count: 5000 },
+        {
+          id: 3,
+          created_at: '2026-03-24T09:00:00Z',
+          point_amount: 30,
+          step_count: 3000,
+        },
+        {
+          id: 4,
+          created_at: '2026-03-24T07:00:00Z',
+          point_amount: 20,
+          step_count: 5000,
+        },
       ]);
 
       const result = await service.getCashbackList(userId, null, 2);
@@ -342,7 +394,13 @@ describe('CashbackService', () => {
 
     it('데이터가 limit 이하면 nextCursor는 null이다', async () => {
       repository.setEveryReceipts(userId, [
-        { id: 1, created_at: '2026-03-24T10:00:00Z', point: 100, status: 'done', image_url: null },
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point: 100,
+          status: 'done',
+          image_url: null,
+        },
       ]);
 
       const result = await service.getCashbackList(userId, null, 20);
@@ -352,12 +410,34 @@ describe('CashbackService', () => {
 
     it('cursor를 전달하면 해당 시간 이전 데이터만 반환한다', async () => {
       repository.setEveryReceipts(userId, [
-        { id: 1, created_at: '2026-03-24T10:00:00Z', point: 100, status: 'done', image_url: null },
-        { id: 2, created_at: '2026-03-24T09:00:00Z', point: 50, status: 'done', image_url: null },
-        { id: 3, created_at: '2026-03-24T08:00:00Z', point: 30, status: 'done', image_url: null },
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point: 100,
+          status: 'done',
+          image_url: null,
+        },
+        {
+          id: 2,
+          created_at: '2026-03-24T09:00:00Z',
+          point: 50,
+          status: 'done',
+          image_url: null,
+        },
+        {
+          id: 3,
+          created_at: '2026-03-24T08:00:00Z',
+          point: 30,
+          status: 'done',
+          image_url: null,
+        },
       ]);
 
-      const result = await service.getCashbackList(userId, '2026-03-24T10:00:00Z', 20);
+      const result = await service.getCashbackList(
+        userId,
+        '2026-03-24T10:00:00Z',
+        20,
+      );
 
       expect(result.items).toHaveLength(2);
       expect(result.items[0].createdAt).toBe('2026-03-24T09:00:00Z');
@@ -366,7 +446,13 @@ describe('CashbackService', () => {
 
     it('7개 소스 데이터를 모두 합쳐서 정렬한다', async () => {
       repository.setEveryReceipts(userId, [
-        { id: 1, created_at: '2026-03-24T13:00:00Z', point: 100, status: 'done', image_url: null },
+        {
+          id: 1,
+          created_at: '2026-03-24T13:00:00Z',
+          point: 100,
+          status: 'done',
+          image_url: null,
+        },
       ]);
       repository.setPointActions(userId, [
         {
@@ -379,7 +465,12 @@ describe('CashbackService', () => {
         },
       ]);
       repository.setStepRewards(userId, [
-        { id: 3, created_at: '2026-03-24T11:00:00Z', point_amount: 30, step_count: 3000 },
+        {
+          id: 3,
+          created_at: '2026-03-24T11:00:00Z',
+          point_amount: 30,
+          step_count: 3000,
+        },
       ]);
       repository.setAffiliateData(userId, [
         {
@@ -394,10 +485,19 @@ describe('CashbackService', () => {
         },
       ]);
       repository.setAttendances(userId, [
-        { id: 5, created_at: '2026-03-24T09:00:00Z', created_at_date: '2026-03-24' },
+        {
+          id: 5,
+          created_at: '2026-03-24T09:00:00Z',
+          created_at_date: '2026-03-24',
+        },
       ]);
       repository.setAttendancePointActions(userId, [
-        { id: 50, point_amount: 10, additional_data: { attendance_id: 5 }, type: 'ATTENDANCE' },
+        {
+          id: 50,
+          point_amount: 10,
+          additional_data: { attendance_id: 5 },
+          type: 'ATTENDANCE',
+        },
       ]);
       repository.setNaverPayExchanges(userId, [
         {
