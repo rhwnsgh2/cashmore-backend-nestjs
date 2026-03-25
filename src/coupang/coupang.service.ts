@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Redis } from '@upstash/redis';
 import { generateHmac } from './utils/hmac-generator';
 import type { GoldBoxProductDto } from './dto/goldbox-product.dto';
+import type { ICoupangVisitRepository } from './interfaces/coupang-visit-repository.interface';
+import { COUPANG_VISIT_REPOSITORY } from './interfaces/coupang-visit-repository.interface';
 
 const COUPANG_DOMAIN = 'https://api-gateway.coupang.com';
 const GOLDBOX_PATH =
@@ -41,7 +43,11 @@ export class CoupangService {
   private readonly accessKey: string;
   private readonly secretKey: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @Inject(COUPANG_VISIT_REPOSITORY)
+    private visitRepository: ICoupangVisitRepository,
+  ) {
     this.redis = Redis.fromEnv();
     this.accessKey = this.configService.get<string>('coupang.accessKey') ?? '';
     this.secretKey = this.configService.get<string>('coupang.secretKey') ?? '';
@@ -82,6 +88,20 @@ export class CoupangService {
     await this.redis.setex(CACHE_KEY, CACHE_TTL, products);
 
     return products;
+  }
+
+  async recordVisit(
+    userId: string,
+  ): Promise<{ success: boolean; message?: string }> {
+    const existing = await this.visitRepository.findTodayVisit(userId);
+
+    if (existing) {
+      return { success: false, message: 'Already received' };
+    }
+
+    await this.visitRepository.createVisit(userId, 10);
+
+    return { success: true };
   }
 
   private async fetchGoldBox(): Promise<GoldBoxItem[]> {

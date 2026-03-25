@@ -159,6 +159,13 @@ export class InfrastructureStack extends cdk.Stack {
       'cashmore/coupang',
     );
 
+    // Reference Account Encrypt secret
+    const accountEncryptSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'AccountEncryptSecret',
+      'cashmore/account-encrypt',
+    );
+
     // Task Definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'CashmoreTask', {
       memoryLimitMiB: 2048,
@@ -277,6 +284,10 @@ export class InfrastructureStack extends cdk.Stack {
         COUPANG_SECRET_KEY: ecs.Secret.fromSecretsManager(
           coupangSecret,
           'secretKey',
+        ),
+        ACCOUNT_ENCRYPT_PRIVATE_KEY: ecs.Secret.fromSecretsManager(
+          accountEncryptSecret,
+          'privateKey',
         ),
       },
     });

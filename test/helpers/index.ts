@@ -9,3 +9,4 @@ export * from './invite-code.helper';
 export * from './buzzvil.helper';
 export * from './onboarding.helper';
 export * from './cashback.helper';
+export * from './account-info.helper';

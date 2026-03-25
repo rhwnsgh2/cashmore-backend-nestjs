@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { CoupangService } from './coupang.service';
+import { COUPANG_VISIT_REPOSITORY } from './interfaces/coupang-visit-repository.interface';
+import { StubCoupangVisitRepository } from './repositories/stub-coupang-visit.repository';
 
 // Redis mock
 const mockRedis = {
@@ -21,9 +23,11 @@ global.fetch = mockFetch;
 
 describe('CoupangService', () => {
   let service: CoupangService;
+  let stubVisitRepo: StubCoupangVisitRepository;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    stubVisitRepo = new StubCoupangVisitRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +43,10 @@ describe('CoupangService', () => {
               return config[key];
             },
           },
+        },
+        {
+          provide: COUPANG_VISIT_REPOSITORY,
+          useValue: stubVisitRepo,
         },
       ],
     }).compile();
@@ -224,6 +232,50 @@ describe('CoupangService', () => {
 
       expect(result).toEqual([]);
       expect(mockRedis.setex).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('recordVisit', () => {
+    const userId = 'user-1';
+
+    it('처음 방문 시 포인트를 지급하고 success: true를 반환한다', async () => {
+      const result = await service.recordVisit(userId);
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it('10P를 지급한다', async () => {
+      await service.recordVisit(userId);
+
+      const visit = await stubVisitRepo.findTodayVisit(userId);
+      expect(visit).not.toBeNull();
+      expect(visit!.pointAmount).toBe(10);
+    });
+
+    it('오늘 이미 받았으면 success: false와 Already received 메시지를 반환한다', async () => {
+      await service.recordVisit(userId);
+
+      const result = await service.recordVisit(userId);
+
+      expect(result).toEqual({ success: false, message: 'Already received' });
+    });
+
+    it('다른 유저는 독립적으로 포인트를 받을 수 있다', async () => {
+      await service.recordVisit('user-A');
+      const result = await service.recordVisit('user-B');
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it('이미 받은 유저도 다른 유저의 방문에 영향을 주지 않는다', async () => {
+      await service.recordVisit('user-A');
+      await service.recordVisit('user-A'); // 중복
+
+      const result = await service.recordVisit('user-B');
+      expect(result).toEqual({ success: true });
+
+      const visit = await stubVisitRepo.findTodayVisit('user-B');
+      expect(visit!.pointAmount).toBe(10);
     });
   });
 });

@@ -19,4 +19,7 @@ export default () => ({
     accessKey: process.env.COUPANG_ACCESS_KEY,
     secretKey: process.env.COUPANG_SECRET_KEY,
   },
+  accountEncrypt: {
+    privateKey: process.env.ACCOUNT_ENCRYPT_PRIVATE_KEY,
+  },
 });
