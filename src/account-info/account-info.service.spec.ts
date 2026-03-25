@@ -236,12 +236,7 @@ describe('AccountInfoService', () => {
     });
 
     it('짧은 계좌번호도 끝 4자리를 올바르게 추출한다', async () => {
-      await service.createAccountInfo(
-        'user-1',
-        '우리은행',
-        '박영희',
-        '12345',
-      );
+      await service.createAccountInfo('user-1', '우리은행', '박영희', '12345');
 
       const accounts = stubRepo.getInsertedAccounts();
       expect(accounts[0].displayNumber).toBe('2345');

@@ -26,7 +26,10 @@ export class CreateAccountInfoRequestDto {
   @IsNotEmpty()
   accountHolder: string;
 
-  @ApiProperty({ description: '계좌번호 (숫자와 -만 허용)', example: '123-456-789012' })
+  @ApiProperty({
+    description: '계좌번호 (숫자와 -만 허용)',
+    example: '123-456-789012',
+  })
   @IsString()
   @IsNotEmpty()
   @Matches(/^[0-9-]+$/, { message: 'Invalid account number format' })
