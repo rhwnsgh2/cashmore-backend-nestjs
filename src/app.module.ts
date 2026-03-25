@@ -37,6 +37,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { NaverPayModule } from './naver-pay/naver-pay.module';
 import { AdminModule } from './admin/admin.module';
 import { CashbackModule } from './cashback/cashback.module';
+import { CoupangModule } from './coupang/coupang.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -90,6 +91,7 @@ import configuration from './config/configuration';
     NaverPayModule,
     CashbackModule,
     AdminModule,
+    CoupangModule,
   ],
   controllers: [AppController],
   providers: [

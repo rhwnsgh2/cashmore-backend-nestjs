@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { DAOU_API_CLIENT } from '../src/naver-pay/interfaces/daou-api-client.interface';
+import { StubDaouApiClient } from '../src/naver-pay/clients/stub-daou-api.client';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
 import { createTestUser } from './helpers/user.helper';
@@ -17,7 +19,10 @@ describe('NaverPay API (e2e) - Real DB', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(DAOU_API_CLIENT)
+      .useValue(new StubDaouApiClient())
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();

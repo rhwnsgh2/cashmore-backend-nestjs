@@ -15,4 +15,8 @@ export default () => ({
   amplitude: {
     apiKey: process.env.AMPLITUDE_API_KEY,
   },
+  coupang: {
+    accessKey: process.env.COUPANG_ACCESS_KEY,
+    secretKey: process.env.COUPANG_SECRET_KEY,
+  },
 });
