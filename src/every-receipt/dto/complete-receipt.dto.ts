@@ -1,9 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { IsInt, IsNotEmpty } from 'class-validator';
 
 export class CompleteReceiptRequestDto {
   @ApiProperty({ description: '영수증 ID', example: 123 })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsInt()
   everyReceiptId: number;
 }
