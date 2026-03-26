@@ -3,11 +3,12 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  HttpException,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { MetricsService } from './metrics.service';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
@@ -15,7 +16,7 @@ export class MetricsInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<Request>();
-    const response = context.switchToHttp().getResponse<Response>();
+    const response = context.switchToHttp().getResponse();
 
     // health check는 제외
     if (request.path === '/health') {
@@ -35,15 +36,12 @@ export class MetricsInterceptor implements NestInterceptor {
             response.statusCode,
           );
         },
-        error: () => {
+        error: (error: unknown) => {
           const responseTime = Date.now() - startTime;
           const endpoint = this.getEndpoint(request);
-          // 에러 시에도 상태 코드 기록 (기본 500)
-          this.metricsService.recordRequest(
-            endpoint,
-            responseTime,
-            response.statusCode || 500,
-          );
+          const statusCode =
+            error instanceof HttpException ? error.getStatus() : 500;
+          this.metricsService.recordRequest(endpoint, responseTime, statusCode);
         },
       }),
     );
