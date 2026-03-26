@@ -4,7 +4,6 @@ import { ATTENDANCE_REPOSITORY } from './interfaces/attendance-repository.interf
 import { StubAttendanceRepository } from './repositories/stub-attendance.repository';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 import { PointWriteService } from '../point-write/point-write.service';
-import { POINT_WRITE_REPOSITORY } from '../point-write/point-write-repository.interface';
 import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 describe('AttendanceService', () => {
@@ -576,9 +575,7 @@ describe('AttendanceService', () => {
       expect(bonusAction!.additionalData.week_start).toBe(
         formatDate(startOfWeek),
       );
-      expect(bonusAction!.additionalData.week_end).toBe(
-        formatDate(endOfWeek),
-      );
+      expect(bonusAction!.additionalData.week_end).toBe(formatDate(endOfWeek));
     });
 
     it('주간 출석이 6일인 경우 보너스가 지급되지 않는다', async () => {
