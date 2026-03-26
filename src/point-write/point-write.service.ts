@@ -15,7 +15,13 @@ export class PointWriteService implements IPointWriteService {
   ) {}
 
   async addPoint(params: AddPointParams): Promise<AddPointResult> {
-    const { userId, amount, type, status = 'done', additionalData = {} } = params;
+    const {
+      userId,
+      amount,
+      type,
+      status = 'done',
+      additionalData = {},
+    } = params;
 
     const result = await this.repository.insertPointAction(
       userId,

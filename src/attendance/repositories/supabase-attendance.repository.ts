@@ -6,7 +6,6 @@ import type {
   AttendancePointAction,
 } from '../interfaces/attendance-repository.interface';
 
-
 interface AttendanceRow {
   id: number;
   user_id: string;
