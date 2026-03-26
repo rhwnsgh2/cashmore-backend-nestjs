@@ -5,7 +5,7 @@ import type {
   AttendanceRecord,
   AttendancePointAction,
 } from '../interfaces/attendance-repository.interface';
-import type { Json } from '../../supabase/database.types';
+
 
 interface AttendanceRow {
   id: number;
@@ -130,27 +130,6 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       createdAtDate: data.created_at_date,
       createdAt: data.created_at,
     };
-  }
-
-  async insertPointAction(
-    userId: string,
-    type: 'ATTENDANCE' | 'WEEKLY_ATTENDANCE_BONUS',
-    pointAmount: number,
-    additionalData: Record<string, unknown>,
-  ): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .insert({
-        user_id: userId,
-        type,
-        point_amount: pointAmount,
-        additional_data: additionalData as Json,
-      });
-
-    if (error) {
-      throw error;
-    }
   }
 
   async findAttendancesByUserIdInDateRange(

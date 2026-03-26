@@ -2,20 +2,32 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AttendanceService } from './attendance.service';
 import { ATTENDANCE_REPOSITORY } from './interfaces/attendance-repository.interface';
 import { StubAttendanceRepository } from './repositories/stub-attendance.repository';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { POINT_WRITE_REPOSITORY } from '../point-write/point-write-repository.interface';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 describe('AttendanceService', () => {
   let service: AttendanceService;
   let repository: StubAttendanceRepository;
+  let pointWriteRepository: StubPointWriteRepository;
 
   const userId = 'test-user-id';
 
   beforeEach(async () => {
     repository = new StubAttendanceRepository();
+    pointWriteRepository = new StubPointWriteRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AttendanceService,
         { provide: ATTENDANCE_REPOSITORY, useValue: repository },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => {
+            return new PointWriteService(pointWriteRepository);
+          },
+        },
       ],
     }).compile();
 
@@ -24,6 +36,7 @@ describe('AttendanceService', () => {
 
   afterEach(() => {
     repository.clear();
+    pointWriteRepository.clear();
   });
 
   describe('getAttendances', () => {
@@ -276,20 +289,23 @@ describe('AttendanceService', () => {
       expect(result.reason).toBeUndefined();
     });
 
-    it('출석 체크 시 포인트가 2P 부여된다', async () => {
+    it('출석 체크 시 PointWriteService를 통해 ATTENDANCE 타입으로 2P가 기록된다', async () => {
       await service.checkIn(userId);
 
-      const pointActions = repository.getInsertedPointActions();
-      expect(pointActions).toHaveLength(1);
-      expect(pointActions[0].type).toBe('ATTENDANCE');
-      expect(pointActions[0].pointAmount).toBe(2);
+      const actions = pointWriteRepository.getInsertedActions();
+      expect(actions).toHaveLength(1);
+      expect(actions[0].type).toBe('ATTENDANCE');
+      expect(actions[0].amount).toBe(2);
+      expect(actions[0].userId).toBe(userId);
+      expect(actions[0].status).toBe('done');
     });
 
-    it('출석 체크 시 attendance_id가 포인트 액션에 포함된다', async () => {
+    it('출석 체크 시 attendance_id가 additionalData에 포함된다', async () => {
       await service.checkIn(userId);
 
-      const pointActions = repository.getInsertedPointActions();
-      expect(pointActions[0].additionalData).toHaveProperty('attendance_id');
+      const actions = pointWriteRepository.getInsertedActions();
+      expect(actions[0].additionalData).toHaveProperty('attendance_id');
+      expect(typeof actions[0].additionalData.attendance_id).toBe('number');
     });
 
     it('이미 출석한 경우 실패를 반환하고 포인트는 0이다', async () => {
@@ -301,6 +317,16 @@ describe('AttendanceService', () => {
       expect(result.reason).toBe('Already attended today');
       expect(result.weeklyBonusEarned).toBe(false);
       expect(result.point).toBe(0);
+    });
+
+    it('이미 출석한 경우 추가 포인트가 기록되지 않는다', async () => {
+      await service.checkIn(userId);
+      pointWriteRepository.clear(); // 첫 번째 체크인 기록 초기화
+
+      await service.checkIn(userId); // 중복 체크인
+
+      const actions = pointWriteRepository.getInsertedActions();
+      expect(actions).toHaveLength(0);
     });
 
     it('주간 개근 시 보너스 포인트 5P가 지급된다', async () => {
@@ -343,12 +369,269 @@ describe('AttendanceService', () => {
       expect(result.weeklyBonusEarned).toBe(true);
       expect(result.point).toBe(7);
 
-      const pointActions = repository.getInsertedPointActions();
-      const bonusAction = pointActions.find(
+      const actions = pointWriteRepository.getInsertedActions();
+      expect(actions).toHaveLength(2);
+
+      const attendanceAction = actions.find((a) => a.type === 'ATTENDANCE');
+      expect(attendanceAction).toBeDefined();
+      expect(attendanceAction!.amount).toBe(2);
+
+      const bonusAction = actions.find(
         (a) => a.type === 'WEEKLY_ATTENDANCE_BONUS',
       );
       expect(bonusAction).toBeDefined();
-      expect(bonusAction!.pointAmount).toBe(5);
+      expect(bonusAction!.amount).toBe(5);
+    });
+
+    it('주간 개근 보너스에 week_start, week_end가 포함된다', async () => {
+      const todayDate = getTodayKST();
+      const dayOfWeek = todayDate.getDay();
+
+      const startOfWeek = new Date(todayDate);
+      if (dayOfWeek === 0) {
+        startOfWeek.setDate(todayDate.getDate() - 6);
+      } else {
+        startOfWeek.setDate(todayDate.getDate() - dayOfWeek + 1);
+      }
+
+      const records: {
+        id: number;
+        userId: string;
+        createdAtDate: string;
+        createdAt: string;
+      }[] = [];
+      const todayStr = formatDate(todayDate);
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        const dateStr = formatDate(date);
+
+        if (dateStr === todayStr) continue;
+
+        records.push({
+          id: i + 1,
+          userId,
+          createdAtDate: dateStr,
+          createdAt: `${dateStr}T09:00:00+09:00`,
+        });
+      }
+      repository.setAttendances(userId, records);
+
+      await service.checkIn(userId);
+
+      const actions = pointWriteRepository.getInsertedActions();
+      const bonusAction = actions.find(
+        (a) => a.type === 'WEEKLY_ATTENDANCE_BONUS',
+      );
+      expect(bonusAction!.additionalData).toHaveProperty('week_start');
+      expect(bonusAction!.additionalData).toHaveProperty('week_end');
+    });
+
+    it('출석 레코드 생성 후 포인트가 기록된다 (순서 보장)', async () => {
+      const callOrder: string[] = [];
+
+      // insertAttendance 호출 시 순서 기록
+      const originalInsert = repository.insertAttendance.bind(repository);
+      repository.insertAttendance = async (uid: string, date: string) => {
+        callOrder.push('insertAttendance');
+        return originalInsert(uid, date);
+      };
+
+      // addPoint 호출 시 순서 기록
+      const originalAddPoint = service['pointWriteService'].addPoint.bind(
+        service['pointWriteService'],
+      );
+      service['pointWriteService'].addPoint = async (params) => {
+        callOrder.push('addPoint');
+        return originalAddPoint(params);
+      };
+
+      await service.checkIn(userId);
+
+      expect(callOrder).toEqual(['insertAttendance', 'addPoint']);
+    });
+
+    it('insertAttendance 예외 발생 시 포인트가 기록되지 않는다', async () => {
+      // insertAttendance가 throw하도록 설정 (동시성 충돌 시나리오)
+      repository.insertAttendance = async () => {
+        throw new Error('unique constraint violation');
+      };
+
+      const result = await service.checkIn(userId);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe('Already attended today');
+
+      const actions = pointWriteRepository.getInsertedActions();
+      expect(actions).toHaveLength(0);
+    });
+
+    it('addPoint 에러 시 예외가 전파된다 (silent fail 방지)', async () => {
+      service['pointWriteService'].addPoint = async () => {
+        throw new Error('DB connection failed');
+      };
+
+      await expect(service.checkIn(userId)).rejects.toThrow(
+        'DB connection failed',
+      );
+    });
+
+    it('ATTENDANCE 포인트의 additionalData에는 attendance_id만 포함된다', async () => {
+      await service.checkIn(userId);
+
+      const actions = pointWriteRepository.getInsertedActions();
+      const attendanceAction = actions.find((a) => a.type === 'ATTENDANCE');
+      expect(Object.keys(attendanceAction!.additionalData)).toEqual([
+        'attendance_id',
+      ]);
+    });
+
+    it('주간 개근 보너스의 status도 done이다', async () => {
+      const todayDate = getTodayKST();
+      const dayOfWeek = todayDate.getDay();
+
+      const startOfWeek = new Date(todayDate);
+      if (dayOfWeek === 0) {
+        startOfWeek.setDate(todayDate.getDate() - 6);
+      } else {
+        startOfWeek.setDate(todayDate.getDate() - dayOfWeek + 1);
+      }
+
+      const records: {
+        id: number;
+        userId: string;
+        createdAtDate: string;
+        createdAt: string;
+      }[] = [];
+      const todayStr = formatDate(todayDate);
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        const dateStr = formatDate(date);
+
+        if (dateStr === todayStr) continue;
+
+        records.push({
+          id: i + 1,
+          userId,
+          createdAtDate: dateStr,
+          createdAt: `${dateStr}T09:00:00+09:00`,
+        });
+      }
+      repository.setAttendances(userId, records);
+
+      await service.checkIn(userId);
+
+      const actions = pointWriteRepository.getInsertedActions();
+      const bonusAction = actions.find(
+        (a) => a.type === 'WEEKLY_ATTENDANCE_BONUS',
+      );
+      expect(bonusAction!.status).toBe('done');
+      expect(bonusAction!.userId).toBe(userId);
+    });
+
+    it('주간 개근 보너스의 week_start는 월요일, week_end�� 일요일이다', async () => {
+      const todayDate = getTodayKST();
+      const dayOfWeek = todayDate.getDay();
+
+      const startOfWeek = new Date(todayDate);
+      if (dayOfWeek === 0) {
+        startOfWeek.setDate(todayDate.getDate() - 6);
+      } else {
+        startOfWeek.setDate(todayDate.getDate() - dayOfWeek + 1);
+      }
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+      const records: {
+        id: number;
+        userId: string;
+        createdAtDate: string;
+        createdAt: string;
+      }[] = [];
+      const todayStr = formatDate(todayDate);
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        const dateStr = formatDate(date);
+
+        if (dateStr === todayStr) continue;
+
+        records.push({
+          id: i + 1,
+          userId,
+          createdAtDate: dateStr,
+          createdAt: `${dateStr}T09:00:00+09:00`,
+        });
+      }
+      repository.setAttendances(userId, records);
+
+      await service.checkIn(userId);
+
+      const actions = pointWriteRepository.getInsertedActions();
+      const bonusAction = actions.find(
+        (a) => a.type === 'WEEKLY_ATTENDANCE_BONUS',
+      );
+      expect(bonusAction!.additionalData.week_start).toBe(
+        formatDate(startOfWeek),
+      );
+      expect(bonusAction!.additionalData.week_end).toBe(
+        formatDate(endOfWeek),
+      );
+    });
+
+    it('주간 출석이 6일인 경우 보너스가 지급되지 않는다', async () => {
+      const todayDate = getTodayKST();
+      const dayOfWeek = todayDate.getDay();
+
+      const startOfWeek = new Date(todayDate);
+      if (dayOfWeek === 0) {
+        startOfWeek.setDate(todayDate.getDate() - 6);
+      } else {
+        startOfWeek.setDate(todayDate.getDate() - dayOfWeek + 1);
+      }
+
+      // 오늘 포함 6일만 (하루 빠짐)
+      const records: {
+        id: number;
+        userId: string;
+        createdAtDate: string;
+        createdAt: string;
+      }[] = [];
+      const todayStr = formatDate(todayDate);
+      let skipped = false;
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        const dateStr = formatDate(date);
+
+        if (dateStr === todayStr) continue;
+
+        // 하루 건너뛰기
+        if (!skipped && dateStr !== todayStr) {
+          skipped = true;
+          continue;
+        }
+
+        records.push({
+          id: i + 1,
+          userId,
+          createdAtDate: dateStr,
+          createdAt: `${dateStr}T09:00:00+09:00`,
+        });
+      }
+      repository.setAttendances(userId, records);
+
+      const result = await service.checkIn(userId);
+
+      expect(result.success).toBe(true);
+      expect(result.weeklyBonusEarned).toBe(false);
+      expect(result.point).toBe(2);
+
+      const actions = pointWriteRepository.getInsertedActions();
+      expect(actions).toHaveLength(1);
+      expect(actions[0].type).toBe('ATTENDANCE');
     });
   });
 });

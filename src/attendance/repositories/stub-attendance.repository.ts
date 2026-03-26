@@ -7,12 +7,6 @@ import type {
 export class StubAttendanceRepository implements IAttendanceRepository {
   private attendances = new Map<string, AttendanceRecord[]>();
   private pointActions = new Map<string, AttendancePointAction[]>();
-  private insertedPointActions: {
-    userId: string;
-    type: string;
-    pointAmount: number;
-    additionalData: Record<string, unknown>;
-  }[] = [];
   private nextId = 1;
 
   setAttendances(userId: string, records: AttendanceRecord[]): void {
@@ -23,14 +17,9 @@ export class StubAttendanceRepository implements IAttendanceRepository {
     this.pointActions.set(userId, actions);
   }
 
-  getInsertedPointActions() {
-    return this.insertedPointActions;
-  }
-
   clear(): void {
     this.attendances.clear();
     this.pointActions.clear();
-    this.insertedPointActions = [];
     this.nextId = 1;
   }
 
@@ -63,21 +52,6 @@ export class StubAttendanceRepository implements IAttendanceRepository {
     existing.push(record);
     this.attendances.set(userId, existing);
     return Promise.resolve(record);
-  }
-
-  insertPointAction(
-    userId: string,
-    type: 'ATTENDANCE' | 'WEEKLY_ATTENDANCE_BONUS',
-    pointAmount: number,
-    additionalData: Record<string, unknown>,
-  ): Promise<void> {
-    this.insertedPointActions.push({
-      userId,
-      type,
-      pointAmount,
-      additionalData,
-    });
-    return Promise.resolve();
   }
 
   findAttendancesByUserIdInDateRange(

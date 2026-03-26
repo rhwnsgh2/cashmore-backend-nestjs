@@ -4,6 +4,8 @@ import {
   Attendance,
   ATTENDANCE_REPOSITORY,
 } from './interfaces/attendance-repository.interface';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 const POINT_AMOUNT = 2;
 const WEEKLY_COMPLETION_BONUS = 5;
@@ -20,6 +22,8 @@ export class AttendanceService {
   constructor(
     @Inject(ATTENDANCE_REPOSITORY)
     private attendanceRepository: IAttendanceRepository,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {}
 
   async getAttendances(userId: string): Promise<Attendance[]> {
@@ -84,12 +88,12 @@ export class AttendanceService {
       };
     }
 
-    await this.attendanceRepository.insertPointAction(
+    await this.pointWriteService.addPoint({
       userId,
-      'ATTENDANCE',
-      POINT_AMOUNT,
-      { attendance_id: attendance.id },
-    );
+      amount: POINT_AMOUNT,
+      type: 'ATTENDANCE',
+      additionalData: { attendance_id: attendance.id },
+    });
 
     const weeklyBonusEarned =
       await this.checkAndAssignWeeklyCompletionBonus(userId);
@@ -140,12 +144,12 @@ export class AttendanceService {
       }
     }
 
-    await this.attendanceRepository.insertPointAction(
+    await this.pointWriteService.addPoint({
       userId,
-      'WEEKLY_ATTENDANCE_BONUS',
-      WEEKLY_COMPLETION_BONUS,
-      { week_start: startDate, week_end: endDate },
-    );
+      amount: WEEKLY_COMPLETION_BONUS,
+      type: 'WEEKLY_ATTENDANCE_BONUS',
+      additionalData: { week_start: startDate, week_end: endDate },
+    });
 
     return true;
   }

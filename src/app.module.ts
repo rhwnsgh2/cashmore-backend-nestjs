@@ -39,6 +39,7 @@ import { AdminModule } from './admin/admin.module';
 import { CashbackModule } from './cashback/cashback.module';
 import { CoupangModule } from './coupang/coupang.module';
 import { AccountInfoModule } from './account-info/account-info.module';
+import { PointWriteModule } from './point-write/point-write.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -60,6 +61,7 @@ import configuration from './config/configuration';
       },
     ]),
     SupabaseModule,
+    PointWriteModule,
     AuthModule,
     HealthModule,
     PointModule,

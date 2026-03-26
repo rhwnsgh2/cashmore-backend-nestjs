@@ -32,12 +32,6 @@ export interface IAttendanceRepository {
     date: string,
   ): Promise<AttendanceRecord | null>;
   insertAttendance(userId: string, date: string): Promise<AttendanceRecord>;
-  insertPointAction(
-    userId: string,
-    type: 'ATTENDANCE' | 'WEEKLY_ATTENDANCE_BONUS',
-    pointAmount: number,
-    additionalData: Record<string, unknown>,
-  ): Promise<void>;
   findAttendancesByUserIdInDateRange(
     userId: string,
     startDate: string,
