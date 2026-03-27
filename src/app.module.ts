@@ -38,6 +38,7 @@ import { NaverPayModule } from './naver-pay/naver-pay.module';
 import { AdminModule } from './admin/admin.module';
 import { CashbackModule } from './cashback/cashback.module';
 import { CoupangModule } from './coupang/coupang.module';
+import { CoupangPartnersModule } from './coupang-partners/coupang-partners.module';
 import { AccountInfoModule } from './account-info/account-info.module';
 import { PointWriteModule } from './point-write/point-write.module';
 import configuration from './config/configuration';
@@ -95,6 +96,7 @@ import configuration from './config/configuration';
     CashbackModule,
     AdminModule,
     CoupangModule,
+    CoupangPartnersModule,
     AccountInfoModule,
   ],
   controllers: [AppController],
