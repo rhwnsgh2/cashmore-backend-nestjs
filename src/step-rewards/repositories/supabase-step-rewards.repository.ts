@@ -39,12 +39,9 @@ export class SupabaseStepRewardsRepository implements IStepRewardsRepository {
       .eq('user_id', userId)
       .eq('claim_date', date)
       .eq('level', level)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return null;
-      }
       throw new Error(`Failed to fetch claim: ${error.message}`);
     }
 
@@ -63,12 +60,9 @@ export class SupabaseStepRewardsRepository implements IStepRewardsRepository {
       .eq('user_id', userId)
       .eq('claim_date', date)
       .eq('required_steps', requiredSteps)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return null;
-      }
       throw new Error(`Failed to fetch claim: ${error.message}`);
     }
 

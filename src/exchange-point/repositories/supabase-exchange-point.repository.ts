@@ -72,9 +72,9 @@ export class SupabaseExchangePointRepository implements IExchangePointRepository
       .eq('id', id)
       .eq('user_id', userId)
       .eq('type', 'EXCHANGE_POINT_TO_CASH')
-      .single();
+      .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       return null;
     }
 

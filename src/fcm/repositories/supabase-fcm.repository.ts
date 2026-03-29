@@ -12,7 +12,7 @@ export class SupabaseFcmRepository implements IFcmRepository {
       .from('user')
       .select('fcm_token')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('[FCM] Failed to find FCM token:', error.message);

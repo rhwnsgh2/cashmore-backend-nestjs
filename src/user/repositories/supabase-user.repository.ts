@@ -21,7 +21,7 @@ export class SupabaseUserRepository implements IUserRepository {
         'id, email, auth_id, created_at, marketing_info, is_banned, nickname, provider',
       )
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return null;
@@ -49,7 +49,7 @@ export class SupabaseUserRepository implements IUserRepository {
       .select('reason')
       .eq('auth_id', authId)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return null;
@@ -66,7 +66,7 @@ export class SupabaseUserRepository implements IUserRepository {
         'id, email, auth_id, created_at, marketing_info, is_banned, nickname, provider',
       )
       .eq('auth_id', authId)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return null;
@@ -175,7 +175,7 @@ export class SupabaseUserRepository implements IUserRepository {
       .select('device_id')
       .eq('user_id', userId)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return null;
