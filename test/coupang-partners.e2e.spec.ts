@@ -235,7 +235,7 @@ describe('Coupang Partners API (e2e)', () => {
 
     // Validation 테스트
     it('afcode가 누락되면 400을 반환한다', async () => {
-      const { afcode, ...dto } = validPostback;
+      const { afcode: _afcode, ...dto } = validPostback;
 
       await request(app.getHttpServer())
         .post('/coupang/postback')
