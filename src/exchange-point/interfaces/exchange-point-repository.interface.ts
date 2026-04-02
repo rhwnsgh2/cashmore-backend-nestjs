@@ -22,7 +22,10 @@ export interface IExchangePointRepository {
   getTotalPoints(userId: string): Promise<number>;
   insertExchangeRequest(data: InsertExchangePointData): Promise<{ id: number }>;
   findById(id: number, userId: string): Promise<ExchangePoint | null>;
+  findByIds(ids: number[]): Promise<ExchangePoint[]>;
   cancelExchangeRequest(id: number, userId: string): Promise<void>;
+  approveExchangeRequests(ids: number[]): Promise<void>;
+  rejectExchangeRequest(id: number, reason: string): Promise<void>;
 }
 
 export const EXCHANGE_POINT_REPOSITORY = Symbol('EXCHANGE_POINT_REPOSITORY');

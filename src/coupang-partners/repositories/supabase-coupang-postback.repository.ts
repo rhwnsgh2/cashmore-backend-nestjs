@@ -6,9 +6,7 @@ import type {
 } from '../interfaces/coupang-postback-repository.interface';
 
 @Injectable()
-export class SupabaseCoupangPostbackRepository
-  implements ICoupangPostbackRepository
-{
+export class SupabaseCoupangPostbackRepository implements ICoupangPostbackRepository {
   constructor(private supabase: SupabaseService) {}
 
   async save(

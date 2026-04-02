@@ -81,6 +81,62 @@ export class SupabaseExchangePointRepository implements IExchangePointRepository
     return data as ExchangePoint;
   }
 
+  async findByIds(ids: number[]): Promise<ExchangePoint[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .select(
+        'id, user_id, type, point_amount, status, created_at, additional_data',
+      )
+      .in('id', ids)
+      .eq('type', 'EXCHANGE_POINT_TO_CASH');
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as ExchangePoint[]) || [];
+  }
+
+  async approveExchangeRequests(ids: number[]): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .update({
+        status: 'done',
+        additional_data: {
+          confirmed_at: new Date().toISOString(),
+          rejected_at: null,
+          cancelled_at: null,
+        },
+      })
+      .in('id', ids);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async rejectExchangeRequest(id: number, reason: string): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .update({
+        status: 'rejected',
+        additional_data: {
+          confirmed_at: null,
+          rejected_at: new Date().toISOString(),
+          cancelled_at: null,
+          reason,
+        },
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+  }
+
   async cancelExchangeRequest(id: number, userId: string): Promise<void> {
     const { error } = await this.supabaseService
       .getClient()

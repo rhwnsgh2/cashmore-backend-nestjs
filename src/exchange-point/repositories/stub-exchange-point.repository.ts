@@ -62,6 +62,46 @@ export class StubExchangePointRepository implements IExchangePointRepository {
     return Promise.resolve(found);
   }
 
+  findByIds(ids: number[]): Promise<ExchangePoint[]> {
+    const results: ExchangePoint[] = [];
+    for (const exchanges of this.exchanges.values()) {
+      results.push(...exchanges.filter((e) => ids.includes(e.id)));
+    }
+    return Promise.resolve(results);
+  }
+
+  approveExchangeRequests(ids: number[]): Promise<void> {
+    for (const exchanges of this.exchanges.values()) {
+      for (const exchange of exchanges) {
+        if (ids.includes(exchange.id)) {
+          exchange.status = 'done';
+          exchange.additional_data = {
+            confirmed_at: new Date().toISOString(),
+            rejected_at: null,
+            cancelled_at: null,
+          };
+        }
+      }
+    }
+    return Promise.resolve();
+  }
+
+  rejectExchangeRequest(id: number, reason: string): Promise<void> {
+    for (const exchanges of this.exchanges.values()) {
+      const exchange = exchanges.find((e) => e.id === id);
+      if (exchange) {
+        exchange.status = 'rejected';
+        exchange.additional_data = {
+          confirmed_at: null,
+          rejected_at: new Date().toISOString(),
+          cancelled_at: null,
+          reason,
+        };
+      }
+    }
+    return Promise.resolve();
+  }
+
   cancelExchangeRequest(id: number, userId: string): Promise<void> {
     const userExchanges = this.exchanges.get(userId) || [];
     const exchange = userExchanges.find((e) => e.id === id);
