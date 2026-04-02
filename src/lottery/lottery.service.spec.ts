@@ -208,12 +208,52 @@ describe('LotteryService', () => {
       expect(result.user_id).toBe(userId);
     });
 
-    it('황금 복권은 하루 1회만 발급 가능하다', async () => {
-      await service.issueLottery(userId, 'MAX_1000', '황금 복권');
+    it('황금 복권은 하루 2회까지 발급 가능하다', async () => {
+      // 1회차: 5시간 전 발급 기록 세팅
+      repository.addReason(
+        userId,
+        '황금 복권',
+        dayjs().subtract(5, 'hour').toISOString(),
+      );
+
+      // 2회차: 4시간 쿨다운 경과했으므로 발급 성공
+      const result = await service.issueLottery(
+        userId,
+        'MAX_1000',
+        '황금 복권',
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('황금 복권 하루 2회 소진 시 발급 불가하다', async () => {
+      // 2회 모두 이전에 발급된 상태
+      repository.addReason(
+        userId,
+        '황금 복권',
+        dayjs().subtract(8, 'hour').toISOString(),
+      );
+      repository.addReason(
+        userId,
+        '황금 복권',
+        dayjs().subtract(4, 'hour').toISOString(),
+      );
 
       await expect(
         service.issueLottery(userId, 'MAX_1000', '황금 복권'),
-      ).rejects.toThrow('황금 복권은 하루에 한 번만 받을 수 있습니다.');
+      ).rejects.toThrow('황금 복권은 하루에 두 번까지만 받을 수 있습니다.');
+    });
+
+    it('황금 복권 1회 발급 후 4시간 미경과 시 발급 불가하다', async () => {
+      // 1시간 전 발급
+      repository.addReason(
+        userId,
+        '황금 복권',
+        dayjs().subtract(1, 'hour').toISOString(),
+      );
+
+      await expect(
+        service.issueLottery(userId, 'MAX_1000', '황금 복권'),
+      ).rejects.toThrow('황금 복권은 4시간 후에 다시 받을 수 있습니다.');
     });
 
     it('황금 복권이 아닌 reason은 제한 없이 발급 가능하다', async () => {
@@ -272,14 +312,65 @@ describe('LotteryService', () => {
       expect(result.nextAvailableAt).toBeNull();
     });
 
-    it('오늘 이미 황금 복권을 받았으면 isAvailable이 false이다', async () => {
-      await service.issueLottery(userId, 'MAX_1000', '황금 복권');
+    it('오늘 1회 받고 4시간 미경과 시 isAvailable이 false이다', async () => {
+      repository.addReason(
+        userId,
+        '황금 복권',
+        dayjs().subtract(1, 'hour').toISOString(),
+      );
 
       const result = await service.getGoldenLotteryAvailability(userId);
 
       expect(result.isAvailable).toBe(false);
       expect(result.nextAvailableAt).toBeDefined();
       expect(result.nextAvailableAt).not.toBeNull();
+    });
+
+    it('오늘 1회 받고 4시간 경과 시 isAvailable이 true이다', async () => {
+      repository.addReason(
+        userId,
+        '황금 복권',
+        dayjs().subtract(5, 'hour').toISOString(),
+      );
+
+      const result = await service.getGoldenLotteryAvailability(userId);
+
+      expect(result.isAvailable).toBe(true);
+      expect(result.nextAvailableAt).toBeNull();
+    });
+
+    it('오늘 2회 소진 시 isAvailable이 false이고 nextAvailableAt이 내일이다', async () => {
+      repository.addReason(
+        userId,
+        '황금 복권',
+        dayjs().subtract(8, 'hour').toISOString(),
+      );
+      repository.addReason(
+        userId,
+        '황금 복권',
+        dayjs().subtract(4, 'hour').toISOString(),
+      );
+
+      const result = await service.getGoldenLotteryAvailability(userId);
+
+      expect(result.isAvailable).toBe(false);
+      expect(result.nextAvailableAt).toBeDefined();
+      // 내일 자정을 가리키는지 확인
+      const tomorrow = dayjs().tz('Asia/Seoul').add(1, 'day').startOf('day');
+      expect(dayjs(result.nextAvailableAt).isSame(tomorrow, 'day')).toBe(true);
+    });
+
+    it('1회 받고 쿨다운 미경과 시 nextAvailableAt이 발급 후 4시간 시점이다', async () => {
+      const issuedAt = dayjs().subtract(2, 'hour');
+      repository.addReason(userId, '황금 복권', issuedAt.toISOString());
+
+      const result = await service.getGoldenLotteryAvailability(userId);
+
+      expect(result.isAvailable).toBe(false);
+      const expectedCooldownEnd = issuedAt.add(4, 'hour');
+      expect(
+        dayjs(result.nextAvailableAt).diff(expectedCooldownEnd, 'minute'),
+      ).toBeLessThanOrEqual(1);
     });
 
     it('다른 reason으로 발급받아도 황금 복권 가용성에 영향 없다', async () => {

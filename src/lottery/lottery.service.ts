@@ -127,21 +127,29 @@ export class LotteryService {
       throw new BadRequestException(`Invalid lottery type: ${lotteryType}`);
     }
 
-    // 황금 복권은 하루 1회 제한
+    // 황금 복권: 하루 2회 제한 + 4시간 쿨다운
     if (reason === '황금 복권') {
       const todayStart = dayjs().tz('Asia/Seoul').startOf('day').toISOString();
       const todayEnd = dayjs().tz('Asia/Seoul').endOf('day').toISOString();
-      const alreadyIssued =
-        await this.lotteryRepository.existsByUserIdAndReasonToday(
+      const { count, lastIssuedAt } =
+        await this.lotteryRepository.countByUserIdAndReasonToday(
           userId,
           reason,
           todayStart,
           todayEnd,
         );
-      if (alreadyIssued) {
+      if (count >= 2) {
         throw new BadRequestException(
-          '황금 복권은 하루에 한 번만 받을 수 있습니다.',
+          '황금 복권은 하루에 두 번까지만 받을 수 있습니다.',
         );
+      }
+      if (count === 1 && lastIssuedAt) {
+        const hoursSince = dayjs().diff(dayjs(lastIssuedAt), 'hour', true);
+        if (hoursSince < 4) {
+          throw new BadRequestException(
+            '황금 복권은 4시간 후에 다시 받을 수 있습니다.',
+          );
+        }
       }
     }
 
@@ -292,21 +300,33 @@ export class LotteryService {
     const todayStart = dayjs().tz('Asia/Seoul').startOf('day').toISOString();
     const todayEnd = dayjs().tz('Asia/Seoul').endOf('day').toISOString();
 
-    const alreadyIssued =
-      await this.lotteryRepository.existsByUserIdAndReasonToday(
+    const { count, lastIssuedAt } =
+      await this.lotteryRepository.countByUserIdAndReasonToday(
         userId,
         '황금 복권',
         todayStart,
         todayEnd,
       );
 
-    if (alreadyIssued) {
+    // 하루 2회 소진 → 내일까지 불가
+    if (count >= 2) {
       const nextAvailableAt = dayjs()
         .tz('Asia/Seoul')
         .add(1, 'day')
         .startOf('day')
         .format('YYYY-MM-DDTHH:mm:ssZ');
       return { isAvailable: false, nextAvailableAt };
+    }
+
+    // 1회 사용 + 4시간 쿨다운 미경과
+    if (count === 1 && lastIssuedAt) {
+      const cooldownEnd = dayjs(lastIssuedAt).add(4, 'hour');
+      if (dayjs().isBefore(cooldownEnd)) {
+        return {
+          isAvailable: false,
+          nextAvailableAt: cooldownEnd.format('YYYY-MM-DDTHH:mm:ssZ'),
+        };
+      }
     }
 
     return { isAvailable: true, nextAvailableAt: null };

@@ -61,12 +61,12 @@ export interface ILotteryRepository {
   insertPointAction(data: InsertPointActionData): Promise<void>;
   insertAdLotterySlot(data: InsertAdLotterySlotData): Promise<void>;
   findMaxRewardLotteries(limit: number): Promise<MaxRewardLottery[]>;
-  existsByUserIdAndReasonToday(
+  countByUserIdAndReasonToday(
     userId: string,
     reason: string,
     todayStart: string,
     todayEnd: string,
-  ): Promise<boolean>;
+  ): Promise<{ count: number; lastIssuedAt: string | null }>;
 }
 
 // DI 토큰

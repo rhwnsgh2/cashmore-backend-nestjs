@@ -27,6 +27,10 @@ export class StubLotteryRepository implements ILotteryRepository {
     this.lotteries.set(userId, lotteries);
   }
 
+  addReason(userId: string, reason: string, issuedAt: string): void {
+    this.insertedReasons.push({ userId, reason, issuedAt });
+  }
+
   clear(): void {
     this.lotteries.clear();
     this.insertedReasons = [];
@@ -110,18 +114,26 @@ export class StubLotteryRepository implements ILotteryRepository {
     return Promise.resolve();
   }
 
-  existsByUserIdAndReasonToday(
+  countByUserIdAndReasonToday(
     userId: string,
     reason: string,
     todayStart: string,
     _todayEnd: string,
-  ): Promise<boolean> {
+  ): Promise<{ count: number; lastIssuedAt: string | null }> {
     // insertLottery에서 reason을 저장하지 않으므로 insertedReasons로 추적
-    const exists = this.insertedReasons.some(
-      (r) =>
-        r.userId === userId && r.reason === reason && r.issuedAt >= todayStart,
-    );
-    return Promise.resolve(exists);
+    const matched = this.insertedReasons
+      .filter(
+        (r) =>
+          r.userId === userId &&
+          r.reason === reason &&
+          r.issuedAt >= todayStart,
+      )
+      .sort((a, b) => (b.issuedAt > a.issuedAt ? 1 : -1));
+
+    return Promise.resolve({
+      count: matched.length,
+      lastIssuedAt: matched.length > 0 ? matched[0].issuedAt : null,
+    });
   }
 
   findMaxRewardLotteries(_limit: number): Promise<MaxRewardLottery[]> {
