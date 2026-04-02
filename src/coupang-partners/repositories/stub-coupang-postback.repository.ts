@@ -3,9 +3,7 @@ import type {
   CoupangPostbackRecord,
 } from '../interfaces/coupang-postback-repository.interface';
 
-export class StubCoupangPostbackRepository
-  implements ICoupangPostbackRepository
-{
+export class StubCoupangPostbackRepository implements ICoupangPostbackRepository {
   private records: CoupangPostbackRecord[] = [];
   private nextId = 1;
 

@@ -16,7 +16,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as appscaling from 'aws-cdk-lib/aws-applicationautoscaling';
-import * as elbv2_targets from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets';
+
 import { Construct } from 'constructs';
 
 export class InfrastructureStack extends cdk.Stack {
@@ -265,18 +265,9 @@ export class InfrastructureStack extends cdk.Stack {
           daouSecret,
           'DAOU_PARTNER_CODE',
         ),
-        DAOU_API_KEY: ecs.Secret.fromSecretsManager(
-          daouSecret,
-          'DAOU_API_KEY',
-        ),
-        DAOU_ENC_KEY: ecs.Secret.fromSecretsManager(
-          daouSecret,
-          'DAOU_ENC_KEY',
-        ),
-        DAOU_API_URL: ecs.Secret.fromSecretsManager(
-          daouSecret,
-          'DAOU_API_URL',
-        ),
+        DAOU_API_KEY: ecs.Secret.fromSecretsManager(daouSecret, 'DAOU_API_KEY'),
+        DAOU_ENC_KEY: ecs.Secret.fromSecretsManager(daouSecret, 'DAOU_ENC_KEY'),
+        DAOU_API_URL: ecs.Secret.fromSecretsManager(daouSecret, 'DAOU_API_URL'),
         COUPANG_ACCESS_KEY: ecs.Secret.fromSecretsManager(
           coupangSecret,
           'accessKey',
@@ -374,8 +365,8 @@ export class InfrastructureStack extends cdk.Stack {
       },
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      assignPublicIp: true, // Public Subnet에서 인터넷 접근 필요
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      assignPublicIp: false, // Private Subnet + NAT Gateway로 아웃바운드 고정 IP 사용
       healthCheckGracePeriod: cdk.Duration.seconds(60),
       enableExecuteCommand: true, // 컨테이너 디버깅용 ECS Exec 활성화
     });
@@ -408,46 +399,6 @@ export class InfrastructureStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(10),
         healthyThresholdCount: 2,
         unhealthyThresholdCount: 3,
-      },
-    });
-
-    // NLB + Elastic IP (외부 업체 쿠폰 연동용 고정 IP)
-    const eip1 = new ec2.CfnEIP(this, 'CashmoreNlbEip1', {
-      tags: [{ key: 'Name', value: 'cashmore-nlb-eip-az1' }],
-    });
-    const eip2 = new ec2.CfnEIP(this, 'CashmoreNlbEip2', {
-      tags: [{ key: 'Name', value: 'cashmore-nlb-eip-az2' }],
-    });
-
-    const nlb = new elbv2.NetworkLoadBalancer(this, 'CashmoreNlb', {
-      vpc,
-      internetFacing: true,
-      crossZoneEnabled: true,
-      subnetMappings: [
-        {
-          subnet: vpc.publicSubnets[0],
-          allocationId: eip1.attrAllocationId,
-        },
-        {
-          subnet: vpc.publicSubnets[1],
-          allocationId: eip2.attrAllocationId,
-        },
-      ],
-    });
-
-    const nlbListener = nlb.addListener('CashmoreNlbListener', {
-      port: 443,
-      protocol: elbv2.Protocol.TCP,
-    });
-
-    nlbListener.addTargets('CashmoreNlbAlbTarget', {
-      targets: [new elbv2_targets.AlbListenerTarget(httpsListener)],
-      port: 443,
-      healthCheck: {
-        enabled: true,
-        protocol: elbv2.Protocol.HTTP,
-        path: '/health',
-        interval: cdk.Duration.seconds(30),
       },
     });
 
@@ -1159,21 +1110,6 @@ exports.handler = async (event) => {
     new cdk.CfnOutput(this, 'EcrRepositoryUri', {
       value: `${this.account}.dkr.ecr.${this.region}.amazonaws.com/cashmore-backend`,
       description: 'ECR Repository URI',
-    });
-
-    new cdk.CfnOutput(this, 'NlbDnsName', {
-      value: nlb.loadBalancerDnsName,
-      description: 'NLB DNS Name (for coupon API integration)',
-    });
-
-    new cdk.CfnOutput(this, 'NlbStaticIp1', {
-      value: eip1.ref,
-      description: 'NLB Elastic IP 1 (AZ1)',
-    });
-
-    new cdk.CfnOutput(this, 'NlbStaticIp2', {
-      value: eip2.ref,
-      description: 'NLB Elastic IP 2 (AZ2)',
     });
 
     new cdk.CfnOutput(this, 'GithubActionsRoleArn', {

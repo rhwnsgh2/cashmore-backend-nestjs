@@ -163,11 +163,6 @@ export class InvitationService {
     const { invitedUserId, inviteCode, deviceId, signupType, receiptId } =
       params;
 
-    // Slack: 초대장 처리 시작 로깅
-    void this.slackService.reportBugToSlack(
-      `초대장 처리 로직 userId :${invitedUserId} , invitationCode : ${inviteCode}`,
-    );
-
     // 1. 초대코드 조회
     const invitation =
       await this.invitationRepository.getInvitationByCode(inviteCode);

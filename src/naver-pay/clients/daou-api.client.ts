@@ -97,14 +97,16 @@ export class DaouApiClient implements IDaouApiClient {
     }
 
     try {
-      const data = await this.request<
-        | { maskingId: string; point: number; userKey: string }
-        | { code: string; message: string }
-      >('/v1/npay/members/nid', {
+      const encryptedBody = {
         uniqueId: encrypt(uniqueId),
         clientId: encrypt(clientId),
         clientSecret: encrypt(clientSecret),
-      });
+      };
+
+      const data = await this.request<
+        | { maskingId: string; point: number; userKey: string }
+        | { code: string; message: string }
+      >('/v1/npay/members/nid', encryptedBody);
 
       if ('code' in data) {
         this.logger.warn(`회원 조회 실패: ${data.code} ${data.message}`);
