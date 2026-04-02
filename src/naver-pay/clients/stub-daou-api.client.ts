@@ -19,6 +19,8 @@ export class StubDaouApiClient implements IDaouApiClient {
     txNo: 'test-tx-no-001',
   };
 
+  private earnError: Error | null = null;
+
   setMemberResult(result: DaouMemberResult): void {
     this.memberResult = result;
   }
@@ -50,6 +52,10 @@ export class StubDaouApiClient implements IDaouApiClient {
     this.earnResult = { success: false, errorCode, errorMessage };
   }
 
+  setEarnThrow(error: Error): void {
+    this.earnError = error;
+  }
+
   async lookupMember(_uniqueId: string): Promise<DaouMemberResult> {
     return this.memberResult;
   }
@@ -59,6 +65,9 @@ export class StubDaouApiClient implements IDaouApiClient {
     _partnerTxNo: string,
     _point: number,
   ): Promise<DaouEarnPointResult> {
+    if (this.earnError) {
+      throw this.earnError;
+    }
     return this.earnResult;
   }
 }

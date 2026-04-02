@@ -809,6 +809,62 @@ describe('NaverPayService', () => {
         BadRequestException,
       );
     });
+
+    it('다우 API가 예외를 throw하면 포인트 복원하고 failed 처리한다', async () => {
+      repository.setExchanges([
+        createExchange({
+          id: 'ex-1',
+          user_id: userId,
+          status: 'pending',
+          cashmore_point: 5000,
+          point_action_id: 42,
+        }),
+      ]);
+      daouClient.setEarnThrow(new Error('ECONNREFUSED'));
+
+      const result = await service.approveExchange('ex-1');
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('failed');
+      expect(result.errorCode).toBe('NETWORK_ERROR');
+
+      // 상태가 failed로 변경되었는지 확인
+      const exchange = await repository.findExchangeById('ex-1');
+      expect(exchange?.status).toBe('failed');
+      expect(exchange?.error_code).toBe('NETWORK_ERROR');
+
+      // 포인트 복원 확인
+      const restorations = pointService.getRestorations();
+      expect(restorations).toHaveLength(1);
+      expect(restorations[0].amount).toBe(5000);
+      expect(restorations[0].originalPointActionId).toBe(42);
+    });
+
+    it('다우 API가 예외를 throw해도 point_action_id가 없으면 복원 없이 failed 처리한다', async () => {
+      repository.setExchanges([
+        createExchange({
+          id: 'ex-1',
+          user_id: userId,
+          status: 'pending',
+          cashmore_point: 5000,
+          point_action_id: null,
+        }),
+      ]);
+      daouClient.setEarnThrow(new Error('timeout'));
+
+      const result = await service.approveExchange('ex-1');
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('failed');
+
+      // 포인트 복원 호출 없음
+      const restorations = pointService.getRestorations();
+      expect(restorations).toHaveLength(0);
+
+      // 상태는 failed
+      const exchange = await repository.findExchangeById('ex-1');
+      expect(exchange?.status).toBe('failed');
+    });
   });
 
   describe('rejectExchange', () => {

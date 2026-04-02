@@ -25,6 +25,7 @@ export function generatePartnerTxNo(): string {
   const maxRandomLen = 30 - datePrefix.length - partnerCode.length;
   const randomSuffix = randomBytes(maxRandomLen)
     .toString('base64url')
+    .replace(/[-_]/g, '')
     .slice(0, maxRandomLen);
 
   return `${datePrefix}${partnerCode}${randomSuffix}`;

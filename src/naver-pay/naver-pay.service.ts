@@ -333,11 +333,53 @@ export class NaverPayService {
       partnerTxNo,
     );
 
-    const result = await this.daouApiClient.earnPoint(
-      account.dau_user_key,
-      partnerTxNo,
-      exchange.naverpay_point,
-    );
+    let result: Awaited<ReturnType<IDaouApiClient['earnPoint']>>;
+    try {
+      result = await this.daouApiClient.earnPoint(
+        account.dau_user_key,
+        partnerTxNo,
+        exchange.naverpay_point,
+      );
+    } catch (error) {
+      // 다우 API 예외 발생 시 포인트 복원 + failed 처리
+      if (exchange.point_action_id) {
+        await this.pointService.restorePoint(
+          exchange.user_id,
+          exchange.cashmore_point,
+          'EXCHANGE_POINT_TO_NAVERPAY',
+          exchange.point_action_id,
+          { exchange_id: exchange.id },
+        );
+      }
+
+      await this.naverPayRepository.updateExchangeStatus(exchangeId, 'failed');
+      await this.naverPayRepository.updateExchangeErrorCode(
+        exchangeId,
+        'NETWORK_ERROR',
+      );
+
+      const kstTime = new Date().toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+      });
+      await this.slackService.reportBugToSlack(
+        [
+          '🚨 네이버페이 포인트 적립 실패 (API 예외)',
+          `• exchangeId: ${exchangeId}`,
+          `• userId: ${exchange.user_id}`,
+          `• partnerTxNo: ${partnerTxNo}`,
+          `• 요청 포인트: ${exchange.naverpay_point}P`,
+          `• 에러: ${error instanceof Error ? error.message : String(error)}`,
+          `• 시각: ${kstTime}`,
+        ].join('\n'),
+      );
+
+      return {
+        success: false,
+        status: 'failed',
+        errorCode: 'NETWORK_ERROR',
+        errorMessage: '네이버페이 적립 API 호출 중 오류가 발생했습니다',
+      };
+    }
 
     if (result.success) {
       await this.naverPayRepository.updateExchangeTxNo(exchangeId, result.txNo);
