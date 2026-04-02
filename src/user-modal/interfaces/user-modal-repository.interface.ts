@@ -15,7 +15,8 @@ export type UserModalType =
   | 'invitation_lotto_result'
   | 'invitation_receipt_received'
   | 'invitation_receipt_onboarding'
-  | 'invite_receipt_reward_received';
+  | 'invite_receipt_reward_received'
+  | 'exchange_point_to_naverpay';
 
 export type UserModalStatus = 'pending' | 'completed';
 

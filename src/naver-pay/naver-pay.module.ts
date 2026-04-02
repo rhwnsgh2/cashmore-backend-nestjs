@@ -8,9 +8,11 @@ import { DaouApiClient } from './clients/daou-api.client';
 import { AuthModule } from '../auth/auth.module';
 import { PointModule } from '../point/point.module';
 import { SlackModule } from '../slack/slack.module';
+import { UserModalModule } from '../user-modal/user-modal.module';
+import { FcmModule } from '../fcm/fcm.module';
 
 @Module({
-  imports: [AuthModule, PointModule, SlackModule],
+  imports: [AuthModule, PointModule, SlackModule, UserModalModule, FcmModule],
   controllers: [NaverPayController],
   providers: [
     NaverPayService,

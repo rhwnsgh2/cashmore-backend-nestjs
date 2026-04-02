@@ -23,6 +23,7 @@ export class UserModalDto {
       'invited_user_mission_reward',
       'affiliate_prepayment_received',
       'every_receipt_re_reviewed',
+      'exchange_point_to_naverpay',
     ],
     example: 'onboarding',
   })

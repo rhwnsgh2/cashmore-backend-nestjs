@@ -10,6 +10,9 @@ import type { IDaouApiClient } from './interfaces/daou-api-client.interface';
 import { DAOU_API_CLIENT } from './interfaces/daou-api-client.interface';
 import { PointService } from '../point/point.service';
 import { SlackService } from '../slack/slack.service';
+import { FcmService } from '../fcm/fcm.service';
+import type { IUserModalRepository } from '../user-modal/interfaces/user-modal-repository.interface';
+import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 import { generatePartnerTxNo } from './utils/partner-tx-no.util';
 
 const MAX_DAILY_CONNECT_ATTEMPTS = 5;
@@ -35,6 +38,9 @@ export class NaverPayService {
     private daouApiClient: IDaouApiClient,
     private pointService: PointService,
     private slackService: SlackService,
+    @Inject(USER_MODAL_REPOSITORY)
+    private userModalRepository: IUserModalRepository,
+    private fcmService: FcmService,
   ) {}
 
   async getAccount(userId: string) {
@@ -387,6 +393,28 @@ export class NaverPayService {
         exchangeId,
         'completed',
       );
+
+      try {
+        await this.userModalRepository.createModal(
+          exchange.user_id,
+          'exchange_point_to_naverpay',
+          { amount: exchange.naverpay_point },
+        );
+        await this.fcmService.pushNotification(
+          exchange.user_id,
+          '네이버페이 포인트 교환이 완료되었어요!',
+          '지금 바로 교환 내역을 확인해보세요',
+        );
+        await this.fcmService.sendRefreshMessage(
+          exchange.user_id,
+          'naverpay_exchange',
+        );
+      } catch (error) {
+        this.slackService.reportBugToSlack(
+          `⚠️ 네이버페이 전환 알림 실패: exchangeId=${exchangeId}, userId=${exchange.user_id}, error=${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
       return { success: true, status: 'completed', txNo: result.txNo };
     }
 

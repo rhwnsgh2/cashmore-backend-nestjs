@@ -159,6 +159,10 @@ export class ExchangePointService {
           '포인트 출금이 완료되었어요!',
           '지금 바로 출금 내역을 확인해보세요',
         );
+        await this.fcmService.sendRefreshMessage(
+          exchange.user_id,
+          'point_update',
+        );
       } catch (error) {
         this.logger.error(
           `Notification failed for user=${exchange.user_id}`,

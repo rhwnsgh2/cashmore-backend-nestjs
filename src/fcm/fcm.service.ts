@@ -15,7 +15,8 @@ export type RefreshMessageType =
   | 'coupang'
   | 'home'
   | 'lottery_update'
-  | 'collect_diagnostic_stepcount';
+  | 'collect_diagnostic_stepcount'
+  | 'naverpay_exchange';
 
 @Injectable()
 export class FcmService implements OnModuleInit {
