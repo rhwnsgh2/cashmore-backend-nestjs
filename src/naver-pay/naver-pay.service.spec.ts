@@ -8,6 +8,9 @@ import { StubNaverPayRepository } from './repositories/stub-naver-pay.repository
 import { StubDaouApiClient } from './clients/stub-daou-api.client';
 import { PointService } from '../point/point.service';
 import { SlackService } from '../slack/slack.service';
+import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
+import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
+import { FcmService } from '../fcm/fcm.service';
 import type {
   NaverPayAccount,
   NaverPayExchange,
@@ -100,6 +103,17 @@ describe('NaverPayService', () => {
         {
           provide: SlackService,
           useValue: { reportBugToSlack: async () => {} },
+        },
+        {
+          provide: USER_MODAL_REPOSITORY,
+          useValue: new StubUserModalRepository(),
+        },
+        {
+          provide: FcmService,
+          useValue: {
+            pushNotification: async () => {},
+            sendRefreshMessage: async () => {},
+          },
         },
       ],
     }).compile();
