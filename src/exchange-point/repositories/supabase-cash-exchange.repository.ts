@@ -7,9 +7,7 @@ import type {
 } from '../interfaces/cash-exchange-repository.interface';
 
 @Injectable()
-export class SupabaseCashExchangeRepository
-  implements ICashExchangeRepository
-{
+export class SupabaseCashExchangeRepository implements ICashExchangeRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async insert(data: InsertCashExchangeData): Promise<{ id: number }> {

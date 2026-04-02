@@ -6,12 +6,7 @@ import {
   Headers,
   UnauthorizedException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiHeader,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { ExchangePointService } from '../exchange-point/exchange-point.service';
 
@@ -45,10 +40,7 @@ export class AdminCashExchangeController {
     @Body() body: { reason?: string },
   ) {
     this.validateApiKey(apiKey);
-    return this.exchangePointService.rejectExchange(
-      Number(id),
-      body.reason,
-    );
+    return this.exchangePointService.rejectExchange(Number(id), body.reason);
   }
 
   private validateApiKey(apiKey: string): void {
