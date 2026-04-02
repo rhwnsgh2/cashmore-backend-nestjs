@@ -26,6 +26,8 @@ export class DaouApiClient implements IDaouApiClient {
       return this.accessToken;
     }
 
+    this.logger.log(`토큰 발급 요청: partnerCode=${DAOU_CONFIG.partnerCode}, apiUrl=${DAOU_CONFIG.apiUrl}`);
+
     const response = await fetch(`${DAOU_CONFIG.apiUrl}/v1/auth/token`, {
       method: 'POST',
       headers: {
