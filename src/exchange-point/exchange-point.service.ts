@@ -146,30 +146,10 @@ export class ExchangePointService {
       }
     }
 
-    // 유저 모달 생성 + 푸시 알림
-    for (const exchange of pendingExchanges) {
-      try {
-        await this.userModalRepository.createModal(
-          exchange.user_id,
-          'exchange_point_to_cash',
-          { amount: exchange.point_amount },
-        );
-        await this.fcmService.pushNotification(
-          exchange.user_id,
-          '포인트 출금이 완료되었어요!',
-          '지금 바로 출금 내역을 확인해보세요',
-        );
-        await this.fcmService.sendRefreshMessage(
-          exchange.user_id,
-          'point_update',
-        );
-      } catch (error) {
-        this.logger.error(
-          `Notification failed for user=${exchange.user_id}`,
-          error,
-        );
-      }
-    }
+    // 알림은 30초 후 비동기로 처리
+    setTimeout(() => {
+      void this.sendApproveNotifications(pendingExchanges);
+    }, 30000);
 
     return { success: true, count: pendingIds.length };
   }
@@ -220,5 +200,29 @@ export class ExchangePointService {
     }
 
     return { success: true };
+  }
+
+  private async sendApproveNotifications(
+    exchanges: { id: number; user_id: string; point_amount: number }[],
+  ): Promise<void> {
+    for (const exchange of exchanges) {
+      try {
+        await this.userModalRepository.createModal(
+          exchange.user_id,
+          'exchange_point_to_cash',
+          { amount: exchange.point_amount },
+        );
+        await this.fcmService.pushNotification(
+          exchange.user_id,
+          '포인트 출금이 완료되었어요!',
+          '지금 바로 출금 내역을 확인해보세요',
+        );
+      } catch (error) {
+        this.logger.error(
+          `Notification failed for user=${exchange.user_id}`,
+          error,
+        );
+      }
+    }
   }
 }
