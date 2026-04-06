@@ -83,9 +83,7 @@ export class ExchangePointService {
     }
 
     // 2. user 정보 bulk 조회 (is_banned 필터용 + email)
-    const userIds = Array.from(
-      new Set(pendingExchanges.map((e) => e.user_id)),
-    );
+    const userIds = Array.from(new Set(pendingExchanges.map((e) => e.user_id)));
     const users = await this.userRepository.findBulkByUserIds(userIds);
     const userMap = new Map(users.map((u) => [u.id, u]));
 
