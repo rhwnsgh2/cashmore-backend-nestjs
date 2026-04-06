@@ -24,15 +24,18 @@ const PUBLIC_KEY =
 @Injectable()
 export class AccountInfoService {
   private readonly logger = new Logger(AccountInfoService.name);
-  private readonly privateKey: string;
+  private readonly privateKeyObject: crypto.KeyObject;
+  private readonly publicKeyObject: crypto.KeyObject;
 
   constructor(
     private configService: ConfigService,
     @Inject(ACCOUNT_INFO_REPOSITORY)
     private accountInfoRepository: IAccountInfoRepository,
   ) {
-    this.privateKey =
+    const privateKeyPem =
       this.configService.get<string>('accountEncrypt.privateKey') ?? '';
+    this.privateKeyObject = crypto.createPrivateKey(privateKeyPem);
+    this.publicKeyObject = crypto.createPublicKey(PUBLIC_KEY);
   }
 
   async getAccountInfo(userId: string): Promise<AccountInfoResponseDto | null> {
@@ -82,7 +85,7 @@ export class AccountInfoService {
   private encryptAccountNumber(text: string): string {
     const encrypted = crypto.publicEncrypt(
       {
-        key: PUBLIC_KEY,
+        key: this.publicKeyObject,
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       },
       Buffer.from(text, 'utf-8'),
@@ -131,7 +134,7 @@ export class AccountInfoService {
     return crypto
       .privateDecrypt(
         {
-          key: this.privateKey,
+          key: this.privateKeyObject,
           padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
         },
         Buffer.from(encryptedBase64, 'base64'),
