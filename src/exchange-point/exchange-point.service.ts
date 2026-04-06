@@ -97,11 +97,15 @@ export class ExchangePointService {
       new Set(filteredExchanges.map((e) => e.user_id)),
     );
 
-    // 4. 계좌 정보 병렬 조회
-    const [pendingAccountInfo, accountInfoName] = await Promise.all([
-      this.accountInfoService.getBulkAccountInfo(filteredUserIds),
-      this.accountInfoService.getBulkAccountInfoName(filteredUserIds),
-    ]);
+    // 4. 계좌 정보 조회 (한 번만 조회 후 두 응답 형태로 분리)
+    const pendingAccountInfo =
+      await this.accountInfoService.getBulkAccountInfo(filteredUserIds);
+
+    const accountInfoName = pendingAccountInfo.map((info) => ({
+      userId: info.userId,
+      accountBank: info.accountBank,
+      accountUserName: info.accountUserName,
+    }));
 
     // 5. 응답 조립
     const exchangePoints: PendingExchangeItem[] = filteredExchanges.map(
