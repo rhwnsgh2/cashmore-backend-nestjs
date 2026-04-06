@@ -142,7 +142,10 @@ describe('UserService - signupContext', () => {
       const lottoModal = pendingModals.find(
         (m) => m.name === 'invitation_lotto_result',
       );
-      expect(lottoModal?.additionalData).toEqual({ rewardPoint: 100 });
+      expect(lottoModal?.additionalData).toEqual({
+        rewardPoint: 100,
+        invitationCode: 'ABC234',
+      });
     });
 
     it('invitation_normal이면 invite_code_input_lotto 모달을 생성하지 않는다', async () => {
@@ -443,6 +446,7 @@ describe('UserService - signupContext', () => {
       expect(lottoModal?.additionalData).toEqual({
         rewardPoint: 100,
         hasReceiptReward: true,
+        invitationCode: 'ABC234',
       });
     });
 

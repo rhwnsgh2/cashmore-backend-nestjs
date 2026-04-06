@@ -443,7 +443,10 @@ export class UserService {
         await this.userModalRepository.createModal(
           userId,
           'invitation_lotto_result',
-          { rewardPoint: result.rewardPoint },
+          {
+            rewardPoint: result.rewardPoint,
+            invitationCode: signupContext.invitationCode,
+          },
         );
       }
       return {
@@ -493,7 +496,11 @@ export class UserService {
         await this.userModalRepository.createModal(
           userId,
           'invitation_lotto_result',
-          { rewardPoint: result.rewardPoint, hasReceiptReward: true },
+          {
+            rewardPoint: result.rewardPoint,
+            hasReceiptReward: true,
+            invitationCode: signupContext.invitationCode,
+          },
         );
       }
     } catch (error) {
