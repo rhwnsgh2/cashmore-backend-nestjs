@@ -214,7 +214,7 @@ export class ExchangePointService {
         );
         await this.fcmService.pushNotification(
           exchange.user_id,
-          '포인트 출금이 완료되었어요!',
+          '🔵 포인트 출금 완료!',
           '지금 바로 출금 내역을 확인해보세요',
         );
       } catch (error) {
