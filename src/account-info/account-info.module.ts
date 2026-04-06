@@ -16,5 +16,6 @@ import { SupabaseModule } from '../supabase/supabase.module';
       useClass: SupabaseAccountInfoRepository,
     },
   ],
+  exports: [AccountInfoService],
 })
 export class AccountInfoModule {}

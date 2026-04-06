@@ -32,6 +32,7 @@ export interface ICashExchangeRepository {
       rejected_at?: string;
     },
   ): Promise<void>;
+  findByStatus(status: CashExchangeStatus): Promise<CashExchange[]>;
 }
 
 export const CASH_EXCHANGE_REPOSITORY = Symbol('CASH_EXCHANGE_REPOSITORY');

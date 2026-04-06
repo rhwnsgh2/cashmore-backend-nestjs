@@ -8,6 +8,9 @@ import {
 import type { IUserModalRepository } from '../user-modal/interfaces/user-modal-repository.interface';
 import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 import { FcmService } from '../fcm/fcm.service';
+import type { IUserRepository } from '../user/interfaces/user-repository.interface';
+import { USER_REPOSITORY } from '../user/interfaces/user-repository.interface';
+import { AccountInfoService } from '../account-info/account-info.service';
 import type { IExchangePointRepository } from './interfaces/exchange-point-repository.interface';
 import { EXCHANGE_POINT_REPOSITORY } from './interfaces/exchange-point-repository.interface';
 import type { ICashExchangeRepository } from './interfaces/cash-exchange-repository.interface';
@@ -18,6 +21,35 @@ export interface ExchangePointResponse {
   createdAt: string;
   amount: number;
   status: string;
+}
+
+export interface PendingExchangeItem {
+  id: number;
+  userId: string;
+  status: string;
+  amount: number;
+  createdAt: string;
+  email: string;
+  confirmedAt: string | null;
+}
+
+export interface PendingAccountInfoItem {
+  userId: string;
+  accountBank: string;
+  accountNumber: string;
+  accountUserName: string;
+}
+
+export interface AccountInfoNameItem {
+  userId: string;
+  accountBank: string;
+  accountUserName: string;
+}
+
+export interface GetPendingWithAccountInfoResult {
+  exchangePoints: PendingExchangeItem[];
+  pendingAccountInfo: PendingAccountInfoItem[];
+  accountInfoName: AccountInfoNameItem[];
 }
 
 @Injectable()
@@ -31,8 +63,67 @@ export class ExchangePointService {
     private cashExchangeRepository: ICashExchangeRepository,
     @Inject(USER_MODAL_REPOSITORY)
     private userModalRepository: IUserModalRepository,
+    @Inject(USER_REPOSITORY)
+    private userRepository: IUserRepository,
+    private accountInfoService: AccountInfoService,
     private fcmService: FcmService,
   ) {}
+
+  async getPendingWithAccountInfo(): Promise<GetPendingWithAccountInfoResult> {
+    // 1. pending 건 조회
+    const pendingExchanges =
+      await this.cashExchangeRepository.findByStatus('pending');
+
+    if (pendingExchanges.length === 0) {
+      return {
+        exchangePoints: [],
+        pendingAccountInfo: [],
+        accountInfoName: [],
+      };
+    }
+
+    // 2. user 정보 bulk 조회 (is_banned 필터용 + email)
+    const userIds = Array.from(
+      new Set(pendingExchanges.map((e) => e.user_id)),
+    );
+    const users = await this.userRepository.findBulkByUserIds(userIds);
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    // 3. is_banned 유저 제외
+    const filteredExchanges = pendingExchanges.filter((e) => {
+      const user = userMap.get(e.user_id);
+      return user && !user.is_banned;
+    });
+
+    const filteredUserIds = Array.from(
+      new Set(filteredExchanges.map((e) => e.user_id)),
+    );
+
+    // 4. 계좌 정보 병렬 조회
+    const [pendingAccountInfo, accountInfoName] = await Promise.all([
+      this.accountInfoService.getBulkAccountInfo(filteredUserIds),
+      this.accountInfoService.getBulkAccountInfoName(filteredUserIds),
+    ]);
+
+    // 5. 응답 조립
+    const exchangePoints: PendingExchangeItem[] = filteredExchanges.map(
+      (e) => ({
+        id: e.point_action_id ?? e.id,
+        userId: e.user_id,
+        status: e.status,
+        amount: Number(e.amount),
+        createdAt: e.created_at,
+        email: userMap.get(e.user_id)?.email ?? '',
+        confirmedAt: e.confirmed_at,
+      }),
+    );
+
+    return {
+      exchangePoints,
+      pendingAccountInfo,
+      accountInfoName,
+    };
+  }
 
   async getExchangeHistory(userId: string): Promise<ExchangePointResponse[]> {
     const exchanges = await this.exchangePointRepository.findByUserId(userId);

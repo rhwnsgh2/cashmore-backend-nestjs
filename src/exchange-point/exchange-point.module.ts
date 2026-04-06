@@ -8,9 +8,17 @@ import { SupabaseCashExchangeRepository } from './repositories/supabase-cash-exc
 import { AuthModule } from '../auth/auth.module';
 import { UserModalModule } from '../user-modal/user-modal.module';
 import { FcmModule } from '../fcm/fcm.module';
+import { UserModule } from '../user/user.module';
+import { AccountInfoModule } from '../account-info/account-info.module';
 
 @Module({
-  imports: [AuthModule, UserModalModule, FcmModule],
+  imports: [
+    AuthModule,
+    UserModalModule,
+    FcmModule,
+    UserModule,
+    AccountInfoModule,
+  ],
   controllers: [ExchangePointController],
   providers: [
     ExchangePointService,

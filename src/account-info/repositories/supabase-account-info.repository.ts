@@ -51,6 +51,49 @@ export class SupabaseAccountInfoRepository implements IAccountInfoRepository {
     };
   }
 
+  async findLatestBulkByUserIds(userIds: string[]): Promise<AccountInfo[]> {
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('account_info')
+      .select(
+        'id, user_id, account_bank, account_number, account_user_name, display_number, created_at',
+      )
+      .in('user_id', userIds)
+      .order('user_id', { ascending: true })
+      .order('created_at', { ascending: false })
+      .returns<AccountInfoRow[]>();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    // 유저별 최신 레코드 1건만
+    const latestByUser = new Map<string, AccountInfoRow>();
+    for (const row of data) {
+      if (!latestByUser.has(row.user_id)) {
+        latestByUser.set(row.user_id, row);
+      }
+    }
+
+    return Array.from(latestByUser.values()).map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      accountBank: row.account_bank,
+      accountNumber: row.account_number,
+      accountUserName: row.account_user_name,
+      displayNumber: row.display_number,
+      createdAt: row.created_at,
+    }));
+  }
+
   async create(data: {
     userId: string;
     accountBank: string;

@@ -9,21 +9,31 @@ import { StubCashExchangeRepository } from './repositories/stub-cash-exchange.re
 import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
 import { FcmService } from '../fcm/fcm.service';
+import { USER_REPOSITORY } from '../user/interfaces/user-repository.interface';
+import { StubUserRepository } from '../user/repositories/stub-user.repository';
+import { AccountInfoService } from '../account-info/account-info.service';
 
 const stubFcmService = {
   pushNotification: async () => {},
   sendRefreshMessage: async () => {},
 };
 
+const stubAccountInfoService = {
+  getBulkAccountInfo: async () => [],
+  getBulkAccountInfoName: async () => [],
+};
+
 describe('ExchangePointService', () => {
   let service: ExchangePointService;
   let repository: StubExchangePointRepository;
   let cashExchangeRepository: StubCashExchangeRepository;
+  let userRepository: StubUserRepository;
   const userId = 'test-user-id';
 
   beforeEach(async () => {
     repository = new StubExchangePointRepository();
     cashExchangeRepository = new StubCashExchangeRepository();
+    userRepository = new StubUserRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +49,14 @@ describe('ExchangePointService', () => {
         {
           provide: USER_MODAL_REPOSITORY,
           useClass: StubUserModalRepository,
+        },
+        {
+          provide: USER_REPOSITORY,
+          useValue: userRepository,
+        },
+        {
+          provide: AccountInfoService,
+          useValue: stubAccountInfoService,
         },
         {
           provide: FcmService,
@@ -78,6 +96,116 @@ describe('ExchangePointService', () => {
     it('내역이 없으면 빈 배열을 반환한다', async () => {
       const result = await service.getExchangeHistory(userId);
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getPendingWithAccountInfo', () => {
+    const makeUser = (
+      id: string,
+      email: string,
+      isBanned: boolean = false,
+    ) => ({
+      id,
+      email,
+      auth_id: `auth-${id}`,
+      created_at: '2025-01-01T00:00:00Z',
+      marketing_info: false,
+      is_banned: isBanned,
+      nickname: null,
+      provider: 'kakao' as const,
+    });
+
+    it('pending 건이 없으면 빈 배열을 반환한다', async () => {
+      const result = await service.getPendingWithAccountInfo();
+
+      expect(result.exchangePoints).toEqual([]);
+      expect(result.pendingAccountInfo).toEqual([]);
+      expect(result.accountInfoName).toEqual([]);
+    });
+
+    it('pending 건이 있으면 유저 정보와 함께 반환한다', async () => {
+      userRepository.setUser(makeUser('user-1', 'user1@test.com'));
+      await cashExchangeRepository.insert({
+        user_id: 'user-1',
+        amount: 5000,
+        point_action_id: 100,
+      });
+
+      const result = await service.getPendingWithAccountInfo();
+
+      expect(result.exchangePoints).toHaveLength(1);
+      expect(result.exchangePoints[0]).toMatchObject({
+        id: 100, // point_action_id
+        userId: 'user-1',
+        status: 'pending',
+        amount: 5000,
+        email: 'user1@test.com',
+      });
+    });
+
+    it('차단된 유저의 출금은 제외한다', async () => {
+      userRepository.setUser(makeUser('user-1', 'user1@test.com', false));
+      userRepository.setUser(makeUser('banned-1', 'banned@test.com', true));
+
+      await cashExchangeRepository.insert({
+        user_id: 'user-1',
+        amount: 5000,
+        point_action_id: 100,
+      });
+      await cashExchangeRepository.insert({
+        user_id: 'banned-1',
+        amount: 3000,
+        point_action_id: 101,
+      });
+
+      const result = await service.getPendingWithAccountInfo();
+
+      expect(result.exchangePoints).toHaveLength(1);
+      expect(result.exchangePoints[0].userId).toBe('user-1');
+    });
+
+    it('pending이 아닌 건은 포함되지 않는다', async () => {
+      userRepository.setUser(makeUser('user-1', 'user1@test.com'));
+
+      await cashExchangeRepository.insert({
+        user_id: 'user-1',
+        amount: 5000,
+        point_action_id: 100,
+      });
+      await cashExchangeRepository.updateStatus(100, 'done', {
+        confirmed_at: new Date().toISOString(),
+      });
+
+      const result = await service.getPendingWithAccountInfo();
+
+      expect(result.exchangePoints).toEqual([]);
+    });
+
+    it('user 정보가 없는 건은 제외한다', async () => {
+      // 유저 등록 안 함
+      await cashExchangeRepository.insert({
+        user_id: 'ghost-user',
+        amount: 5000,
+        point_action_id: 100,
+      });
+
+      const result = await service.getPendingWithAccountInfo();
+
+      expect(result.exchangePoints).toEqual([]);
+    });
+
+    it('반환되는 id는 cash_exchanges.id가 아니라 point_action_id다', async () => {
+      userRepository.setUser(makeUser('user-1', 'user1@test.com'));
+
+      await cashExchangeRepository.insert({
+        user_id: 'user-1',
+        amount: 5000,
+        point_action_id: 99999,
+      });
+
+      const result = await service.getPendingWithAccountInfo();
+
+      expect(result.exchangePoints[0].id).toBe(99999);
     });
   });
 

@@ -41,6 +41,11 @@ export interface IUserRepository {
   findById(userId: string): Promise<User | null>;
 
   /**
+   * 여러 사용자 ID로 사용자 정보 일괄 조회
+   */
+  findBulkByUserIds(userIds: string[]): Promise<User[]>;
+
+  /**
    * auth_id로 사용자 조회
    */
   findByAuthId(authId: string): Promise<User | null>;

@@ -31,6 +31,17 @@ export class StubAccountInfoRepository implements IAccountInfoRepository {
     return userAccounts[0] ?? null;
   }
 
+  async findLatestBulkByUserIds(userIds: string[]): Promise<AccountInfo[]> {
+    const result: AccountInfo[] = [];
+    for (const userId of userIds) {
+      const latest = await this.findLatestByUserId(userId);
+      if (latest) {
+        result.push(latest);
+      }
+    }
+    return result;
+  }
+
   async create(data: {
     userId: string;
     accountBank: string;

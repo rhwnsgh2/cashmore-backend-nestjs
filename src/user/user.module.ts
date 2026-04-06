@@ -17,6 +17,6 @@ import { InvitationModule } from '../invitation/invitation.module';
       useClass: SupabaseUserRepository,
     },
   ],
-  exports: [UserService],
+  exports: [UserService, USER_REPOSITORY],
 })
 export class UserModule {}

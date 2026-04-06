@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
 import type {
   ICashExchangeRepository,
+  CashExchange,
   CashExchangeStatus,
   InsertCashExchangeData,
 } from '../interfaces/cash-exchange-repository.interface';
@@ -59,5 +60,20 @@ export class SupabaseCashExchangeRepository implements ICashExchangeRepository {
     if (error) {
       throw error;
     }
+  }
+
+  async findByStatus(status: CashExchangeStatus): Promise<CashExchange[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('*')
+      .eq('status', status)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as CashExchange[]) || [];
   }
 }

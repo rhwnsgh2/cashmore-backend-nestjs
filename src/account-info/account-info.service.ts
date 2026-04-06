@@ -91,6 +91,42 @@ export class AccountInfoService {
     return encrypted.toString('base64');
   }
 
+  async getBulkAccountInfo(userIds: string[]): Promise<
+    {
+      userId: string;
+      accountBank: string;
+      accountNumber: string;
+      accountUserName: string;
+    }[]
+  > {
+    const accounts =
+      await this.accountInfoRepository.findLatestBulkByUserIds(userIds);
+
+    return accounts.map((account) => ({
+      userId: account.userId,
+      accountBank: account.accountBank,
+      accountNumber: this.decryptAccountNumber(account.accountNumber),
+      accountUserName: account.accountUserName,
+    }));
+  }
+
+  async getBulkAccountInfoName(userIds: string[]): Promise<
+    {
+      userId: string;
+      accountBank: string;
+      accountUserName: string;
+    }[]
+  > {
+    const accounts =
+      await this.accountInfoRepository.findLatestBulkByUserIds(userIds);
+
+    return accounts.map((account) => ({
+      userId: account.userId,
+      accountBank: account.accountBank,
+      accountUserName: account.accountUserName,
+    }));
+  }
+
   private decryptAccountNumber(encryptedBase64: string): string {
     return crypto
       .privateDecrypt(

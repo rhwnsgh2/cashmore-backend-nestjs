@@ -10,6 +10,7 @@ export interface AccountInfo {
 
 export interface IAccountInfoRepository {
   findLatestByUserId(userId: string): Promise<AccountInfo | null>;
+  findLatestBulkByUserIds(userIds: string[]): Promise<AccountInfo[]>;
   create(data: {
     userId: string;
     accountBank: string;

@@ -66,6 +66,13 @@ export class StubUserRepository implements IUserRepository {
     return Promise.resolve(this.users.get(userId) || null);
   }
 
+  findBulkByUserIds(userIds: string[]): Promise<User[]> {
+    const result = userIds
+      .map((id) => this.users.get(id))
+      .filter((u): u is User => u !== undefined);
+    return Promise.resolve(result);
+  }
+
   findByAuthId(authId: string): Promise<User | null> {
     const user = Array.from(this.users.values()).find(
       (u) => u.auth_id === authId,
