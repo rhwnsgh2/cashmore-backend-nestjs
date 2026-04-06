@@ -56,29 +56,47 @@ export class SupabaseAccountInfoRepository implements IAccountInfoRepository {
       return [];
     }
 
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('account_info')
-      .select(
-        'id, user_id, account_bank, account_number, account_user_name, display_number, created_at',
-      )
-      .in('user_id', userIds)
-      .order('user_id', { ascending: true })
-      .order('created_at', { ascending: false })
-      .returns<AccountInfoRow[]>();
-
-    if (error) {
-      throw error;
+    const CHUNK_SIZE = 100;
+    const chunks: string[][] = [];
+    for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
+      chunks.push(userIds.slice(i, i + CHUNK_SIZE));
     }
 
-    if (!data || data.length === 0) {
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        const { data, error } = await this.supabase
+          .getClient()
+          .from('account_info')
+          .select(
+            'id, user_id, account_bank, account_number, account_user_name, display_number, created_at',
+          )
+          .in('user_id', chunk)
+          .order('user_id', { ascending: true })
+          .order('created_at', { ascending: false })
+          .returns<AccountInfoRow[]>();
+
+        if (error) {
+          throw error;
+        }
+
+        return data || [];
+      }),
+    );
+
+    const allRows = results.flat();
+    if (allRows.length === 0) {
       return [];
     }
 
     // 유저별 최신 레코드 1건만
     const latestByUser = new Map<string, AccountInfoRow>();
-    for (const row of data) {
-      if (!latestByUser.has(row.user_id)) {
+    for (const row of allRows) {
+      const existing = latestByUser.get(row.user_id);
+      if (
+        !existing ||
+        new Date(row.created_at).getTime() >
+          new Date(existing.created_at).getTime()
+      ) {
         latestByUser.set(row.user_id, row);
       }
     }

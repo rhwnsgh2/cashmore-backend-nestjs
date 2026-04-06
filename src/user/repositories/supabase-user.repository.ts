@@ -35,19 +35,31 @@ export class SupabaseUserRepository implements IUserRepository {
       return [];
     }
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('user')
-      .select(
-        'id, email, auth_id, created_at, marketing_info, is_banned, nickname, provider',
-      )
-      .in('id', userIds);
-
-    if (error) {
-      throw error;
+    const CHUNK_SIZE = 100;
+    const chunks: string[][] = [];
+    for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
+      chunks.push(userIds.slice(i, i + CHUNK_SIZE));
     }
 
-    return (data as User[]) || [];
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        const { data, error } = await this.supabaseService
+          .getClient()
+          .from('user')
+          .select(
+            'id, email, auth_id, created_at, marketing_info, is_banned, nickname, provider',
+          )
+          .in('id', chunk);
+
+        if (error) {
+          throw error;
+        }
+
+        return (data as User[]) || [];
+      }),
+    );
+
+    return results.flat();
   }
 
   async updateNickname(userId: string, nickname: string): Promise<void> {
