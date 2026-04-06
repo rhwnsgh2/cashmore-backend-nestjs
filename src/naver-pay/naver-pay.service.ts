@@ -402,7 +402,7 @@ export class NaverPayService {
         );
         await this.fcmService.pushNotification(
           exchange.user_id,
-          '네이버페이 포인트 교환이 완료되었어요!',
+          '🟢 네이버페이 포인트 교환 완료!',
           '지금 바로 교환 내역을 확인해보세요',
         );
         await this.fcmService.sendRefreshMessage(
@@ -410,7 +410,7 @@ export class NaverPayService {
           'naverpay_exchange',
         );
       } catch (error) {
-        this.slackService.reportBugToSlack(
+        void this.slackService.reportBugToSlack(
           `⚠️ 네이버페이 전환 알림 실패: exchangeId=${exchangeId}, userId=${exchange.user_id}, error=${error instanceof Error ? error.message : String(error)}`,
         );
       }
