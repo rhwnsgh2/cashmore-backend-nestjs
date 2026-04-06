@@ -10,8 +10,12 @@ import { encrypt } from '../utils/daou-crypto.util';
 
 interface TokenResponse {
   accessToken: string;
-  expireIn: string;
+  expiresIn: string | number;
 }
+
+const TOKEN_TTL_FALLBACK_SECONDS = 50 * 60; // 응답 파싱 실패 시 안전 fallback (50분)
+const TOKEN_TTL_MIN_SECONDS = 60;
+const TOKEN_TTL_MAX_SECONDS = 60 * 60;
 
 @Injectable()
 export class DaouApiClient implements IDaouApiClient {
@@ -41,14 +45,33 @@ export class DaouApiClient implements IDaouApiClient {
       throw new Error(`다우기술 토큰 발급 실패: ${response.status}`);
     }
 
-    const data = (await response.json()) as TokenResponse;
+    const rawData = (await response.json()) as Record<string, unknown>;
+    const data = rawData as unknown as TokenResponse;
     this.accessToken = data.accessToken;
 
-    // expireIn을 초 단위로 파싱, 1분 여유를 두고 만료 시간 설정
-    const expireInSeconds = parseInt(data.expireIn, 10);
+    // 응답 구조 디버깅용 — accessToken 값은 노출하지 않고 키 목록만 로깅
+    const responseKeys = Object.keys(rawData).join(',');
+
+    // expiresIn을 초 단위로 파싱, 1분 여유를 두고 만료 시간 설정
+    // 응답 필드가 누락/이상하면 안전 fallback (50분) 사용
+    const parsedExpiresIn =
+      typeof data.expiresIn === 'number'
+        ? data.expiresIn
+        : parseInt(String(data.expiresIn), 10);
+
+    const expireInSeconds =
+      Number.isFinite(parsedExpiresIn) && parsedExpiresIn > 0
+        ? Math.min(
+            Math.max(parsedExpiresIn, TOKEN_TTL_MIN_SECONDS),
+            TOKEN_TTL_MAX_SECONDS,
+          )
+        : TOKEN_TTL_FALLBACK_SECONDS;
+
     this.tokenExpiresAt = Date.now() + (expireInSeconds - 60) * 1000;
 
-    this.logger.log(`토큰 발급 성공, 유효 기간: ${data.expireIn}초`);
+    this.logger.log(
+      `토큰 발급 성공, 유효 기간: ${expireInSeconds}초 (raw=${String(data.expiresIn)}, keys=[${responseKeys}])`,
+    );
     return this.accessToken;
   }
 
