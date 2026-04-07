@@ -42,6 +42,16 @@ export class AdminNaverPayController {
     return this.naverPayService.getExchangesByStatus(status);
   }
 
+  @Get('exchanges/daily-stats')
+  @ApiOperation({
+    summary: '완료 건 일자별 집계 (최근 7일, 관리자)',
+  })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  async getDailyStats(@Headers('x-admin-api-key') apiKey: string) {
+    this.validateApiKey(apiKey);
+    return this.naverPayService.getCompletedDailyStats();
+  }
+
   @Post('exchanges/:id/approve')
   @ApiOperation({ summary: '전환 요청 승인 → 다우 API 호출' })
   @ApiHeader({ name: 'x-admin-api-key', required: true })

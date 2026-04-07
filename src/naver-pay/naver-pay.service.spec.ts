@@ -737,6 +737,190 @@ describe('NaverPayService', () => {
     });
   });
 
+  describe('getCompletedDailyStats', () => {
+    // 테스트 결정성을 위해 처리일을 절대 시각으로 고정한다.
+    // 7일 윈도우 안에 들어오는지 보려면 "지금"을 기준으로 상대 ISO를 만들어야 함.
+    function isoDaysAgo(days: number, hour = 12): string {
+      const d = new Date();
+      d.setUTCHours(hour, 0, 0, 0);
+      d.setUTCDate(d.getUTCDate() - days);
+      return d.toISOString();
+    }
+
+    it('완료 건이 없으면 빈 배열을 반환한다', async () => {
+      repository.setExchanges([]);
+
+      const result = await service.getCompletedDailyStats();
+
+      expect(result.stats).toEqual([]);
+    });
+
+    it('completed 가 아닌 건은 집계에서 제외한다', async () => {
+      repository.setExchanges([
+        createExchange({
+          id: 'ex-1',
+          status: 'pending',
+          processed_at: isoDaysAgo(1),
+        }),
+        createExchange({
+          id: 'ex-2',
+          status: 'failed',
+          processed_at: isoDaysAgo(1),
+          cashmore_point: 1000,
+          naverpay_point: 1000,
+        }),
+        createExchange({
+          id: 'ex-3',
+          status: 'rejected',
+          processed_at: isoDaysAgo(1),
+        }),
+      ]);
+
+      const result = await service.getCompletedDailyStats();
+
+      expect(result.stats).toEqual([]);
+    });
+
+    it('processed_at이 null인 completed는 제외한다', async () => {
+      repository.setExchanges([
+        createExchange({
+          id: 'ex-1',
+          status: 'completed',
+          processed_at: null,
+          cashmore_point: 5000,
+          naverpay_point: 5000,
+        }),
+      ]);
+
+      const result = await service.getCompletedDailyStats();
+
+      expect(result.stats).toEqual([]);
+    });
+
+    it('같은 날짜의 completed 건들을 합산한다', async () => {
+      const day = isoDaysAgo(2, 9);
+      const sameDayDifferentHour = isoDaysAgo(2, 18);
+
+      repository.setExchanges([
+        createExchange({
+          id: 'ex-1',
+          status: 'completed',
+          processed_at: day,
+          cashmore_point: 1000,
+          naverpay_point: 1000,
+        }),
+        createExchange({
+          id: 'ex-2',
+          status: 'completed',
+          processed_at: sameDayDifferentHour,
+          cashmore_point: 2500,
+          naverpay_point: 2500,
+        }),
+      ]);
+
+      const result = await service.getCompletedDailyStats();
+
+      expect(result.stats).toHaveLength(1);
+      expect(result.stats[0]).toEqual({
+        date: day.slice(0, 10),
+        count: 2,
+        cashmorePoint: 3500,
+        naverpayPoint: 3500,
+      });
+    });
+
+    it('서로 다른 날짜는 최신순으로 정렬된다', async () => {
+      repository.setExchanges([
+        createExchange({
+          id: 'ex-old',
+          status: 'completed',
+          processed_at: isoDaysAgo(5),
+          cashmore_point: 100,
+          naverpay_point: 100,
+        }),
+        createExchange({
+          id: 'ex-mid',
+          status: 'completed',
+          processed_at: isoDaysAgo(3),
+          cashmore_point: 200,
+          naverpay_point: 200,
+        }),
+        createExchange({
+          id: 'ex-new',
+          status: 'completed',
+          processed_at: isoDaysAgo(1),
+          cashmore_point: 300,
+          naverpay_point: 300,
+        }),
+      ]);
+
+      const result = await service.getCompletedDailyStats();
+
+      expect(result.stats).toHaveLength(3);
+      expect(result.stats[0].date).toBe(isoDaysAgo(1).slice(0, 10));
+      expect(result.stats[1].date).toBe(isoDaysAgo(3).slice(0, 10));
+      expect(result.stats[2].date).toBe(isoDaysAgo(5).slice(0, 10));
+    });
+
+    it('7일을 넘긴 completed 건은 집계에서 제외된다', async () => {
+      repository.setExchanges([
+        createExchange({
+          id: 'ex-too-old',
+          status: 'completed',
+          processed_at: isoDaysAgo(30),
+          cashmore_point: 9999,
+          naverpay_point: 9999,
+        }),
+        createExchange({
+          id: 'ex-recent',
+          status: 'completed',
+          processed_at: isoDaysAgo(2),
+          cashmore_point: 100,
+          naverpay_point: 100,
+        }),
+      ]);
+
+      const result = await service.getCompletedDailyStats();
+
+      expect(result.stats).toHaveLength(1);
+      expect(result.stats[0]).toMatchObject({
+        count: 1,
+        cashmorePoint: 100,
+        naverpayPoint: 100,
+      });
+    });
+
+    it('정확히 7일째(경계) 건이 포함되는지 확인한다', async () => {
+      // since 는 6일 전 00:00 UTC. 그래서 6일 전 12시 처리건은 윈도우 안.
+      // 7일 전은 윈도우 밖.
+      repository.setExchanges([
+        createExchange({
+          id: 'ex-on-edge',
+          status: 'completed',
+          processed_at: isoDaysAgo(6, 12),
+          cashmore_point: 500,
+          naverpay_point: 500,
+        }),
+        createExchange({
+          id: 'ex-just-out',
+          status: 'completed',
+          processed_at: isoDaysAgo(7, 12),
+          cashmore_point: 700,
+          naverpay_point: 700,
+        }),
+      ]);
+
+      const result = await service.getCompletedDailyStats();
+
+      expect(result.stats).toHaveLength(1);
+      expect(result.stats[0]).toMatchObject({
+        count: 1,
+        cashmorePoint: 500,
+        naverpayPoint: 500,
+      });
+    });
+  });
+
   describe('approveExchange', () => {
     beforeEach(() => {
       repository.setAccounts([

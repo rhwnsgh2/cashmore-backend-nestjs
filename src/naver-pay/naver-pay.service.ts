@@ -303,6 +303,28 @@ export class NaverPayService {
     };
   }
 
+  /**
+   * 최근 7일(오늘 포함)간 완료된 전환의 일자별 집계
+   */
+  async getCompletedDailyStats() {
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    since.setUTCDate(since.getUTCDate() - 6);
+
+    const stats = await this.naverPayRepository.getCompletedDailyStats(
+      since.toISOString(),
+    );
+
+    return {
+      stats: stats.map((s) => ({
+        date: s.date,
+        count: s.count,
+        cashmorePoint: s.cashmore_point,
+        naverpayPoint: s.naverpay_point,
+      })),
+    };
+  }
+
   async approveExchange(exchangeId: string) {
     const exchange = await this.naverPayRepository.findExchangeById(exchangeId);
 

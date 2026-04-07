@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
+import { aggregateDailyStats } from '../utils/aggregate-daily-stats';
 import type {
   INaverPayRepository,
   NaverPayAccount,
+  NaverPayDailyStat,
   NaverPayExchange,
   NaverPayExchangeStatus,
   CreateNaverPayAccountData,
@@ -129,7 +131,8 @@ export class SupabaseNaverPayRepository implements INaverPayRepository {
       .getClient()
       .from('naver_pay_exchanges')
       .select('*, user:user_id(email)')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (status) {
       query = query.eq('status', status);
@@ -150,6 +153,30 @@ export class SupabaseNaverPayRepository implements INaverPayRepository {
         }),
       ) || []
     );
+  }
+
+  async getCompletedDailyStats(
+    sinceIso: string,
+  ): Promise<NaverPayDailyStat[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('naver_pay_exchanges')
+      .select('processed_at, cashmore_point, naverpay_point')
+      .eq('status', 'completed')
+      .gte('processed_at', sinceIso);
+
+    if (error) {
+      throw error;
+    }
+
+    const rows =
+      (data as Array<{
+        processed_at: string | null;
+        cashmore_point: number;
+        naverpay_point: number;
+      }>) || [];
+
+    return aggregateDailyStats(rows);
   }
 
   async findExchangesByUserId(userId: string): Promise<NaverPayExchange[]> {

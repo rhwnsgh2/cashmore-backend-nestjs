@@ -1,11 +1,13 @@
 import type {
   INaverPayRepository,
   NaverPayAccount,
+  NaverPayDailyStat,
   NaverPayExchange,
   NaverPayExchangeStatus,
   CreateNaverPayAccountData,
   CreateNaverPayExchangeData,
 } from '../interfaces/naver-pay-repository.interface';
+import { aggregateDailyStats } from '../utils/aggregate-daily-stats';
 
 export class StubNaverPayRepository implements INaverPayRepository {
   private accounts: NaverPayAccount[] = [];
@@ -119,6 +121,24 @@ export class StubNaverPayRepository implements INaverPayRepository {
       return this.exchanges;
     }
     return this.exchanges.filter((e) => e.status === status);
+  }
+
+  async getCompletedDailyStats(
+    sinceIso: string,
+  ): Promise<NaverPayDailyStat[]> {
+    const filtered = this.exchanges.filter(
+      (e) =>
+        e.status === 'completed' &&
+        e.processed_at !== null &&
+        e.processed_at >= sinceIso,
+    );
+    return aggregateDailyStats(
+      filtered.map((e) => ({
+        processed_at: e.processed_at,
+        cashmore_point: e.cashmore_point,
+        naverpay_point: e.naverpay_point,
+      })),
+    );
   }
 
   async findPendingExchangesByUserId(

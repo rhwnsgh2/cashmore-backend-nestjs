@@ -47,6 +47,13 @@ export interface NaverPayExchange {
   processed_at: string | null;
 }
 
+export interface NaverPayDailyStat {
+  date: string; // YYYY-MM-DD
+  count: number;
+  cashmore_point: number;
+  naverpay_point: number;
+}
+
 export interface CreateNaverPayExchangeData {
   user_id: string;
   naver_pay_account_id: string;
@@ -69,6 +76,7 @@ export interface INaverPayRepository {
   findExchangesByStatus(
     status?: string,
   ): Promise<(NaverPayExchange & { user_email?: string })[]>;
+  getCompletedDailyStats(sinceIso: string): Promise<NaverPayDailyStat[]>;
   findPendingExchangesByUserId(userId: string): Promise<NaverPayExchange[]>;
   countTodayExchanges(userId: string): Promise<number>;
   updateExchangeStatus(
