@@ -32,6 +32,13 @@ export interface ICashExchangeRepository {
       rejected_at?: string;
     },
   ): Promise<void>;
+  updateStatusBulk(
+    pointActionIds: number[],
+    status: CashExchangeStatus,
+    extra?: {
+      confirmed_at?: string;
+    },
+  ): Promise<void>;
   findByStatus(status: CashExchangeStatus): Promise<CashExchange[]>;
 }
 

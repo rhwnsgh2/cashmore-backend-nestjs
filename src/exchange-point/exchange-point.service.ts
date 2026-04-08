@@ -224,19 +224,17 @@ export class ExchangePointService {
 
     await this.exchangePointRepository.approveExchangeRequests(pendingIds);
 
-    // dual-write: cash_exchanges 상태 업데이트
+    // dual-write: cash_exchanges 일괄 상태 업데이트
     const confirmedAt = new Date().toISOString();
-    for (const id of pendingIds) {
-      try {
-        await this.cashExchangeRepository.updateStatus(id, 'done', {
-          confirmed_at: confirmedAt,
-        });
-      } catch (error) {
-        this.logger.error(
-          `cash_exchanges dual-write approve failed for point_action_id=${id}`,
-          error,
-        );
-      }
+    try {
+      await this.cashExchangeRepository.updateStatusBulk(pendingIds, 'done', {
+        confirmed_at: confirmedAt,
+      });
+    } catch (error) {
+      this.logger.error(
+        `cash_exchanges dual-write approve failed for ${pendingIds.length} ids`,
+        error,
+      );
     }
 
     // 알림은 30초 후 비동기로 처리

@@ -41,6 +41,24 @@ export class StubCashExchangeRepository implements ICashExchangeRepository {
     return Promise.resolve(this.exchanges.filter((e) => e.status === status));
   }
 
+  updateStatusBulk(
+    pointActionIds: number[],
+    status: CashExchangeStatus,
+    extra?: { confirmed_at?: string },
+  ): Promise<void> {
+    for (const exchange of this.exchanges) {
+      if (
+        exchange.point_action_id !== null &&
+        pointActionIds.includes(exchange.point_action_id)
+      ) {
+        exchange.status = status;
+        exchange.updated_at = new Date().toISOString();
+        if (extra?.confirmed_at) exchange.confirmed_at = extra.confirmed_at;
+      }
+    }
+    return Promise.resolve();
+  }
+
   updateStatus(
     pointActionId: number,
     status: CashExchangeStatus,

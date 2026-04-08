@@ -62,6 +62,36 @@ export class SupabaseCashExchangeRepository implements ICashExchangeRepository {
     }
   }
 
+  async updateStatusBulk(
+    pointActionIds: number[],
+    status: CashExchangeStatus,
+    extra?: { confirmed_at?: string },
+  ): Promise<void> {
+    if (pointActionIds.length === 0) {
+      return;
+    }
+
+    const updateData: Record<string, unknown> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    if (extra?.confirmed_at) updateData.confirmed_at = extra.confirmed_at;
+
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < pointActionIds.length; i += CHUNK_SIZE) {
+      const chunk = pointActionIds.slice(i, i + CHUNK_SIZE);
+      const { error } = await this.supabaseService
+        .getClient()
+        .from('cash_exchanges')
+        .update(updateData)
+        .in('point_action_id', chunk);
+
+      if (error) {
+        throw error;
+      }
+    }
+  }
+
   async findByStatus(status: CashExchangeStatus): Promise<CashExchange[]> {
     const { data, error } = await this.supabaseService
       .getClient()
