@@ -51,14 +51,18 @@ export class BuzzvilService {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const ads = (Array.isArray(data?.ads) ? data.ads : []) as Array<{
       type?: string;
+      reward_condition?: string;
     }>;
     const typeCounts: Record<string, number> = {};
+    const condCounts: Record<string, number> = {};
     for (const ad of ads) {
       const t = ad.type ?? 'unknown';
       typeCounts[t] = (typeCounts[t] ?? 0) + 1;
+      const c = ad.reward_condition ?? 'unknown';
+      condCounts[c] = (condCounts[c] ?? 0) + 1;
     }
     this.logger.log(
-      `getAds: authId=${authId}, total=${ads.length}, types=${JSON.stringify(typeCounts)}`,
+      `getAds: authId=${authId}, total=${ads.length}, types=${JSON.stringify(typeCounts)}, conds=${JSON.stringify(condCounts)}`,
     );
 
     return data;
