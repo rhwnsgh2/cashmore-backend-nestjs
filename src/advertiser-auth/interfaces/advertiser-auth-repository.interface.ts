@@ -7,6 +7,7 @@ export interface Advertiser {
 
 export interface IAdvertiserAuthRepository {
   findByLoginId(loginId: string): Promise<Advertiser | null>;
+  findAll(): Promise<Advertiser[]>;
   create(
     loginId: string,
     passwordHash: string,

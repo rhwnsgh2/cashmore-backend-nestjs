@@ -145,4 +145,58 @@ describe('AdvertiserAuthService', () => {
       expect(payload.advertiserId).toBe(2);
     });
   });
+
+  describe('findAllAdvertisers', () => {
+    it('전체 광고주 목록을 camelCase로 반환한다', async () => {
+      repository.setAdvertisers([
+        { id: 1, login_id: 'corp_a', password_hash: 'hash1', company_name: 'A사' },
+        { id: 2, login_id: 'corp_b', password_hash: 'hash2', company_name: 'B사' },
+      ]);
+
+      const result = await service.findAllAdvertisers();
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        id: 1,
+        loginId: 'corp_a',
+        companyName: 'A사',
+      });
+      expect(result[1]).toEqual({
+        id: 2,
+        loginId: 'corp_b',
+        companyName: 'B사',
+      });
+    });
+
+    it('광고주가 없으면 빈 배열을 반환한다', async () => {
+      repository.setAdvertisers([]);
+
+      const result = await service.findAllAdvertisers();
+
+      expect(result).toEqual([]);
+    });
+
+    it('password_hash는 응답에 포함되지 않는다', async () => {
+      repository.setAdvertisers([
+        { id: 1, login_id: 'corp_a', password_hash: 'secret-hash', company_name: 'A사' },
+      ]);
+
+      const result = await service.findAllAdvertisers();
+
+      expect(result[0]).not.toHaveProperty('password_hash');
+      expect(result[0]).not.toHaveProperty('passwordHash');
+    });
+
+    it('ID 오름차순으로 정렬된다', async () => {
+      repository.setAdvertisers([
+        { id: 3, login_id: 'corp_c', password_hash: 'h3', company_name: 'C사' },
+        { id: 1, login_id: 'corp_a', password_hash: 'h1', company_name: 'A사' },
+        { id: 2, login_id: 'corp_b', password_hash: 'h2', company_name: 'B사' },
+      ]);
+
+      const result = await service.findAllAdvertisers();
+
+      expect(result.map((a) => a.id)).toEqual([1, 2, 3]);
+    });
+  });
 });

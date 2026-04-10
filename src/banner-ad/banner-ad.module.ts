@@ -16,5 +16,6 @@ import { SupabaseBannerAdRepository } from './repositories/supabase-banner-ad.re
       useClass: SupabaseBannerAdRepository,
     },
   ],
+  exports: [BannerAdService],
 })
 export class BannerAdModule {}

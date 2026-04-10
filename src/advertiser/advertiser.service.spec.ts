@@ -203,4 +203,152 @@ describe('AdvertiserService', () => {
       ]);
     });
   });
+
+  describe('getBanners', () => {
+    it('광고주의 배너 목록을 camelCase로 반환한다', async () => {
+      repository.setBanners([
+        {
+          id: 1,
+          title: '여름 프로모션',
+          image_url: 'https://cdn.example.com/summer.png',
+          click_url: 'https://link.example.com/summer',
+          is_active: true,
+          start_date: '2026-04-01',
+          end_date: '2026-04-30',
+          advertiser_id: 10,
+        },
+      ]);
+
+      const result = await service.getBanners(10);
+
+      expect(result.banners).toHaveLength(1);
+      expect(result.banners[0]).toEqual({
+        id: 1,
+        title: '여름 프로모션',
+        imageUrl: 'https://cdn.example.com/summer.png',
+        clickUrl: 'https://link.example.com/summer',
+        isActive: true,
+        startDate: '2026-04-01',
+        endDate: '2026-04-30',
+      });
+    });
+
+    it('해당 광고주의 배너만 반환한다', async () => {
+      repository.setBanners([
+        {
+          id: 1,
+          title: '배너 A',
+          image_url: 'a.png',
+          click_url: 'a.com',
+          is_active: true,
+          start_date: null,
+          end_date: null,
+          advertiser_id: 10,
+        },
+        {
+          id: 2,
+          title: '배너 B',
+          image_url: 'b.png',
+          click_url: 'b.com',
+          is_active: true,
+          start_date: null,
+          end_date: null,
+          advertiser_id: 20,
+        },
+      ]);
+
+      const result = await service.getBanners(10);
+
+      expect(result.banners).toHaveLength(1);
+      expect(result.banners[0].id).toBe(1);
+    });
+
+    it('배너가 없으면 빈 배열을 반환한다', async () => {
+      repository.setBanners([]);
+
+      const result = await service.getBanners(999);
+
+      expect(result.banners).toEqual([]);
+    });
+
+    it('비활성 배너도 포함하여 반환한다', async () => {
+      repository.setBanners([
+        {
+          id: 1,
+          title: '활성 배너',
+          image_url: 'a.png',
+          click_url: 'a.com',
+          is_active: true,
+          start_date: null,
+          end_date: null,
+          advertiser_id: 10,
+        },
+        {
+          id: 2,
+          title: '비활성 배너',
+          image_url: 'b.png',
+          click_url: 'b.com',
+          is_active: false,
+          start_date: null,
+          end_date: null,
+          advertiser_id: 10,
+        },
+      ]);
+
+      const result = await service.getBanners(10);
+
+      expect(result.banners).toHaveLength(2);
+      expect(result.banners[0].isActive).toBe(true);
+      expect(result.banners[1].isActive).toBe(false);
+    });
+
+    it('start_date/end_date가 null일 수 있다', async () => {
+      repository.setBanners([
+        {
+          id: 1,
+          title: '무기한 배너',
+          image_url: 'a.png',
+          click_url: 'a.com',
+          is_active: true,
+          start_date: null,
+          end_date: null,
+          advertiser_id: 10,
+        },
+      ]);
+
+      const result = await service.getBanners(10);
+
+      expect(result.banners[0].startDate).toBeNull();
+      expect(result.banners[0].endDate).toBeNull();
+    });
+
+    it('ID 오름차순으로 정렬된다', async () => {
+      repository.setBanners([
+        {
+          id: 3,
+          title: 'C',
+          image_url: 'c.png',
+          click_url: 'c.com',
+          is_active: true,
+          start_date: null,
+          end_date: null,
+          advertiser_id: 10,
+        },
+        {
+          id: 1,
+          title: 'A',
+          image_url: 'a.png',
+          click_url: 'a.com',
+          is_active: true,
+          start_date: null,
+          end_date: null,
+          advertiser_id: 10,
+        },
+      ]);
+
+      const result = await service.getBanners(10);
+
+      expect(result.banners.map((b) => b.id)).toEqual([1, 3]);
+    });
+  });
 });

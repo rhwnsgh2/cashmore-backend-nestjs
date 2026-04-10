@@ -9,6 +9,13 @@ export interface BannerAd {
 
 export type BannerAdEventType = 'impression' | 'click';
 
+export interface BannerAdStatSummary {
+  ad_id: number;
+  ad_title: string;
+  impressions: number;
+  clicks: number;
+}
+
 export interface IBannerAdRepository {
   findActive(placement: string): Promise<BannerAd[]>;
   recordEvent(
@@ -16,10 +23,15 @@ export interface IBannerAdRepository {
     userId: string,
     eventType: BannerAdEventType,
   ): Promise<void>;
-  incrementDailyStat(
-    adId: number,
-    eventType: BannerAdEventType,
+  incrementDailyStat(adId: number, eventType: BannerAdEventType): Promise<void>;
+  updateAdvertiserId(
+    bannerAdId: number,
+    advertiserId: number,
   ): Promise<void>;
+  findStatsSummary(
+    startDate: string,
+    endDate: string,
+  ): Promise<BannerAdStatSummary[]>;
 }
 
 export const BANNER_AD_REPOSITORY = Symbol('BANNER_AD_REPOSITORY');

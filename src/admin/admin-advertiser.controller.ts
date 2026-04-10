@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   Post,
   UnauthorizedException,
@@ -22,6 +23,18 @@ export class AdminAdvertiserController {
     private readonly advertiserAuthService: AdvertiserAuthService,
     private readonly configService: ConfigService,
   ) {}
+
+  @Get()
+  @ApiOperation({ summary: '광고주 전체 목록 조회 (관리자)' })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiResponse({
+    status: 200,
+    description: '광고주 목록',
+  })
+  async listAdvertisers(@Headers('x-admin-api-key') apiKey: string) {
+    this.validateApiKey(apiKey);
+    return this.advertiserAuthService.findAllAdvertisers();
+  }
 
   @Post()
   @ApiOperation({ summary: '광고주 계정 생성 (관리자)' })

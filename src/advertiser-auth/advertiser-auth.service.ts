@@ -54,6 +54,17 @@ export class AdvertiserAuthService {
     };
   }
 
+  async findAllAdvertisers(): Promise<
+    { id: number; loginId: string; companyName: string; createdAt?: string }[]
+  > {
+    const advertisers = await this.advertiserAuthRepository.findAll();
+    return advertisers.map((a) => ({
+      id: a.id,
+      loginId: a.login_id,
+      companyName: a.company_name,
+    }));
+  }
+
   async createAdvertiser(
     loginId: string,
     password: string,

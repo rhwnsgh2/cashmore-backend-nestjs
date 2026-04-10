@@ -1,17 +1,26 @@
 import type {
+  AdvertiserBanner,
   BannerAdDailyStat,
   IAdvertiserRepository,
 } from '../interfaces/advertiser-repository.interface';
 
 export class StubAdvertiserRepository implements IAdvertiserRepository {
   private stats: BannerAdDailyStat[] = [];
+  private banners: (AdvertiserBanner & { advertiser_id: number })[] = [];
 
   setStats(stats: BannerAdDailyStat[]): void {
     this.stats = stats;
   }
 
+  setBanners(
+    banners: (AdvertiserBanner & { advertiser_id: number })[],
+  ): void {
+    this.banners = banners;
+  }
+
   clear(): void {
     this.stats = [];
+    this.banners = [];
   }
 
   async findDailyStats(
@@ -19,8 +28,6 @@ export class StubAdvertiserRepository implements IAdvertiserRepository {
     startDate: string,
     endDate: string,
   ): Promise<BannerAdDailyStat[]> {
-    // advertiserId 필터링은 실제 DB에서 처리되므로,
-    // stub에서는 별도 metadata로 관리
     return this.stats
       .filter(
         (s) => s.stat_date >= startDate && s.stat_date <= endDate,
@@ -31,5 +38,14 @@ export class StubAdvertiserRepository implements IAdvertiserRepository {
         }
         return a.ad_id - b.ad_id;
       });
+  }
+
+  async findBannersByAdvertiserId(
+    advertiserId: number,
+  ): Promise<AdvertiserBanner[]> {
+    return this.banners
+      .filter((b) => b.advertiser_id === advertiserId)
+      .map(({ advertiser_id: _, ...banner }) => banner)
+      .sort((a, b) => a.id - b.id);
   }
 }

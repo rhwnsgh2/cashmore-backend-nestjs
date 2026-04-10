@@ -28,6 +28,21 @@ export class SupabaseAdvertiserAuthRepository
     return data as Advertiser;
   }
 
+  async findAll(): Promise<Advertiser[]> {
+    const client = this.supabaseService.getClient() as unknown as SupabaseClient;
+
+    const { data, error } = await client
+      .from('advertisers')
+      .select('id, login_id, password_hash, company_name')
+      .order('id', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data || []) as Advertiser[];
+  }
+
   async create(
     loginId: string,
     passwordHash: string,

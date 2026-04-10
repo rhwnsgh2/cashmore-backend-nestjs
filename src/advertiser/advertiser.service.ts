@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { IAdvertiserRepository } from './interfaces/advertiser-repository.interface';
 import { ADVERTISER_REPOSITORY } from './interfaces/advertiser-repository.interface';
 import type { AdDailyStatDto } from './dto/advertiser-stats.dto';
+import type { AdvertiserBannerDto } from './dto/advertiser-banners.dto';
 
 @Injectable()
 export class AdvertiserService {
@@ -41,5 +42,24 @@ export class AdvertiserService {
     }));
 
     return { stats };
+  }
+
+  async getBanners(
+    advertiserId: number,
+  ): Promise<{ banners: AdvertiserBannerDto[] }> {
+    const banners =
+      await this.advertiserRepository.findBannersByAdvertiserId(advertiserId);
+
+    return {
+      banners: banners.map((b) => ({
+        id: b.id,
+        title: b.title,
+        imageUrl: b.image_url,
+        clickUrl: b.click_url,
+        isActive: b.is_active,
+        startDate: b.start_date,
+        endDate: b.end_date,
+      })),
+    };
   }
 }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseService } from '../../supabase/supabase.service';
 import type {
+  AdvertiserBanner,
   BannerAdDailyStat,
   IAdvertiserRepository,
 } from '../interfaces/advertiser-repository.interface';
@@ -64,5 +65,23 @@ export class SupabaseAdvertiserRepository implements IAdvertiserRepository {
         clicks: stat.clicks,
       }),
     );
+  }
+
+  async findBannersByAdvertiserId(
+    advertiserId: number,
+  ): Promise<AdvertiserBanner[]> {
+    const client = this.supabaseService.getClient() as unknown as SupabaseClient;
+
+    const { data, error } = await client
+      .from('banner_ads')
+      .select('id, title, image_url, click_url, is_active, start_date, end_date')
+      .eq('advertiser_id', advertiserId)
+      .order('id', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data || []) as AdvertiserBanner[];
   }
 }

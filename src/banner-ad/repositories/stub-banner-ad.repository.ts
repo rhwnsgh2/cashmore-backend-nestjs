@@ -1,6 +1,7 @@
 import type {
   BannerAd,
   BannerAdEventType,
+  BannerAdStatSummary,
   IBannerAdRepository,
 } from '../interfaces/banner-ad-repository.interface';
 
@@ -11,7 +12,10 @@ export class StubBannerAdRepository implements IBannerAdRepository {
     userId: string;
     eventType: BannerAdEventType;
   }> = [];
-  private dailyStats = new Map<string, { impressions: number; clicks: number }>();
+  private dailyStats = new Map<
+    string,
+    { impressions: number; clicks: number }
+  >();
 
   setAds(ads: BannerAd[]): void {
     this.ads = ads;
@@ -22,7 +26,9 @@ export class StubBannerAdRepository implements IBannerAdRepository {
   }
 
   getDailyStat(adId: number, date: string) {
-    return this.dailyStats.get(`${adId}:${date}`) || { impressions: 0, clicks: 0 };
+    return (
+      this.dailyStats.get(`${adId}:${date}`) || { impressions: 0, clicks: 0 }
+    );
   }
 
   clear(): void {
@@ -64,5 +70,53 @@ export class StubBannerAdRepository implements IBannerAdRepository {
 
     this.dailyStats.set(key, stat);
     return Promise.resolve();
+  }
+
+  updateAdvertiserId(
+    bannerAdId: number,
+    advertiserId: number,
+  ): Promise<void> {
+    const ad = this.ads.find((a) => a.id === bannerAdId);
+    if (ad) {
+      (ad as BannerAd & { advertiser_id?: number }).advertiser_id =
+        advertiserId;
+    }
+    return Promise.resolve();
+  }
+
+  findStatsSummary(
+    startDate: string,
+    endDate: string,
+  ): Promise<BannerAdStatSummary[]> {
+    const summaryMap = new Map<
+      number,
+      { impressions: number; clicks: number }
+    >();
+
+    for (const [key, stat] of this.dailyStats.entries()) {
+      const [adIdStr, date] = key.split(':');
+      if (date >= startDate && date <= endDate) {
+        const adId = Number(adIdStr);
+        const existing = summaryMap.get(adId) || {
+          impressions: 0,
+          clicks: 0,
+        };
+        existing.impressions += stat.impressions;
+        existing.clicks += stat.clicks;
+        summaryMap.set(adId, existing);
+      }
+    }
+
+    return Promise.resolve(
+      Array.from(summaryMap.entries()).map(([adId, agg]) => {
+        const ad = this.ads.find((a) => a.id === adId);
+        return {
+          ad_id: adId,
+          ad_title: ad?.title || '',
+          impressions: agg.impressions,
+          clicks: agg.clicks,
+        };
+      }),
+    );
   }
 }

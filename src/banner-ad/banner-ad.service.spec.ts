@@ -149,4 +149,128 @@ describe('BannerAdService', () => {
       expect(stat.clicks).toBe(1);
     });
   });
+
+  describe('updateAdvertiserId', () => {
+    it('배너에 광고주를 연결한다', async () => {
+      repository.setAds([
+        {
+          id: 100,
+          title: '테스트 배너',
+          image_url: 'https://cdn.example.com/banner1.png',
+          click_url: 'https://link.example.com/promo1',
+          placement: 'main',
+          priority: 10,
+        },
+      ]);
+
+      await service.updateAdvertiserId(100, 5);
+
+      const ads = repository['ads'] as Array<{ id: number; advertiser_id?: number }>;
+      expect(ads[0].advertiser_id).toBe(5);
+    });
+  });
+
+  describe('getStatsSummary', () => {
+    it('배너별 통계와 전체 요약을 반환한다', async () => {
+      repository.setAds([
+        {
+          id: 1,
+          title: '배너 A',
+          image_url: 'a.png',
+          click_url: 'a.com',
+          placement: 'main',
+          priority: 1,
+        },
+        {
+          id: 2,
+          title: '배너 B',
+          image_url: 'b.png',
+          click_url: 'b.com',
+          placement: 'main',
+          priority: 2,
+        },
+      ]);
+
+      // 일별 통계 시뮬레이션
+      await service.trackImpression(1, userId);
+      await service.trackImpression(1, userId);
+      await service.trackImpression(1, userId);
+      await service.trackClick(1, userId);
+      await service.trackImpression(2, userId);
+      await service.trackImpression(2, userId);
+      await service.trackClick(2, userId);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const result = await service.getStatsSummary(today, today);
+
+      expect(result.totalImpressions).toBe(5);
+      expect(result.totalClicks).toBe(2);
+      expect(result.overallCtr).toBe(40);
+
+      expect(result.banners).toHaveLength(2);
+      const bannerA = result.banners.find((b) => b.adId === 1);
+      expect(bannerA).toEqual({
+        adId: 1,
+        adTitle: '배너 A',
+        impressions: 3,
+        clicks: 1,
+        ctr: 33.33,
+      });
+    });
+
+    it('통계가 없으면 빈 결과를 반환한다', async () => {
+      const result = await service.getStatsSummary('2026-04-01', '2026-04-10');
+
+      expect(result.totalImpressions).toBe(0);
+      expect(result.totalClicks).toBe(0);
+      expect(result.overallCtr).toBe(0);
+      expect(result.banners).toEqual([]);
+    });
+
+    it('startDate/endDate가 없으면 기본값으로 최근 7일을 사용한다', async () => {
+      repository.setAds([
+        {
+          id: 1,
+          title: '배너 A',
+          image_url: 'a.png',
+          click_url: 'a.com',
+          placement: 'main',
+          priority: 1,
+        },
+      ]);
+
+      await service.trackImpression(1, userId);
+
+      const result = await service.getStatsSummary();
+
+      expect(result.totalImpressions).toBe(1);
+    });
+
+    it('노출이 0인 배너의 CTR은 0이다', async () => {
+      repository.setAds([
+        {
+          id: 1,
+          title: '배너 A',
+          image_url: 'a.png',
+          click_url: 'a.com',
+          placement: 'main',
+          priority: 1,
+        },
+      ]);
+
+      // dailyStats에 직접 세팅: impressions=0, clicks=0
+      repository['dailyStats'].set(
+        `1:${new Date().toISOString().slice(0, 10)}`,
+        { impressions: 0, clicks: 0 },
+      );
+
+      const today = new Date().toISOString().slice(0, 10);
+      const result = await service.getStatsSummary(today, today);
+
+      if (result.banners.length > 0) {
+        expect(result.banners[0].ctr).toBe(0);
+      }
+      expect(result.overallCtr).toBe(0);
+    });
+  });
 });

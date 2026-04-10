@@ -20,6 +20,10 @@ export class StubAdvertiserAuthRepository
     return this.advertisers.find((a) => a.login_id === loginId) || null;
   }
 
+  async findAll(): Promise<Advertiser[]> {
+    return [...this.advertisers].sort((a, b) => a.id - b.id);
+  }
+
   async create(
     loginId: string,
     passwordHash: string,
