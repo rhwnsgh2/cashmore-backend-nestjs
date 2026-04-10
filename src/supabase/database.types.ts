@@ -107,6 +107,33 @@ export type Database = {
           },
         ]
       }
+      advertisers: {
+        Row: {
+          company_name: string
+          created_at: string
+          id: number
+          login_id: string
+          password_hash: string
+          updated_at: string
+        }
+        Insert: {
+          company_name: string
+          created_at?: string
+          id?: never
+          login_id: string
+          password_hash: string
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string
+          created_at?: string
+          id?: never
+          login_id?: string
+          password_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       affiliate_callback_data: {
         Row: {
           approval_date: string
@@ -337,6 +364,7 @@ export type Database = {
       }
       banner_ads: {
         Row: {
+          advertiser_id: number | null
           click_url: string
           created_at: string
           end_date: string | null
@@ -350,6 +378,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          advertiser_id?: number | null
           click_url: string
           created_at?: string
           end_date?: string | null
@@ -363,6 +392,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          advertiser_id?: number | null
           click_url?: string
           created_at?: string
           end_date?: string | null
@@ -375,7 +405,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "banner_ads_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "advertisers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bigquery_sync_status: {
         Row: {

@@ -22,4 +22,8 @@ export default () => ({
   accountEncrypt: {
     privateKey: process.env.ACCOUNT_ENCRYPT_PRIVATE_KEY,
   },
+  advertiser: {
+    jwtSecret:
+      process.env.ADVERTISER_JWT_SECRET || 'advertiser-jwt-secret-dev',
+  },
 });

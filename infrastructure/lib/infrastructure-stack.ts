@@ -209,6 +209,10 @@ export class InfrastructureStack extends cdk.Stack {
           supabaseSecret,
           'batchApiKey',
         ),
+        ADVERTISER_JWT_SECRET: ecs.Secret.fromSecretsManager(
+          supabaseSecret,
+          'advertiserJwtSecret',
+        ),
         UPSTASH_REDIS_REST_URL: ecs.Secret.fromSecretsManager(
           upstashSecret,
           'restUrl',

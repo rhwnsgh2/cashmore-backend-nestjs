@@ -44,6 +44,8 @@ import { LocationEngagementModule } from './location-engagement/location-engagem
 import { RetailerModule } from './retailer/retailer.module';
 import { NoticeModule } from './notice/notice.module';
 import { BannerAdModule } from './banner-ad/banner-ad.module';
+import { AdvertiserAuthModule } from './advertiser-auth/advertiser-auth.module';
+import { AdvertiserModule } from './advertiser/advertiser.module';
 import { PointWriteModule } from './point-write/point-write.module';
 import configuration from './config/configuration';
 
@@ -106,6 +108,8 @@ import configuration from './config/configuration';
     RetailerModule,
     NoticeModule,
     BannerAdModule,
+    AdvertiserAuthModule,
+    AdvertiserModule,
   ],
   controllers: [AppController],
   providers: [
