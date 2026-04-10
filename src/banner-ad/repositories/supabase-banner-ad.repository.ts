@@ -12,6 +12,20 @@ import type {
 export class SupabaseBannerAdRepository implements IBannerAdRepository {
   constructor(private supabaseService: SupabaseService) {}
 
+  async findAll(): Promise<BannerAd[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('banner_ads')
+      .select('id, title, image_url, click_url, placement, priority, advertiser_id')
+      .order('id', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data || []) as unknown as BannerAd[];
+  }
+
   async findActive(placement: string): Promise<BannerAd[]> {
     const now = new Date().toISOString();
 

@@ -37,6 +37,10 @@ export class StubBannerAdRepository implements IBannerAdRepository {
     this.dailyStats.clear();
   }
 
+  findAll(): Promise<BannerAd[]> {
+    return Promise.resolve([...this.ads].sort((a, b) => a.id - b.id));
+  }
+
   findActive(placement: string): Promise<BannerAd[]> {
     return Promise.resolve(
       [...this.ads]
@@ -72,10 +76,7 @@ export class StubBannerAdRepository implements IBannerAdRepository {
     return Promise.resolve();
   }
 
-  updateAdvertiserId(
-    bannerAdId: number,
-    advertiserId: number,
-  ): Promise<void> {
+  updateAdvertiserId(bannerAdId: number, advertiserId: number): Promise<void> {
     const ad = this.ads.find((a) => a.id === bannerAdId);
     if (ad) {
       (ad as BannerAd & { advertiser_id?: number }).advertiser_id =

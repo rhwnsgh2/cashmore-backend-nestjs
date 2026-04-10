@@ -5,6 +5,7 @@ export interface BannerAd {
   click_url: string;
   placement: string;
   priority: number;
+  advertiser_id?: number | null;
 }
 
 export type BannerAdEventType = 'impression' | 'click';
@@ -17,6 +18,7 @@ export interface BannerAdStatSummary {
 }
 
 export interface IBannerAdRepository {
+  findAll(): Promise<BannerAd[]>;
   findActive(placement: string): Promise<BannerAd[]>;
   recordEvent(
     adId: number,
@@ -24,10 +26,7 @@ export interface IBannerAdRepository {
     eventType: BannerAdEventType,
   ): Promise<void>;
   incrementDailyStat(adId: number, eventType: BannerAdEventType): Promise<void>;
-  updateAdvertiserId(
-    bannerAdId: number,
-    advertiserId: number,
-  ): Promise<void>;
+  updateAdvertiserId(bannerAdId: number, advertiserId: number): Promise<void>;
   findStatsSummary(
     startDate: string,
     endDate: string,

@@ -32,6 +32,15 @@ export class AdminBannerAdController {
     private readonly configService: ConfigService,
   ) {}
 
+  @Get()
+  @ApiOperation({ summary: '배너 목록 조회 (관리자)' })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiResponse({ status: 200, description: '배너 목록' })
+  async getAllBannerAds(@Headers('x-admin-api-key') apiKey: string) {
+    this.validateApiKey(apiKey);
+    return this.bannerAdService.getAllBannerAds();
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: '배너에 광고주 연결 (관리자)' })
   @ApiHeader({ name: 'x-admin-api-key', required: true })
@@ -72,10 +81,7 @@ export class AdminBannerAdController {
     @Query() query: BannerAdStatsSummaryQueryDto,
   ): Promise<BannerAdStatsSummaryResponseDto> {
     this.validateApiKey(apiKey);
-    return this.bannerAdService.getStatsSummary(
-      query.startDate,
-      query.endDate,
-    );
+    return this.bannerAdService.getStatsSummary(query.startDate, query.endDate);
   }
 
   private validateApiKey(apiKey: string): void {

@@ -37,6 +37,17 @@ export class BannerAdService {
     return hour >= policy.startHour && hour < policy.endHour;
   }
 
+  async getAllBannerAds() {
+    const ads = await this.bannerAdRepository.findAll();
+    return ads.map((ad) => ({
+      id: ad.id,
+      title: ad.title,
+      imageUrl: ad.image_url,
+      clickUrl: ad.click_url,
+      advertiserId: ad.advertiser_id ?? null,
+    }));
+  }
+
   async getActiveBanners(placement: string): Promise<BannerAdDto[]> {
     const ads = await this.bannerAdRepository.findActive(placement);
     return ads
@@ -96,9 +107,7 @@ export class BannerAdService {
     const end = endDate || new Date().toISOString().slice(0, 10);
     const start =
       startDate ||
-      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
+      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const summaries: BannerAdStatSummary[] =
       await this.bannerAdRepository.findStatsSummary(start, end);
