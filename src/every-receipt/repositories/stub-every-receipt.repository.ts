@@ -2,6 +2,7 @@ import type {
   InsertEveryReceiptParams,
   InsertedEveryReceipt,
   PendingEveryReceipt,
+  ReReviewRecord,
 } from '../interfaces/every-receipt-repository.interface';
 import {
   IEveryReceiptRepository,
@@ -27,6 +28,7 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     point: number;
   }[] = [];
   private firstReceiptMap = new Map<string, number>();
+  private reReviewRecords = new Map<string, ReReviewRecord[]>();
 
   setReceipts(userId: string, receipts: EveryReceipt[]): void {
     this.receipts.set(userId, receipts);
@@ -46,6 +48,10 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
 
   setPendingReceipt(receipt: PendingEveryReceipt): void {
     this.pendingReceipts.set(receipt.id, receipt);
+  }
+
+  setReReviewRecords(userId: string, records: ReReviewRecord[]): void {
+    this.reReviewRecords.set(userId, records);
   }
 
   setFirstReceiptId(userId: string, receiptId: number): void {
@@ -84,6 +90,7 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     this.pointUpdateList = [];
     this.pointActionList = [];
     this.firstReceiptMap.clear();
+    this.reReviewRecords.clear();
   }
 
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]> {
@@ -105,6 +112,12 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     userId: string,
   ): Promise<EveryReceiptDetail | null> {
     return Promise.resolve(this.details.get(`${userId}:${receiptId}`) ?? null);
+  }
+
+  countCompletedByUserId(userId: string): Promise<number> {
+    const userReceipts = this.receipts.get(userId) || [];
+    const count = userReceipts.filter((r) => r.status === 'completed').length;
+    return Promise.resolve(count);
   }
 
   countByUserIdAndMonth(
@@ -166,5 +179,82 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
 
   isFirstReceipt(userId: string, receiptId: number): Promise<boolean> {
     return Promise.resolve(this.firstReceiptMap.get(userId) === receiptId);
+  }
+
+  findReReviewsSince(
+    userId: string,
+    since: string,
+  ): Promise<ReReviewRecord[]> {
+    const records = this.reReviewRecords.get(userId) || [];
+    const filtered = records.filter((r) => r.created_at >= since);
+    return Promise.resolve(filtered);
+  }
+
+  private reReviewReceiptData = new Map<
+    string,
+    { id: number; score_data: Record<string, unknown> | null }
+  >();
+  private existingReReviews = new Set<number>();
+  private deletedPointActions: { userId: string; everyReceiptId: number }[] = [];
+  private createdReReviews: Record<string, unknown>[] = [];
+  private reReviewStatusUpdates: number[] = [];
+
+  setEveryReceiptForReReview(
+    receiptId: number,
+    userId: string,
+    data: { id: number; score_data: Record<string, unknown> | null },
+  ): void {
+    this.reReviewReceiptData.set(`${userId}:${receiptId}`, data);
+  }
+
+  setExistingReReview(receiptId: number): void {
+    this.existingReReviews.add(receiptId);
+  }
+
+  getDeletedPointActions(): { userId: string; everyReceiptId: number }[] {
+    return this.deletedPointActions;
+  }
+
+  getCreatedReReviews(): Record<string, unknown>[] {
+    return this.createdReReviews;
+  }
+
+  getReReviewStatusUpdates(): number[] {
+    return this.reReviewStatusUpdates;
+  }
+
+  findEveryReceiptForReReview(
+    receiptId: number,
+    userId: string,
+  ): Promise<{ id: number; score_data: Record<string, unknown> | null } | null> {
+    return Promise.resolve(
+      this.reReviewReceiptData.get(`${userId}:${receiptId}`) ?? null,
+    );
+  }
+
+  hasExistingReReview(receiptId: number): Promise<boolean> {
+    return Promise.resolve(this.existingReReviews.has(receiptId));
+  }
+
+  deletePointAction(userId: string, everyReceiptId: number): Promise<void> {
+    this.deletedPointActions.push({ userId, everyReceiptId });
+    return Promise.resolve();
+  }
+
+  createReReview(params: {
+    everyReceiptId: number;
+    requestedItems: string[];
+    userNote: string;
+    userId: string;
+    beforeScoreData: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown>> {
+    const reReview = { id: this.createdReReviews.length + 1, ...params };
+    this.createdReReviews.push(reReview);
+    return Promise.resolve(reReview);
+  }
+
+  updateStatusToReReview(receiptId: number): Promise<void> {
+    this.reReviewStatusUpdates.push(receiptId);
+    return Promise.resolve();
   }
 }

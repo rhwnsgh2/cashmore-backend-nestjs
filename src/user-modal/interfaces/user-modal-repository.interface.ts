@@ -35,6 +35,7 @@ export interface IUserModalRepository {
     name: UserModalType,
     additionalData?: Record<string, unknown>,
   ): Promise<void>;
+  completeModal(userId: string, modalId: number): Promise<void>;
 }
 
 export const USER_MODAL_REPOSITORY = Symbol('USER_MODAL_REPOSITORY');

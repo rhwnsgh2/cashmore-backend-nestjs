@@ -58,6 +58,64 @@ export class EveryReceiptController {
     return this.everyReceiptService.getEveryReceipts(userId);
   }
 
+  @Post('re_review')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '영수증 재검수 요청',
+    description:
+      '완료된 영수증에 대해 재검수를 요청합니다. 기존 포인트는 환수됩니다.',
+  })
+  @ApiResponse({ status: 200, description: '재검수 요청 성공' })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async requestReReview(
+    @CurrentUser('userId') userId: string,
+    @Body() body: { id: number; requestedItems: string[]; userNote?: string },
+  ) {
+    return this.everyReceiptService.requestReReview(
+      userId,
+      body.id,
+      body.requestedItems,
+      body.userNote ?? '',
+    );
+  }
+
+  @Get('re_review_tickets')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '재검수 티켓 조회',
+    description:
+      '이번주 재검수 티켓 사용 현황을 조회합니다. 주당 3개 제공.',
+  })
+  @ApiResponse({ status: 200, description: '재검수 티켓 조회 성공' })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async getReReviewTickets(
+    @CurrentUser('userId') userId: string,
+  ): Promise<{ ticketCount: number; usedTickets: number; totalTickets: number }> {
+    return this.everyReceiptService.getReReviewTickets(userId);
+  }
+
+  @Get('count')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '완료 영수증 총 개수 조회',
+    description:
+      '사용자의 완료(completed) 상태 영수증 총 개수를 조회합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '완료 영수증 개수 조회 성공',
+  })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async getCompletedCount(
+    @CurrentUser('userId') userId: string,
+  ): Promise<{ count: number }> {
+    return this.everyReceiptService.getCompletedCount(userId);
+  }
+
   @Get('monthly-count')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

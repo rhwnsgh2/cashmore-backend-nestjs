@@ -90,6 +90,21 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     };
   }
 
+  async countCompletedByUserId(userId: string): Promise<number> {
+    const { count, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'completed');
+
+    if (error) {
+      throw error;
+    }
+
+    return count ?? 0;
+  }
+
   async countByUserIdAndMonth(
     userId: string,
     year: number,
@@ -260,5 +275,99 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     if (error) {
       throw error;
     }
+  }
+
+  async findEveryReceiptForReReview(
+    receiptId: number,
+    userId: string,
+  ): Promise<{ id: number; score_data: Record<string, unknown> | null } | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .select('id, score_data')
+      .eq('id', receiptId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) return null;
+    return data as { id: number; score_data: Record<string, unknown> | null };
+  }
+
+  async hasExistingReReview(receiptId: number): Promise<boolean> {
+    const { data } = await this.supabaseService
+      .getClient()
+      .from('every_receipt_re_review')
+      .select('id')
+      .eq('every_receipt_id', receiptId)
+      .single();
+
+    return !!data;
+  }
+
+  async deletePointAction(
+    userId: string,
+    everyReceiptId: number,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('type', 'EVERY_RECEIPT')
+      .eq('additional_data->every_receipt_id', everyReceiptId);
+
+    if (error) throw error;
+  }
+
+  async createReReview(params: {
+    everyReceiptId: number;
+    requestedItems: string[];
+    userNote: string;
+    userId: string;
+    beforeScoreData: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown>> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt_re_review')
+      .insert({
+        every_receipt_id: params.everyReceiptId,
+        requested_items: params.requestedItems,
+        user_note: params.userNote || '',
+        status: 'pending',
+        before_score_data: params.beforeScoreData as unknown as import('../../supabase/database.types').Json,
+        user_id: params.userId,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Record<string, unknown>;
+  }
+
+  async updateStatusToReReview(receiptId: number): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .update({ status: 're-review' })
+      .eq('id', receiptId);
+
+    if (error) throw error;
+  }
+
+  async findReReviewsSince(
+    userId: string,
+    since: string,
+  ): Promise<
+    import('../interfaces/every-receipt-repository.interface').ReReviewRecord[]
+  > {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt_re_review')
+      .select('id, status, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', since);
+
+    if (error || !data) return [];
+    return data as { id: number; status: string; created_at: string }[];
   }
 }

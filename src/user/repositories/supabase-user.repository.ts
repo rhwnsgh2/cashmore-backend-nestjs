@@ -229,4 +229,47 @@ export class SupabaseUserRepository implements IUserRepository {
 
     return (data?.length ?? 0) > 0;
   }
+
+  async findUsersByDeviceId(
+    deviceId: string,
+  ): Promise<{ id: string; auth_id: string }[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('user')
+      .select('id, auth_id')
+      .eq('device_id', deviceId);
+
+    if (error || !data) return [];
+    return data
+      .filter((u): u is { id: string; auth_id: string } => u.auth_id !== null);
+  }
+
+  async getPointTotal(userId: string): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .select('point_amount, status')
+      .eq('user_id', userId);
+
+    if (error || !data) return 0;
+    return data
+      .filter((a: { status: string | null }) => a.status === 'done')
+      .reduce(
+        (acc: number, a: { point_amount: number | null }) =>
+          acc + (a.point_amount ?? 0),
+        0,
+      );
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('user')
+      .delete()
+      .eq('id', userId);
+
+    if (error) {
+      throw error;
+    }
+  }
 }

@@ -46,4 +46,13 @@ export class StubUserModalRepository implements IUserModalRepository {
     this.modals.set(userId, userModals);
     return Promise.resolve();
   }
+
+  completeModal(userId: string, modalId: number): Promise<void> {
+    const userModals = this.modals.get(userId) || [];
+    const modal = userModals.find((m) => m.id === modalId);
+    if (modal) {
+      modal.status = 'completed';
+    }
+    return Promise.resolve();
+  }
 }

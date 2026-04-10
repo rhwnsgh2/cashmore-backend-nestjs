@@ -26,6 +26,65 @@ describe('UserModalService', () => {
     repository.clear();
   });
 
+  describe('completeModal', () => {
+    it('존재하는 모달을 완료 처리하면 success: true를 반환한다', async () => {
+      repository.setModals(userId, [
+        {
+          id: 1,
+          name: 'onboarding',
+          status: 'pending',
+          additionalData: null,
+        },
+      ]);
+
+      const result = await service.completeModal(userId, 1);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('완료 처리 후 해당 모달의 상태가 completed로 변경된다', async () => {
+      repository.setModals(userId, [
+        {
+          id: 1,
+          name: 'onboarding',
+          status: 'pending',
+          additionalData: null,
+        },
+      ]);
+
+      await service.completeModal(userId, 1);
+
+      const modals = await service.getPendingModals(userId);
+      expect(modals.modals).toHaveLength(0);
+    });
+
+    it('존재하지 않는 모달 ID여도 success: true를 반환한다', async () => {
+      const result = await service.completeModal(userId, 999);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('다른 사용자의 모달을 지정해도 success: true를 반환하지만 실제 변경은 없다', async () => {
+      repository.setModals('other-user', [
+        {
+          id: 1,
+          name: 'onboarding',
+          status: 'pending',
+          additionalData: null,
+        },
+      ]);
+
+      const result = await service.completeModal(userId, 1);
+
+      expect(result.success).toBe(true);
+
+      // other-user의 모달은 여전히 pending
+      const otherModals = await service.getPendingModals('other-user');
+      expect(otherModals.modals).toHaveLength(1);
+      expect(otherModals.modals[0].status).toBe('pending');
+    });
+  });
+
   describe('getPendingModals', () => {
     it('대기 중인 모달이 없으면 빈 배열을 반환한다', async () => {
       const result = await service.getPendingModals(userId);

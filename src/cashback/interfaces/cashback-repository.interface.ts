@@ -187,6 +187,10 @@ export interface ICashbackRepository {
     cursor: string | null,
     limit: number,
   ): Promise<RawNaverPayExchange[]>;
+
+  sumCompletedClaimCashback(userId: string): Promise<number>;
+
+  sumExchangePointToCash(userId: string): Promise<number>;
 }
 
 // DI 토큰

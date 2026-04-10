@@ -100,6 +100,14 @@ export interface IUserRepository {
   findDeviceId(userId: string): Promise<string | null>;
 
   isInvitedUser(userId: string): Promise<boolean>;
+
+  deleteUser(userId: string): Promise<void>;
+
+  findUsersByDeviceId(
+    deviceId: string,
+  ): Promise<{ id: string; auth_id: string }[]>;
+
+  getPointTotal(userId: string): Promise<number>;
 }
 
 // DI 토큰

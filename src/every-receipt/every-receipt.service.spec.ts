@@ -404,6 +404,218 @@ describe('EveryReceiptService', () => {
     });
   });
 
+  describe('requestReReview', () => {
+    it('정상적으로 재검수 요청을 생성한다', async () => {
+      repository.setEveryReceiptForReReview(1, userId, {
+        id: 1,
+        score_data: { total_score: 80 },
+      });
+
+      const result = await service.requestReReview(
+        userId,
+        1,
+        ['store_name'],
+        '매장명이 잘못되었습니다',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.reReview).toBeDefined();
+      expect(repository.getDeletedPointActions()).toHaveLength(1);
+      expect(repository.getReReviewStatusUpdates()).toEqual([1]);
+    });
+
+    it('영수증이 없으면 NotFoundException을 던진다', async () => {
+      await expect(
+        service.requestReReview(userId, 999, ['store_name'], ''),
+      ).rejects.toThrow('영수증을 찾을 수 없습니다.');
+    });
+
+    it('이미 재검수 요청이 있으면 BadRequestException을 던진다', async () => {
+      repository.setEveryReceiptForReReview(1, userId, {
+        id: 1,
+        score_data: null,
+      });
+      repository.setExistingReReview(1);
+
+      await expect(
+        service.requestReReview(userId, 1, ['store_name'], ''),
+      ).rejects.toThrow('이미 재검수 요청이 존재합니다.');
+    });
+
+    it('포인트 환수 후 재검수 레코드를 생성한다', async () => {
+      repository.setEveryReceiptForReReview(1, userId, {
+        id: 1,
+        score_data: { total_score: 90 },
+      });
+
+      await service.requestReReview(userId, 1, ['items', 'date_validity'], '메모');
+
+      const deleted = repository.getDeletedPointActions();
+      expect(deleted).toEqual([{ userId, everyReceiptId: 1 }]);
+
+      const created = repository.getCreatedReReviews();
+      expect(created).toHaveLength(1);
+      expect(created[0]).toMatchObject({
+        everyReceiptId: 1,
+        requestedItems: ['items', 'date_validity'],
+        userNote: '메모',
+        userId,
+        beforeScoreData: { total_score: 90 },
+      });
+    });
+  });
+
+  describe('getReReviewTickets', () => {
+    it('재검수 기록이 없으면 3개 전부 남아있다', async () => {
+      const result = await service.getReReviewTickets(userId);
+
+      expect(result.ticketCount).toBe(3);
+      expect(result.usedTickets).toBe(0);
+      expect(result.totalTickets).toBe(3);
+    });
+
+    it('pending 상태의 재검수는 사용한 티켓으로 카운트한다', async () => {
+      repository.setReReviewRecords(userId, [
+        { id: 1, status: 'pending', created_at: new Date().toISOString() },
+      ]);
+
+      const result = await service.getReReviewTickets(userId);
+
+      expect(result.ticketCount).toBe(2);
+      expect(result.usedTickets).toBe(1);
+    });
+
+    it('rejected 상태의 재검수도 사용한 티켓으로 카운트한다', async () => {
+      repository.setReReviewRecords(userId, [
+        { id: 1, status: 'rejected', created_at: new Date().toISOString() },
+      ]);
+
+      const result = await service.getReReviewTickets(userId);
+
+      expect(result.ticketCount).toBe(2);
+      expect(result.usedTickets).toBe(1);
+    });
+
+    it('completed 상태의 재검수는 티켓이 반환되므로 카운트하지 않는다', async () => {
+      repository.setReReviewRecords(userId, [
+        { id: 1, status: 'completed', created_at: new Date().toISOString() },
+      ]);
+
+      const result = await service.getReReviewTickets(userId);
+
+      expect(result.ticketCount).toBe(3);
+      expect(result.usedTickets).toBe(0);
+    });
+
+    it('3개 모두 사용하면 ticketCount는 0이다', async () => {
+      const now = new Date().toISOString();
+      repository.setReReviewRecords(userId, [
+        { id: 1, status: 'pending', created_at: now },
+        { id: 2, status: 'pending', created_at: now },
+        { id: 3, status: 'rejected', created_at: now },
+      ]);
+
+      const result = await service.getReReviewTickets(userId);
+
+      expect(result.ticketCount).toBe(0);
+      expect(result.usedTickets).toBe(3);
+    });
+
+    it('3개 초과 사용해도 ticketCount는 0 미만이 되지 않는다', async () => {
+      const now = new Date().toISOString();
+      repository.setReReviewRecords(userId, [
+        { id: 1, status: 'pending', created_at: now },
+        { id: 2, status: 'pending', created_at: now },
+        { id: 3, status: 'pending', created_at: now },
+        { id: 4, status: 'rejected', created_at: now },
+      ]);
+
+      const result = await service.getReReviewTickets(userId);
+
+      expect(result.ticketCount).toBe(0);
+      expect(result.usedTickets).toBe(4);
+    });
+
+    it('이번주 이전 데이터는 카운트하지 않는다', async () => {
+      // 2주 전 데이터
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      repository.setReReviewRecords(userId, [
+        {
+          id: 1,
+          status: 'pending',
+          created_at: twoWeeksAgo.toISOString(),
+        },
+      ]);
+
+      const result = await service.getReReviewTickets(userId);
+
+      expect(result.ticketCount).toBe(3);
+      expect(result.usedTickets).toBe(0);
+    });
+  });
+
+  describe('getCompletedCount', () => {
+    it('completed 상태의 영수증 수를 반환한다', async () => {
+      repository.setReceipts(userId, [
+        {
+          id: '1',
+          createdAt: '2026-04-01T10:00:00Z',
+          pointAmount: 100,
+          status: 'completed',
+          imageUrl: null,
+        },
+        {
+          id: '2',
+          createdAt: '2026-04-02T10:00:00Z',
+          pointAmount: 50,
+          status: 'completed',
+          imageUrl: null,
+        },
+        {
+          id: '3',
+          createdAt: '2026-04-03T10:00:00Z',
+          pointAmount: null,
+          status: 'pending',
+          imageUrl: null,
+        },
+      ]);
+
+      const result = await service.getCompletedCount(userId);
+
+      expect(result.count).toBe(2);
+    });
+
+    it('영수증이 없으면 0을 반환한다', async () => {
+      const result = await service.getCompletedCount(userId);
+
+      expect(result.count).toBe(0);
+    });
+
+    it('completed가 아닌 상태만 있으면 0을 반환한다', async () => {
+      repository.setReceipts(userId, [
+        {
+          id: '1',
+          createdAt: '2026-04-01T10:00:00Z',
+          pointAmount: null,
+          status: 'pending',
+          imageUrl: null,
+        },
+        {
+          id: '2',
+          createdAt: '2026-04-02T10:00:00Z',
+          pointAmount: null,
+          status: 'rejected',
+          imageUrl: null,
+        },
+      ]);
+
+      const result = await service.getCompletedCount(userId);
+
+      expect(result.count).toBe(0);
+    });
+  });
+
   describe('getEveryReceiptDetail', () => {
     const receiptId = 123;
 

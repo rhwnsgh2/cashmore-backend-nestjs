@@ -168,6 +168,39 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     return data as unknown as RawClaim[];
   }
 
+  async sumCompletedClaimCashback(userId: string): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('claim')
+      .select('cashback_amount')
+      .eq('user_id', userId)
+      .eq('status', 'completed');
+
+    if (error || !data) return 0;
+    return data.reduce(
+      (acc: number, row: { cashback_amount: number | null }) =>
+        acc + (row.cashback_amount ?? 0),
+      0,
+    );
+  }
+
+  async sumExchangePointToCash(userId: string): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .select('point_amount')
+      .eq('user_id', userId)
+      .eq('type', 'EXCHANGE_POINT_TO_CASH')
+      .eq('status', 'done');
+
+    if (error || !data) return 0;
+    return data.reduce(
+      (acc: number, row: { point_amount: number | null }) =>
+        acc + (row.point_amount ?? 0) * -1,
+      0,
+    );
+  }
+
   async findNaverPayExchanges(
     userId: string,
     cursor: string | null,

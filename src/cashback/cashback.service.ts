@@ -16,6 +16,17 @@ export class CashbackService {
     private cashbackRepository: ICashbackRepository,
   ) {}
 
+  async getReceivedCashback(
+    userId: string,
+  ): Promise<{ receivedCashback: number }> {
+    const [claimCashback, exchangeAmount] = await Promise.all([
+      this.cashbackRepository.sumCompletedClaimCashback(userId),
+      this.cashbackRepository.sumExchangePointToCash(userId),
+    ]);
+
+    return { receivedCashback: claimCashback + exchangeAmount };
+  }
+
   async getCashbackList(
     userId: string,
     cursor: string | null,

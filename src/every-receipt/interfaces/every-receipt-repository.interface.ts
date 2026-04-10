@@ -50,6 +50,12 @@ export interface PendingEveryReceipt {
   scoreData: ScoreData;
 }
 
+export interface ReReviewRecord {
+  id: number;
+  status: string;
+  created_at: string;
+}
+
 export interface IEveryReceiptRepository {
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]>;
   findById(
@@ -57,6 +63,7 @@ export interface IEveryReceiptRepository {
     userId: string,
   ): Promise<EveryReceiptDetail | null>;
   findReReviewStatus(receiptId: number): Promise<ReReviewStatus | null>;
+  countCompletedByUserId(userId: string): Promise<number>;
   countByUserIdAndMonth(
     userId: string,
     year: number,
@@ -75,6 +82,32 @@ export interface IEveryReceiptRepository {
     point: number,
   ): Promise<void>;
   isFirstReceipt(userId: string, receiptId: number): Promise<boolean>;
+  findReReviewsSince(
+    userId: string,
+    since: string,
+  ): Promise<ReReviewRecord[]>;
+
+  findEveryReceiptForReReview(
+    receiptId: number,
+    userId: string,
+  ): Promise<{ id: number; score_data: Record<string, unknown> | null } | null>;
+
+  hasExistingReReview(receiptId: number): Promise<boolean>;
+
+  deletePointAction(
+    userId: string,
+    everyReceiptId: number,
+  ): Promise<void>;
+
+  createReReview(params: {
+    everyReceiptId: number;
+    requestedItems: string[];
+    userNote: string;
+    userId: string;
+    beforeScoreData: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown>>;
+
+  updateStatusToReReview(receiptId: number): Promise<void>;
 }
 
 export const EVERY_RECEIPT_REPOSITORY = Symbol('EVERY_RECEIPT_REPOSITORY');

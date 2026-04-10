@@ -22,10 +22,20 @@ export class StubUserRepository implements IUserRepository {
   }[] = [];
   private invitedUsers: Set<string> = new Set();
   private authProviders: Map<string, UserProvider> = new Map();
+  private deviceIdMap: Map<string, string> = new Map(); // userId → deviceId
+  private pointTotals: Map<string, number> = new Map();
 
   // 데이터 설정 메서드
   setUser(user: User): void {
     this.users.set(user.id, user);
+  }
+
+  setUserDeviceId(userId: string, deviceId: string): void {
+    this.deviceIdMap.set(userId, deviceId);
+  }
+
+  setPointTotal(userId: string, total: number): void {
+    this.pointTotals.set(userId, total);
   }
 
   setBanReason(authId: string, reason: string): void {
@@ -145,5 +155,29 @@ export class StubUserRepository implements IUserRepository {
 
   isInvitedUser(userId: string): Promise<boolean> {
     return Promise.resolve(this.invitedUsers.has(userId));
+  }
+
+  deleteUser(userId: string): Promise<void> {
+    this.users.delete(userId);
+    return Promise.resolve();
+  }
+
+  findUsersByDeviceId(
+    deviceId: string,
+  ): Promise<{ id: string; auth_id: string }[]> {
+    const results: { id: string; auth_id: string }[] = [];
+    for (const [userId, devId] of this.deviceIdMap.entries()) {
+      if (devId === deviceId) {
+        const user = this.users.get(userId);
+        if (user) {
+          results.push({ id: user.id, auth_id: user.auth_id });
+        }
+      }
+    }
+    return Promise.resolve(results);
+  }
+
+  getPointTotal(userId: string): Promise<number> {
+    return Promise.resolve(this.pointTotals.get(userId) ?? 0);
   }
 }

@@ -1,10 +1,13 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   NotFoundException,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -13,6 +16,7 @@ import {
   ApiConflictResponse,
   ApiNotFoundResponse,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -32,6 +36,23 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('user')
 export class UserController {
   constructor(private userService: UserService) {}
+
+  @Get('last-used')
+  @ApiOperation({
+    summary: '마지막 사용 계정 provider 조회',
+    description:
+      'device_id로 해당 기기에서 포인트가 가장 많은 유저의 로그인 provider를 조회합니다.',
+  })
+  @ApiQuery({ name: 'device_id', required: true, description: '디바이스 ID' })
+  @ApiResponse({ status: 200, description: 'provider 조회 성공' })
+  async getLastUsed(
+    @Query('device_id') deviceId?: string,
+  ): Promise<{ provider: 'apple' | 'kakao' | null }> {
+    if (!deviceId) {
+      throw new BadRequestException('device_id is required');
+    }
+    return this.userService.getLastUsedProvider(deviceId);
+  }
 
   @Get('info')
   @UseGuards(JwtAuthGuard)
@@ -98,6 +119,21 @@ export class UserController {
       deviceId: dto.deviceId,
       signupContext: dto.signupContext,
     });
+  }
+
+  @Delete('delete')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '회원 탈퇴',
+    description: '현재 로그인한 사용자의 계정을 삭제합니다.',
+  })
+  @ApiResponse({ status: 200, description: '계정 삭제 성공' })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async deleteUser(
+    @CurrentUser('userId') userId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.userService.deleteUser(userId);
   }
 
   @Post('onboarding')

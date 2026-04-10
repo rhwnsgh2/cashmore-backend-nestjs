@@ -1,7 +1,8 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -15,6 +16,23 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('user')
 export class UserModalController {
   constructor(private userModalService: UserModalService) {}
+
+  @Post('modals/:modalId/complete')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '모달 완료 처리',
+    description: '특정 모달을 완료 상태로 변경합니다.',
+  })
+  @ApiParam({ name: 'modalId', description: '모달 ID', type: Number })
+  @ApiResponse({ status: 200, description: '모달 완료 처리 성공' })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async completeModal(
+    @CurrentUser('userId') userId: string,
+    @Param('modalId', ParseIntPipe) modalId: number,
+  ): Promise<{ success: boolean }> {
+    return this.userModalService.completeModal(userId, modalId);
+  }
 
   @Get('modals')
   @UseGuards(JwtAuthGuard)

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/swagger';
 import { CashbackService } from './cashback.service';
 import { CashbackListResponseDto } from './dto/get-cashback-list.dto';
+import { ReceivedCashbackResponseDto } from './dto/get-received-cashback.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -16,6 +17,27 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('cashback')
 export class CashbackController {
   constructor(private cashbackService: CashbackService) {}
+
+  @Get('received_cashback')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '총 수령 캐시백 조회',
+    description:
+      '완료된 claim 캐시백과 포인트 환급 금액을 합산하여 반환합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '총 수령 캐시백 조회 성공',
+    type: ReceivedCashbackResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async getReceivedCashback(
+    @CurrentUser('userId') userId: string,
+  ): Promise<ReceivedCashbackResponseDto> {
+    return this.cashbackService.getReceivedCashback(userId);
+  }
 
   @Get('list')
   @UseGuards(JwtAuthGuard)

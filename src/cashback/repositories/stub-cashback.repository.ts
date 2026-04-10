@@ -152,4 +152,22 @@ export class StubCashbackRepository implements ICashbackRepository {
     const data = this.naverPayExchanges.get(userId) || [];
     return Promise.resolve(this.applyPagination(data, cursor, limit));
   }
+
+  sumCompletedClaimCashback(userId: string): Promise<number> {
+    const claims = this.claims.get(userId) || [];
+    const sum = claims
+      .filter((c) => c.status === 'completed')
+      .reduce((acc, c) => acc + (c.cashback_amount || 0), 0);
+    return Promise.resolve(sum);
+  }
+
+  sumExchangePointToCash(userId: string): Promise<number> {
+    const actions = this.pointActions.get(userId) || [];
+    const sum = actions
+      .filter(
+        (a) => a.type === 'EXCHANGE_POINT_TO_CASH' && a.status === 'done',
+      )
+      .reduce((acc, a) => acc + (a.point_amount || 0) * -1, 0);
+    return Promise.resolve(sum);
+  }
 }

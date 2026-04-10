@@ -85,4 +85,17 @@ export class SupabaseUserModalRepository implements IUserModalRepository {
       throw error;
     }
   }
+
+  async completeModal(userId: string, modalId: number): Promise<void> {
+    const { error } = await this.supabase
+      .getClient()
+      .from('modal_shown')
+      .update({ status: 'completed' })
+      .eq('id', modalId)
+      .eq('user_id', userId);
+
+    if (error) {
+      throw error;
+    }
+  }
 }

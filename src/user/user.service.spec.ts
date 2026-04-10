@@ -50,6 +50,111 @@ describe('UserService', () => {
     service = module.get<UserService>(UserService);
   });
 
+  describe('getLastUsedProvider', () => {
+    it('device_id에 해당하는 유저가 없으면 provider: null을 반환한다', async () => {
+      const result = await service.getLastUsedProvider('unknown-device');
+      expect(result.provider).toBeNull();
+    });
+
+    it('포인트가 가장 많은 유저의 provider를 반환한다', async () => {
+      repository.setUser({
+        id: 'user-1',
+        email: 'a@test.com',
+        auth_id: 'auth-1',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'user1',
+        provider: 'kakao',
+      });
+      repository.setUser({
+        id: 'user-2',
+        email: 'b@test.com',
+        auth_id: 'auth-2',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'user2',
+        provider: 'apple',
+      });
+      repository.setUserDeviceId('user-1', 'device-abc');
+      repository.setUserDeviceId('user-2', 'device-abc');
+      repository.setPointTotal('user-1', 100);
+      repository.setPointTotal('user-2', 500);
+      repository.setAuthProvider('auth-2', 'apple');
+
+      const result = await service.getLastUsedProvider('device-abc');
+
+      expect(result.provider).toBe('apple');
+    });
+
+    it('유저가 1명이면 해당 유저의 provider를 반환한다', async () => {
+      repository.setUser({
+        id: 'user-1',
+        email: 'a@test.com',
+        auth_id: 'auth-1',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'user1',
+        provider: 'kakao',
+      });
+      repository.setUserDeviceId('user-1', 'device-abc');
+      repository.setPointTotal('user-1', 100);
+      repository.setAuthProvider('auth-1', 'kakao');
+
+      const result = await service.getLastUsedProvider('device-abc');
+
+      expect(result.provider).toBe('kakao');
+    });
+  });
+
+  describe('deleteUser', () => {
+    const userId = 'test-user-id';
+
+    it('유저를 삭제하고 success: true를 반환한다', async () => {
+      repository.setUser({
+        id: userId,
+        email: 'test@example.com',
+        auth_id: 'auth-123',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'tester',
+        provider: 'kakao',
+      });
+
+      const result = await service.deleteUser(userId);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('계정이 삭제되었습니다.');
+    });
+
+    it('삭제 후 getUserInfo로 조회하면 null이다', async () => {
+      repository.setUser({
+        id: userId,
+        email: 'test@example.com',
+        auth_id: 'auth-123',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'tester',
+        provider: 'kakao',
+      });
+
+      await service.deleteUser(userId);
+
+      const userInfo = await service.getUserInfo(userId);
+      expect(userInfo).toBeNull();
+    });
+
+    it('존재하지 않는 유저 삭제도 에러 없이 success를 반환한다', async () => {
+      const result = await service.deleteUser('non-existent-id');
+
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('getUserInfo', () => {
     const userId = 'test-user-id';
 

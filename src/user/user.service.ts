@@ -242,6 +242,54 @@ export class UserService {
     private amplitudeService: AmplitudeService,
   ) {}
 
+  async getLastUsedProvider(
+    deviceId: string,
+  ): Promise<{ provider: 'apple' | 'kakao' | null }> {
+    const users = await this.userRepository.findUsersByDeviceId(deviceId);
+
+    if (users.length === 0) {
+      return { provider: null };
+    }
+
+    let maxPointUserId: string | null = null;
+    let maxPoints = -1;
+
+    for (const user of users) {
+      const points = await this.userRepository.getPointTotal(user.id);
+      if (points > maxPoints) {
+        maxPoints = points;
+        maxPointUserId = user.id;
+      }
+    }
+
+    if (!maxPointUserId) {
+      return { provider: null };
+    }
+
+    const targetUser = users.find((u) => u.id === maxPointUserId);
+    if (!targetUser) {
+      return { provider: null };
+    }
+
+    const provider = await this.userRepository.getAuthProvider(
+      targetUser.auth_id,
+    );
+
+    return { provider: provider === 'other' ? null : provider };
+  }
+
+  async deleteUser(
+    userId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    await this.userRepository.deleteUser(userId);
+
+    this.amplitudeService.track('user_deleted', userId, {
+      timestamp: new Date().toISOString(),
+    });
+
+    return { success: true, message: '계정이 삭제되었습니다.' };
+  }
+
   async getUserInfo(userId: string): Promise<UserInfoResponse | null> {
     const user = await this.userRepository.findById(userId);
 

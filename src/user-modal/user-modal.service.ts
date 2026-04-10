@@ -17,6 +17,14 @@ export class UserModalService {
     private userModalRepository: IUserModalRepository,
   ) {}
 
+  async completeModal(
+    userId: string,
+    modalId: number,
+  ): Promise<{ success: boolean }> {
+    await this.userModalRepository.completeModal(userId, modalId);
+    return { success: true };
+  }
+
   async getPendingModals(userId: string): Promise<GetUserModalsResult> {
     const modals = await this.userModalRepository.findPendingByUserId(userId);
 

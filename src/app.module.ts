@@ -40,6 +40,9 @@ import { CashbackModule } from './cashback/cashback.module';
 import { CoupangModule } from './coupang/coupang.module';
 import { CoupangPartnersModule } from './coupang-partners/coupang-partners.module';
 import { AccountInfoModule } from './account-info/account-info.module';
+import { LocationEngagementModule } from './location-engagement/location-engagement.module';
+import { RetailerModule } from './retailer/retailer.module';
+import { NoticeModule } from './notice/notice.module';
 import { PointWriteModule } from './point-write/point-write.module';
 import configuration from './config/configuration';
 
@@ -98,6 +101,9 @@ import configuration from './config/configuration';
     CoupangModule,
     CoupangPartnersModule,
     AccountInfoModule,
+    LocationEngagementModule,
+    RetailerModule,
+    NoticeModule,
   ],
   controllers: [AppController],
   providers: [

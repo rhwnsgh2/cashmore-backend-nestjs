@@ -25,6 +25,163 @@ describe('CashbackService', () => {
     service = module.get<CashbackService>(CashbackService);
   });
 
+  describe('getReceivedCashback', () => {
+    beforeEach(() => {
+      repository.clear();
+    });
+
+    it('데이터가 없으면 0을 반환한다', async () => {
+      const result = await service.getReceivedCashback(userId);
+
+      expect(result.receivedCashback).toBe(0);
+    });
+
+    it('completed claim의 cashback_amount를 합산한다', async () => {
+      repository.setClaims(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          cashback_amount: 500,
+          status: 'completed',
+          location_info: null,
+        },
+        {
+          id: 2,
+          created_at: '2026-03-24T09:00:00Z',
+          cashback_amount: 300,
+          status: 'completed',
+          location_info: null,
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      expect(result.receivedCashback).toBe(800);
+    });
+
+    it('completed가 아닌 claim은 합산에서 제외한다', async () => {
+      repository.setClaims(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          cashback_amount: 500,
+          status: 'completed',
+          location_info: null,
+        },
+        {
+          id: 2,
+          created_at: '2026-03-24T09:00:00Z',
+          cashback_amount: 300,
+          status: 'processing',
+          location_info: null,
+        },
+        {
+          id: 3,
+          created_at: '2026-03-24T08:00:00Z',
+          cashback_amount: 200,
+          status: 'rejected',
+          location_info: null,
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      expect(result.receivedCashback).toBe(500);
+    });
+
+    it('EXCHANGE_POINT_TO_CASH의 done 상태 point_amount를 음수 반전하여 합산한다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 10,
+          created_at: '2026-03-24T10:00:00Z',
+          point_amount: -5000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+        {
+          id: 11,
+          created_at: '2026-03-24T09:00:00Z',
+          point_amount: -3000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      expect(result.receivedCashback).toBe(8000);
+    });
+
+    it('done이 아닌 EXCHANGE_POINT_TO_CASH는 합산에서 제외한다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 10,
+          created_at: '2026-03-24T10:00:00Z',
+          point_amount: -5000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+        {
+          id: 11,
+          created_at: '2026-03-24T09:00:00Z',
+          point_amount: -3000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'pending',
+          additional_data: null,
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      expect(result.receivedCashback).toBe(5000);
+    });
+
+    it('claim 캐시백과 환급 포인트를 합산한다', async () => {
+      repository.setClaims(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          cashback_amount: 1000,
+          status: 'completed',
+          location_info: null,
+        },
+      ]);
+      repository.setPointActions(userId, [
+        {
+          id: 10,
+          created_at: '2026-03-24T09:00:00Z',
+          point_amount: -2000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      expect(result.receivedCashback).toBe(3000);
+    });
+
+    it('cashback_amount가 null인 claim은 0으로 처리한다', async () => {
+      repository.setClaims(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          cashback_amount: null,
+          status: 'completed',
+          location_info: null,
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      expect(result.receivedCashback).toBe(0);
+    });
+  });
+
   describe('getCashbackList', () => {
     beforeEach(() => {
       repository.clear();
@@ -554,6 +711,22 @@ describe('CashbackService', () => {
         status: 'completed',
         data: { naverpayPoint: 4500 },
       });
+    });
+
+    it('naverPayExchange amount는 cashmore_point의 음수이다', async () => {
+      repository.setNaverPayExchanges(userId, [
+        {
+          id: 'npe-2',
+          created_at: '2026-03-24T10:00:00Z',
+          cashmore_point: 3000,
+          naverpay_point: 2700,
+          status: 'completed',
+        },
+      ]);
+
+      const result = await service.getCashbackList(userId, null, 20);
+
+      expect(result.items[0].amount).toBe(-3000);
     });
 
     it('여러 소스에서 20개 초과 데이터가 합쳐지면 20개만 반환하고 nextCursor를 설정한다', async () => {
