@@ -43,6 +43,7 @@ import { AccountInfoModule } from './account-info/account-info.module';
 import { LocationEngagementModule } from './location-engagement/location-engagement.module';
 import { RetailerModule } from './retailer/retailer.module';
 import { NoticeModule } from './notice/notice.module';
+import { BannerAdModule } from './banner-ad/banner-ad.module';
 import { PointWriteModule } from './point-write/point-write.module';
 import configuration from './config/configuration';
 
@@ -104,6 +105,7 @@ import configuration from './config/configuration';
     LocationEngagementModule,
     RetailerModule,
     NoticeModule,
+    BannerAdModule,
   ],
   controllers: [AppController],
   providers: [
