@@ -117,15 +117,13 @@ export class StubNaverPayRepository implements INaverPayRepository {
   async findExchangesByStatus(
     status?: string,
   ): Promise<(NaverPayExchange & { user_email?: string })[]> {
-    if (!status) {
-      return this.exchanges;
-    }
-    return this.exchanges.filter((e) => e.status === status);
+    const list = status
+      ? this.exchanges.filter((e) => e.status === status)
+      : this.exchanges;
+    return list.map((e) => ({ ...e, user_email: e.user_id + '@test.com' }));
   }
 
-  async getCompletedDailyStats(
-    sinceIso: string,
-  ): Promise<NaverPayDailyStat[]> {
+  async getCompletedDailyStats(sinceIso: string): Promise<NaverPayDailyStat[]> {
     const filtered = this.exchanges.filter(
       (e) =>
         e.status === 'completed' &&
