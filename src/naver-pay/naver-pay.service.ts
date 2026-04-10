@@ -290,16 +290,18 @@ export class NaverPayService {
       await this.naverPayRepository.findExchangesByStatus(status);
 
     return {
-      exchanges: exchanges.map((e) => ({
-        id: e.id,
-        userId: e.user_id,
-        userEmail: e.user_email ?? undefined,
-        cashmorePoint: e.cashmore_point,
-        naverpayPoint: e.naverpay_point,
-        status: e.status,
-        createdAt: e.created_at,
-        processedAt: e.processed_at ?? undefined,
-      })),
+      exchanges: exchanges
+        .filter((e) => e.user_email)
+        .map((e) => ({
+          id: e.id,
+          userId: e.user_id,
+          userEmail: e.user_email!,
+          cashmorePoint: e.cashmore_point,
+          naverpayPoint: e.naverpay_point,
+          status: e.status,
+          createdAt: e.created_at,
+          processedAt: e.processed_at ?? undefined,
+        })),
     };
   }
 
