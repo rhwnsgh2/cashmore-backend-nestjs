@@ -849,11 +849,12 @@ describe('CashbackService', () => {
       ]);
 
       await service.getCashbackList(userId, null, 20);
+      await new Promise((resolve) => setImmediate(resolve));
 
       expect(slackSpy).not.toHaveBeenCalled();
     });
 
-    it('cashbackList에서 cash_exchanges 건수가 다르면 슬랙 알림이 발송된다', async () => {
+    it('cashbackList에서 cash_exchanges에 누락된 건이 있으면 슬랙 알림이 발송된다', async () => {
       repository.setPointActions(userId, [
         {
           id: 1,
@@ -868,11 +869,12 @@ describe('CashbackService', () => {
       repository.setCashExchanges(userId, []);
 
       await service.getCashbackList(userId, null, 20);
+      // fire-and-forget이라 microtask 처리 대기
+      await new Promise((resolve) => setImmediate(resolve));
 
       expect(slackSpy).toHaveBeenCalledTimes(1);
-      expect(slackSpy.mock.calls[0][0]).toContain(
-        'cashbackList count mismatch',
-      );
+      expect(slackSpy.mock.calls[0][0]).toContain('cashbackList mismatch');
+      expect(slackSpy.mock.calls[0][0]).toContain('missing_in_cash_exchanges');
     });
 
     it('cashbackList에서 status가 다르면 슬랙 알림이 발송된다', async () => {
@@ -897,9 +899,11 @@ describe('CashbackService', () => {
       ]);
 
       await service.getCashbackList(userId, null, 20);
+      await new Promise((resolve) => setImmediate(resolve));
 
       expect(slackSpy).toHaveBeenCalledTimes(1);
       expect(slackSpy.mock.calls[0][0]).toContain('cashbackList mismatch');
+      expect(slackSpy.mock.calls[0][0]).toContain('status_mismatch');
     });
   });
 });

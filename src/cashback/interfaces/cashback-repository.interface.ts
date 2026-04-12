@@ -202,10 +202,8 @@ export interface ICashbackRepository {
 
   sumCashExchangeDone(userId: string): Promise<number>;
 
-  findCashExchanges(
-    userId: string,
-    cursor: string | null,
-    limit: number,
+  findCashExchangesByPointActionIds(
+    pointActionIds: number[],
   ): Promise<RawCashExchange[]>;
 }
 

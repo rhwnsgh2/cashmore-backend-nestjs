@@ -217,24 +217,19 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     );
   }
 
-  async findCashExchanges(
-    userId: string,
-    cursor: string | null,
-    limit: number,
+  async findCashExchangesByPointActionIds(
+    pointActionIds: number[],
   ): Promise<RawCashExchange[]> {
-    let query = this.supabaseService
+    if (pointActionIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabaseService
       .getClient()
       .from('cash_exchanges')
       .select('id, point_action_id, created_at, amount, status')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+      .in('point_action_id', pointActionIds);
 
-    if (cursor) {
-      query = query.lt('created_at', cursor);
-    }
-
-    const { data, error } = await query;
     if (error || !data) return [];
     return data as unknown as RawCashExchange[];
   }

@@ -66,53 +66,31 @@ export class CashbackService {
     }
   }
 
-  private async safeFindCashExchanges(
+  private async compareCashbackListExchangesAsync(
     userId: string,
-    cursor: string | null,
-    limit: number,
-  ): Promise<RawCashExchange[] | null> {
-    try {
-      return await this.cashbackRepository.findCashExchanges(
-        userId,
-        cursor,
-        limit,
-      );
-    } catch (error) {
-      this.logger.error(
-        `[CashExchangeMigration] findCashExchanges read failed userId=${userId}`,
-        error,
-      );
-      void this.slackService.reportBugToSlack(
-        `🚨 [CashExchangeMigration] findCashExchanges read failed userId=${userId} error=${error instanceof Error ? error.message : String(error)}`,
-      );
-      return null;
-    }
-  }
-
-  private compareCashbackList(
-    userId: string,
-    pointActions: RawPointAction[],
-    cashExchanges: RawCashExchange[],
-  ): void {
-    // legacy: pointActions에서 EXCHANGE_POINT_TO_CASH만 추출
-    const legacyExchanges = pointActions.filter(
-      (a) => a.type === 'EXCHANGE_POINT_TO_CASH',
-    );
-
-    // 같은 페이지 안의 EXCHANGE_POINT_TO_CASH 행 개수와 amount 합계로 비교
-    if (legacyExchanges.length !== cashExchanges.length) {
-      const message = `[CashExchangeMigration] cashbackList count mismatch userId=${userId} ${JSON.stringify(
-        {
-          legacyCount: legacyExchanges.length,
-          newCount: cashExchanges.length,
-        },
-      )}`;
-      this.logger.warn(message);
-      void this.slackService.reportBugToSlack(`🚨 ${message}`);
+    pointActionsExchanges: RawPointAction[],
+  ): Promise<void> {
+    if (pointActionsExchanges.length === 0) {
       return;
     }
 
-    // 매핑: legacy.id ↔ cashExchange.point_action_id
+    const ids = pointActionsExchanges.map((p) => p.id);
+
+    let cashExchanges: RawCashExchange[];
+    try {
+      cashExchanges =
+        await this.cashbackRepository.findCashExchangesByPointActionIds(ids);
+    } catch (error) {
+      this.logger.error(
+        `[CashExchangeMigration] findCashExchangesByPointActionIds failed userId=${userId}`,
+        error,
+      );
+      void this.slackService.reportBugToSlack(
+        `🚨 [CashExchangeMigration] findCashExchangesByPointActionIds failed userId=${userId} error=${error instanceof Error ? error.message : String(error)}`,
+      );
+      return;
+    }
+
     const newMap = new Map<number, RawCashExchange>();
     for (const ce of cashExchanges) {
       if (ce.point_action_id !== null) {
@@ -125,7 +103,7 @@ export class CashbackService {
       reason: string;
     }> = [];
 
-    for (const legacy of legacyExchanges) {
+    for (const legacy of pointActionsExchanges) {
       const newItem = newMap.get(legacy.id);
       if (!newItem) {
         mismatches.push({
@@ -172,7 +150,6 @@ export class CashbackService {
       attendances,
       claims,
       naverPayExchanges,
-      cashExchanges,
     ] = await Promise.all([
       this.cashbackRepository.findEveryReceipts(userId, cursor, limit),
       this.cashbackRepository.findPointActions(userId, cursor, limit),
@@ -181,12 +158,13 @@ export class CashbackService {
       this.cashbackRepository.findAttendances(userId, cursor, limit),
       this.cashbackRepository.findClaims(userId, cursor, limit),
       this.cashbackRepository.findNaverPayExchanges(userId, cursor, limit),
-      this.safeFindCashExchanges(userId, cursor, limit),
     ]);
 
-    if (cashExchanges !== null) {
-      this.compareCashbackList(userId, pointActions, cashExchanges);
-    }
+    // 비교는 응답 후 비동기로 (fire-and-forget)
+    const exchangePointActions = pointActions.filter(
+      (a) => a.type === 'EXCHANGE_POINT_TO_CASH',
+    );
+    void this.compareCashbackListExchangesAsync(userId, exchangePointActions);
 
     // attendance는 point_actions 매칭이 필요
     let attendancePointActions: Awaited<

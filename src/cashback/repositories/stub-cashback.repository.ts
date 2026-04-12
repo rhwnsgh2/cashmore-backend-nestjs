@@ -184,12 +184,23 @@ export class StubCashbackRepository implements ICashbackRepository {
     return Promise.resolve(sum);
   }
 
-  findCashExchanges(
-    userId: string,
-    cursor: string | null,
-    limit: number,
+  findCashExchangesByPointActionIds(
+    pointActionIds: number[],
   ): Promise<RawCashExchange[]> {
-    const data = this.cashExchanges.get(userId) || [];
-    return Promise.resolve(this.applyPagination(data, cursor, limit));
+    if (pointActionIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    const result: RawCashExchange[] = [];
+    for (const exchanges of this.cashExchanges.values()) {
+      for (const ex of exchanges) {
+        if (
+          ex.point_action_id !== null &&
+          pointActionIds.includes(ex.point_action_id)
+        ) {
+          result.push(ex);
+        }
+      }
+    }
+    return Promise.resolve(result);
   }
 }
