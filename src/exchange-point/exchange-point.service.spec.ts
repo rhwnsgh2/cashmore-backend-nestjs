@@ -288,7 +288,7 @@ describe('ExchangePointService', () => {
       repository.setTotalPoints(userId, 10000);
       await service.requestExchange(userId, 5000);
 
-      const exchanges = repository['exchanges'].get(userId)!;
+      const exchanges = repository.getExchangesByUserId(userId);
       const pointActionId = exchanges[0].id;
 
       await service.cancelExchange(userId, pointActionId);
@@ -398,7 +398,7 @@ describe('ExchangePointService', () => {
       repository.setTotalPoints(userId, 10000);
       await service.requestExchange(userId, 5000);
 
-      const exchanges = repository['exchanges'].get(userId)!;
+      const exchanges = repository.getExchangesByUserId(userId);
       const pointActionId = exchanges[0].id;
 
       await service.approveExchanges([pointActionId]);
@@ -447,7 +447,7 @@ describe('ExchangePointService', () => {
       repository.setTotalPoints(userId, 10000);
       await service.requestExchange(userId, 5000);
 
-      const exchanges = repository['exchanges'].get(userId)!;
+      const exchanges = repository.getExchangesByUserId(userId);
       const pointActionId = exchanges[0].id;
 
       await service.rejectExchange(pointActionId, 'invalid_account_number');
@@ -469,7 +469,7 @@ describe('ExchangePointService', () => {
 
         await service.requestExchange(userId, 5000);
 
-        const exchanges = repository['exchanges'].get(userId)!;
+        const exchanges = repository.getExchangesByUserId(userId);
         expect(exchanges).toHaveLength(1);
         expect(exchanges[0]).toMatchObject({
           user_id: userId,
@@ -508,11 +508,11 @@ describe('ExchangePointService', () => {
       it('취소 시 point_actions에 +amount 복원 행이 INSERT된다 (원본 행은 그대로)', async () => {
         repository.setTotalPoints(userId, 10000);
         await service.requestExchange(userId, 5000);
-        const originalId = repository['exchanges'].get(userId)![0].id;
+        const originalId = repository.getExchangesByUserId(userId)[0].id;
 
         await service.cancelExchange(userId, originalId);
 
-        const exchanges = repository['exchanges'].get(userId)!;
+        const exchanges = repository.getExchangesByUserId(userId);
         expect(exchanges).toHaveLength(2);
         // 원본 deduct 행 (status='done', -5000) — 그대로
         expect(exchanges[0]).toMatchObject({
@@ -534,7 +534,7 @@ describe('ExchangePointService', () => {
       it('취소 후 잔액 net = 0 (deduct + restore)', async () => {
         repository.setTotalPoints(userId, 10000);
         await service.requestExchange(userId, 5000);
-        const originalId = repository['exchanges'].get(userId)![0].id;
+        const originalId = repository.getExchangesByUserId(userId)[0].id;
 
         await service.cancelExchange(userId, originalId);
 
@@ -545,7 +545,7 @@ describe('ExchangePointService', () => {
       it('취소 시 cash_exchanges status는 cancelled로 변경된다', async () => {
         repository.setTotalPoints(userId, 10000);
         await service.requestExchange(userId, 5000);
-        const originalId = repository['exchanges'].get(userId)![0].id;
+        const originalId = repository.getExchangesByUserId(userId)[0].id;
 
         await service.cancelExchange(userId, originalId);
 
@@ -559,11 +559,11 @@ describe('ExchangePointService', () => {
       it('승인 시 point_actions에 추가 INSERT나 UPDATE가 없다', async () => {
         repository.setTotalPoints(userId, 10000);
         await service.requestExchange(userId, 5000);
-        const originalId = repository['exchanges'].get(userId)![0].id;
+        const originalId = repository.getExchangesByUserId(userId)[0].id;
 
         await service.approveExchanges([originalId]);
 
-        const exchanges = repository['exchanges'].get(userId)!;
+        const exchanges = repository.getExchangesByUserId(userId);
         // 신청 시 INSERT된 1행 그대로
         expect(exchanges).toHaveLength(1);
         expect(exchanges[0]).toMatchObject({
@@ -575,7 +575,7 @@ describe('ExchangePointService', () => {
       it('승인 후 잔액은 -amount (영구 차감)', async () => {
         repository.setTotalPoints(userId, 10000);
         await service.requestExchange(userId, 5000);
-        const originalId = repository['exchanges'].get(userId)![0].id;
+        const originalId = repository.getExchangesByUserId(userId)[0].id;
 
         await service.approveExchanges([originalId]);
 
@@ -586,7 +586,7 @@ describe('ExchangePointService', () => {
       it('승인 시 cash_exchanges status는 done으로 변경된다', async () => {
         repository.setTotalPoints(userId, 10000);
         await service.requestExchange(userId, 5000);
-        const originalId = repository['exchanges'].get(userId)![0].id;
+        const originalId = repository.getExchangesByUserId(userId)[0].id;
 
         await service.approveExchanges([originalId]);
 
@@ -600,11 +600,11 @@ describe('ExchangePointService', () => {
       it('거절 시 point_actions에 +amount 복원 행이 INSERT된다 (원본 행은 그대로)', async () => {
         repository.setTotalPoints(userId, 10000);
         await service.requestExchange(userId, 5000);
-        const originalId = repository['exchanges'].get(userId)![0].id;
+        const originalId = repository.getExchangesByUserId(userId)[0].id;
 
         await service.rejectExchange(originalId, 'invalid_account_number');
 
-        const exchanges = repository['exchanges'].get(userId)!;
+        const exchanges = repository.getExchangesByUserId(userId);
         expect(exchanges).toHaveLength(2);
         expect(exchanges[0]).toMatchObject({
           id: originalId,
@@ -624,7 +624,7 @@ describe('ExchangePointService', () => {
       it('거절 후 잔액 net = 0', async () => {
         repository.setTotalPoints(userId, 10000);
         await service.requestExchange(userId, 5000);
-        const originalId = repository['exchanges'].get(userId)![0].id;
+        const originalId = repository.getExchangesByUserId(userId)[0].id;
 
         await service.rejectExchange(originalId, 'invalid_account_number');
 
@@ -646,7 +646,7 @@ describe('ExchangePointService', () => {
         repository.setTotalPoints(userId, 10000);
 
         await service.requestExchange(userId, 5000);
-        const id = repository['exchanges'].get(userId)![0].id;
+        const id = repository.getExchangesByUserId(userId)[0].id;
         await service.cancelExchange(userId, id);
 
         expect(await repository.getTotalPoints(userId)).toBe(10000);
@@ -656,7 +656,7 @@ describe('ExchangePointService', () => {
         repository.setTotalPoints(userId, 10000);
 
         await service.requestExchange(userId, 5000);
-        const id = repository['exchanges'].get(userId)![0].id;
+        const id = repository.getExchangesByUserId(userId)[0].id;
         await service.approveExchanges([id]);
 
         expect(await repository.getTotalPoints(userId)).toBe(5000);
@@ -666,7 +666,7 @@ describe('ExchangePointService', () => {
         repository.setTotalPoints(userId, 10000);
 
         await service.requestExchange(userId, 5000);
-        const id = repository['exchanges'].get(userId)![0].id;
+        const id = repository.getExchangesByUserId(userId)[0].id;
         await service.rejectExchange(id, 'invalid_account_number');
 
         expect(await repository.getTotalPoints(userId)).toBe(10000);
@@ -676,9 +676,9 @@ describe('ExchangePointService', () => {
         repository.setTotalPoints(userId, 10000);
 
         await service.requestExchange(userId, 5000);
-        const firstId = repository['exchanges'].get(userId)![0].id;
+        const firstId = repository.getExchangesByUserId(userId)[0].id;
         await service.requestExchange(userId, 3000);
-        const secondId = repository['exchanges'].get(userId)![1].id;
+        const secondId = repository.getExchangesByUserId(userId)[1].id;
 
         // 8000 차감
         expect(await repository.getTotalPoints(userId)).toBe(2000);
@@ -689,7 +689,7 @@ describe('ExchangePointService', () => {
         expect(await repository.getTotalPoints(userId)).toBe(5000);
 
         // first는 그대로, 자동 검증
-        const exchanges = repository['exchanges'].get(userId)!;
+        const exchanges = repository.getExchangesByUserId(userId);
         expect(exchanges).toHaveLength(3); // deduct 2 + restore 1
       });
 
@@ -698,7 +698,7 @@ describe('ExchangePointService', () => {
 
         // 5000 신청 + 승인
         await service.requestExchange(userId, 5000);
-        const firstId = repository['exchanges'].get(userId)![0].id;
+        const firstId = repository.getExchangesByUserId(userId)[0].id;
         await service.approveExchanges([firstId]);
         expect(await repository.getTotalPoints(userId)).toBe(5000);
 
@@ -712,7 +712,7 @@ describe('ExchangePointService', () => {
 
         // 5000 신청 + 취소
         await service.requestExchange(userId, 5000);
-        const firstId = repository['exchanges'].get(userId)![0].id;
+        const firstId = repository.getExchangesByUserId(userId)[0].id;
         await service.cancelExchange(userId, firstId);
         expect(await repository.getTotalPoints(userId)).toBe(10000);
 
@@ -726,13 +726,13 @@ describe('ExchangePointService', () => {
 
         // 첫 신청 + 거절
         await service.requestExchange(userId, 5000);
-        const firstId = repository['exchanges'].get(userId)![0].id;
+        const firstId = repository.getExchangesByUserId(userId)[0].id;
         await service.rejectExchange(firstId, 'invalid_account_number');
         expect(await repository.getTotalPoints(userId)).toBe(10000);
 
         // 두 번째 신청 + 승인
         await service.requestExchange(userId, 5000);
-        const secondId = repository['exchanges'].get(userId)![2].id; // [0]: deduct, [1]: restore, [2]: 새 deduct
+        const secondId = repository.getExchangesByUserId(userId)[2].id; // [0]: deduct, [1]: restore, [2]: 새 deduct
         await service.approveExchanges([secondId]);
         expect(await repository.getTotalPoints(userId)).toBe(5000);
       });
@@ -742,11 +742,11 @@ describe('ExchangePointService', () => {
 
         // 3건 신청
         await service.requestExchange(userId, 5000);
-        const id1 = repository['exchanges'].get(userId)![0].id;
+        const id1 = repository.getExchangesByUserId(userId)[0].id;
         await service.requestExchange(userId, 3000);
-        const id2 = repository['exchanges'].get(userId)![1].id;
+        const id2 = repository.getExchangesByUserId(userId)[1].id;
         await service.requestExchange(userId, 2000);
-        const id3 = repository['exchanges'].get(userId)![2].id;
+        const id3 = repository.getExchangesByUserId(userId)[2].id;
 
         expect(await repository.getTotalPoints(userId)).toBe(10000); // 20000 - 10000
 

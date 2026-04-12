@@ -14,6 +14,10 @@ export class StubExchangePointRepository implements IExchangePointRepository {
     this.exchanges.set(userId, exchanges);
   }
 
+  getExchangesByUserId(userId: string): ExchangePoint[] {
+    return this.exchanges.get(userId) ?? [];
+  }
+
   setTotalPoints(userId: string, total: number): void {
     this.totalPoints.set(userId, total);
   }
