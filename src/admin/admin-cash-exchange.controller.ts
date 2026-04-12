@@ -52,6 +52,22 @@ export class AdminCashExchangeController {
     return this.exchangePointService.searchByEmail(email);
   }
 
+  @Get(':id')
+  @ApiOperation({
+    summary: '출금 거래 단건 상세 조회 (어드민)',
+    description:
+      'cash_exchanges 1건과 그에 연결된 모든 point_actions(deduct + restore) 반환',
+  })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiResponse({ status: 200, description: '거래 상세' })
+  async getDetail(
+    @Headers('x-admin-api-key') apiKey: string,
+    @Param('id') id: string,
+  ) {
+    this.validateApiKey(apiKey);
+    return this.exchangePointService.getCashExchangeDetail(Number(id));
+  }
+
   @Post('approve')
   @ApiOperation({ summary: '출금 요청 일괄 승인' })
   @ApiHeader({ name: 'x-admin-api-key', required: true })

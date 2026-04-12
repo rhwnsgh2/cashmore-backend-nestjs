@@ -45,6 +45,11 @@ export class StubCashExchangeRepository implements ICashExchangeRepository {
     return Promise.resolve(this.exchanges.filter((e) => e.user_id === userId));
   }
 
+  findById(id: number): Promise<CashExchange | null> {
+    const found = this.exchanges.find((e) => e.id === id);
+    return Promise.resolve(found ?? null);
+  }
+
   findByPointActionId(pointActionId: number): Promise<CashExchange | null> {
     const found = this.exchanges.find(
       (e) => e.point_action_id === pointActionId,

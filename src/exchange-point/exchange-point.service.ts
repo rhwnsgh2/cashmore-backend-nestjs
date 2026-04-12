@@ -68,6 +68,31 @@ export interface SearchExchangesResult {
   accountInfoName: AccountInfoNameItem[];
 }
 
+export interface CashExchangeDetailPointAction {
+  id: number;
+  pointAmount: number;
+  role: 'deduct' | 'restore';
+  status: string;
+  createdAt: string;
+  additionalData: Record<string, unknown> | null;
+}
+
+export interface CashExchangeDetailResult {
+  id: number;
+  userId: string;
+  amount: number;
+  status: string;
+  reason: string | null;
+  pointActionId: number | null;
+  confirmedAt: string | null;
+  cancelledAt: string | null;
+  rejectedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  pointActions: CashExchangeDetailPointAction[];
+  netAmount: number;
+}
+
 @Injectable()
 export class ExchangePointService {
   private readonly logger = new Logger(ExchangePointService.name);
@@ -199,6 +224,54 @@ export class ExchangePointService {
       exchangePoints,
       pendingAccountInfo,
       accountInfoName,
+    };
+  }
+
+  async getCashExchangeDetail(id: number): Promise<CashExchangeDetailResult> {
+    const cashExchange = await this.cashExchangeRepository.findById(id);
+
+    if (!cashExchange) {
+      throw new NotFoundException('Cash exchange not found');
+    }
+
+    // 관련 point_actions 조회 (deduct + restore)
+    let pointActions: CashExchangeDetailPointAction[] = [];
+    let netAmount = 0;
+
+    if (cashExchange.point_action_id !== null) {
+      const related = await this.exchangePointRepository.findRelatedToExchange(
+        cashExchange.point_action_id,
+      );
+
+      pointActions = related.map((pa) => {
+        const isOriginal = pa.id === cashExchange.point_action_id;
+        return {
+          id: pa.id,
+          pointAmount: pa.point_amount,
+          role: isOriginal ? ('deduct' as const) : ('restore' as const),
+          status: pa.status,
+          createdAt: pa.created_at,
+          additionalData: pa.additional_data,
+        };
+      });
+
+      netAmount = pointActions.reduce((sum, p) => sum + p.pointAmount, 0);
+    }
+
+    return {
+      id: cashExchange.id,
+      userId: cashExchange.user_id,
+      amount: Number(cashExchange.amount),
+      status: cashExchange.status,
+      reason: cashExchange.reason,
+      pointActionId: cashExchange.point_action_id,
+      confirmedAt: cashExchange.confirmed_at,
+      cancelledAt: cashExchange.cancelled_at,
+      rejectedAt: cashExchange.rejected_at,
+      createdAt: cashExchange.created_at,
+      updatedAt: cashExchange.updated_at,
+      pointActions,
+      netAmount,
     };
   }
 

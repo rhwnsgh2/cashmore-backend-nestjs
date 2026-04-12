@@ -72,6 +72,28 @@ export class SupabaseExchangePointRepository implements IExchangePointRepository
     return { id: (result as { id: number }).id };
   }
 
+  async findRelatedToExchange(
+    originalPointActionId: number,
+  ): Promise<ExchangePoint[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .select(
+        'id, user_id, type, point_amount, status, created_at, additional_data',
+      )
+      .eq('type', 'EXCHANGE_POINT_TO_CASH')
+      .or(
+        `id.eq.${originalPointActionId},additional_data->>original_point_action_id.eq.${originalPointActionId}`,
+      )
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as ExchangePoint[]) || [];
+  }
+
   async findById(id: number, userId: string): Promise<ExchangePoint | null> {
     const { data, error } = await this.supabaseService
       .getClient()

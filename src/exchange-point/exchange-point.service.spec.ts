@@ -766,4 +766,131 @@ describe('ExchangePointService', () => {
       });
     });
   });
+
+  // ============================================================
+  // getCashExchangeDetail (어드민 단건 상세 조회)
+  // ============================================================
+  describe('getCashExchangeDetail', () => {
+    it('존재하지 않는 id면 NotFoundException', async () => {
+      await expect(service.getCashExchangeDetail(99999)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('pending 거래는 deduct 행 1개 반환, netAmount = -amount', async () => {
+      repository.setTotalPoints(userId, 10000);
+      await service.requestExchange(userId, 5000);
+
+      const cashExchanges = cashExchangeRepository.getAll();
+      const ceId = cashExchanges[0].id;
+
+      const detail = await service.getCashExchangeDetail(ceId);
+
+      expect(detail.id).toBe(ceId);
+      expect(detail.userId).toBe(userId);
+      expect(detail.amount).toBe(5000);
+      expect(detail.status).toBe('pending');
+      expect(detail.pointActions).toHaveLength(1);
+      expect(detail.pointActions[0]).toMatchObject({
+        pointAmount: -5000,
+        role: 'deduct',
+      });
+      expect(detail.netAmount).toBe(-5000);
+    });
+
+    it('취소된 거래는 deduct + restore 행 2개 반환, netAmount = 0', async () => {
+      repository.setTotalPoints(userId, 10000);
+      await service.requestExchange(userId, 5000);
+
+      const cashExchanges = cashExchangeRepository.getAll();
+      const ceId = cashExchanges[0].id;
+      const pointActionId = cashExchanges[0].point_action_id as number;
+
+      await service.cancelExchange(userId, pointActionId);
+
+      const detail = await service.getCashExchangeDetail(ceId);
+
+      expect(detail.status).toBe('cancelled');
+      expect(detail.pointActions).toHaveLength(2);
+
+      const deduct = detail.pointActions.find((p) => p.role === 'deduct')!;
+      const restore = detail.pointActions.find((p) => p.role === 'restore')!;
+
+      expect(deduct.pointAmount).toBe(-5000);
+      expect(restore.pointAmount).toBe(5000);
+      expect(restore.additionalData).toMatchObject({
+        original_point_action_id: pointActionId,
+        reason: 'cancelled',
+      });
+
+      expect(detail.netAmount).toBe(0);
+    });
+
+    it('승인된 거래는 deduct 행 1개만 반환 (point_actions 변동 없음), netAmount = -amount', async () => {
+      repository.setTotalPoints(userId, 10000);
+      await service.requestExchange(userId, 5000);
+
+      const cashExchanges = cashExchangeRepository.getAll();
+      const ceId = cashExchanges[0].id;
+      const pointActionId = cashExchanges[0].point_action_id as number;
+
+      await service.approveExchanges([pointActionId]);
+
+      const detail = await service.getCashExchangeDetail(ceId);
+
+      expect(detail.status).toBe('done');
+      expect(detail.pointActions).toHaveLength(1);
+      expect(detail.pointActions[0].role).toBe('deduct');
+      expect(detail.netAmount).toBe(-5000);
+    });
+
+    it('거절된 거래는 deduct + restore 2개 반환, netAmount = 0, restore.reason = rejected_*', async () => {
+      repository.setTotalPoints(userId, 10000);
+      await service.requestExchange(userId, 5000);
+
+      const cashExchanges = cashExchangeRepository.getAll();
+      const ceId = cashExchanges[0].id;
+      const pointActionId = cashExchanges[0].point_action_id as number;
+
+      await service.rejectExchange(pointActionId, 'invalid_account_number');
+
+      const detail = await service.getCashExchangeDetail(ceId);
+
+      expect(detail.status).toBe('rejected');
+      expect(detail.pointActions).toHaveLength(2);
+
+      const restore = detail.pointActions.find((p) => p.role === 'restore')!;
+      expect(restore.additionalData).toMatchObject({
+        original_point_action_id: pointActionId,
+        reason: 'rejected_invalid_account_number',
+      });
+
+      expect(detail.netAmount).toBe(0);
+    });
+
+    it('다른 거래의 복원 행은 포함되지 않는다', async () => {
+      repository.setTotalPoints(userId, 20000);
+
+      // 첫 거래: 신청 + 취소
+      await service.requestExchange(userId, 5000);
+      const firstCe = cashExchangeRepository.getAll()[0];
+      await service.cancelExchange(userId, firstCe.point_action_id as number);
+
+      // 두 번째 거래: 신청만
+      await service.requestExchange(userId, 3000);
+      const secondCe = cashExchangeRepository
+        .getAll()
+        .find((e) => e.id !== firstCe.id)!;
+
+      // 첫 거래 detail은 deduct + restore 2개만
+      const firstDetail = await service.getCashExchangeDetail(firstCe.id);
+      expect(firstDetail.pointActions).toHaveLength(2);
+      expect(firstDetail.netAmount).toBe(0);
+
+      // 두 번째 거래 detail은 deduct 1개만
+      const secondDetail = await service.getCashExchangeDetail(secondCe.id);
+      expect(secondDetail.pointActions).toHaveLength(1);
+      expect(secondDetail.netAmount).toBe(-3000);
+    });
+  });
 });

@@ -30,6 +30,14 @@ export interface IExchangePointRepository {
   insertRestoreAction(data: InsertRestoreActionData): Promise<{ id: number }>;
   findById(id: number, userId: string): Promise<ExchangePoint | null>;
   findByIds(ids: number[]): Promise<ExchangePoint[]>;
+  /**
+   * 한 출금 거래(deduct 행)에 연관된 모든 point_actions 조회
+   * - deduct 행 (id = originalPointActionId)
+   * - restore 행들 (additional_data.original_point_action_id = originalPointActionId)
+   */
+  findRelatedToExchange(
+    originalPointActionId: number,
+  ): Promise<ExchangePoint[]>;
   cancelExchangeRequest(id: number, userId: string): Promise<void>;
   approveExchangeRequests(ids: number[]): Promise<void>;
   rejectExchangeRequest(id: number, reason: string): Promise<void>;

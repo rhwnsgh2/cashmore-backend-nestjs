@@ -107,6 +107,21 @@ export class SupabaseCashExchangeRepository implements ICashExchangeRepository {
     return (data as CashExchange[]) || [];
   }
 
+  async findById(id: number): Promise<CashExchange | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data as CashExchange;
+  }
+
   async findByPointActionId(
     pointActionId: number,
   ): Promise<CashExchange | null> {

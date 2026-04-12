@@ -101,6 +101,32 @@ export class StubExchangePointRepository implements IExchangePointRepository {
     return Promise.resolve(results);
   }
 
+  findRelatedToExchange(
+    originalPointActionId: number,
+  ): Promise<ExchangePoint[]> {
+    const results: ExchangePoint[] = [];
+    for (const exchanges of this.exchanges.values()) {
+      for (const e of exchanges) {
+        if (e.type !== 'EXCHANGE_POINT_TO_CASH') continue;
+        const isOriginal = e.id === originalPointActionId;
+        const isRestore =
+          e.additional_data &&
+          typeof e.additional_data === 'object' &&
+          (e.additional_data as Record<string, unknown>)
+            .original_point_action_id === originalPointActionId;
+        if (isOriginal || isRestore) {
+          results.push(e);
+        }
+      }
+    }
+    return Promise.resolve(
+      results.sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      ),
+    );
+  }
+
   approveExchangeRequests(ids: number[]): Promise<void> {
     for (const exchanges of this.exchanges.values()) {
       for (const exchange of exchanges) {

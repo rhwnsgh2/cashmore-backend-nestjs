@@ -44,6 +44,7 @@ export interface ICashExchangeRepository {
   findByUserIds(userIds: string[], limit: number): Promise<CashExchange[]>;
   findByPointActionId(pointActionId: number): Promise<CashExchange | null>;
   findByPointActionIds(pointActionIds: number[]): Promise<CashExchange[]>;
+  findById(id: number): Promise<CashExchange | null>;
 }
 
 export const CASH_EXCHANGE_REPOSITORY = Symbol('CASH_EXCHANGE_REPOSITORY');
