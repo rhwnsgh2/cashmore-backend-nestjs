@@ -10,6 +10,7 @@ import { UserModalModule } from '../user-modal/user-modal.module';
 import { FcmModule } from '../fcm/fcm.module';
 import { UserModule } from '../user/user.module';
 import { AccountInfoModule } from '../account-info/account-info.module';
+import { SlackModule } from '../slack/slack.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AccountInfoModule } from '../account-info/account-info.module';
     FcmModule,
     UserModule,
     AccountInfoModule,
+    SlackModule,
   ],
   controllers: [ExchangePointController],
   providers: [

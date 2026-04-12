@@ -1,16 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CashbackService } from './cashback.service';
 import { CASHBACK_REPOSITORY } from './interfaces/cashback-repository.interface';
 import { StubCashbackRepository } from './repositories/stub-cashback.repository';
+import { SlackService } from '../slack/slack.service';
 
 describe('CashbackService', () => {
   let service: CashbackService;
   let repository: StubCashbackRepository;
+  let slackSpy: ReturnType<typeof vi.fn>;
   const userId = 'test-user-id';
 
   beforeEach(async () => {
     repository = new StubCashbackRepository();
+    slackSpy = vi.fn().mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -18,6 +21,10 @@ describe('CashbackService', () => {
         {
           provide: CASHBACK_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: SlackService,
+          useValue: { reportBugToSlack: slackSpy },
         },
       ],
     }).compile();
@@ -751,6 +758,144 @@ describe('CashbackService', () => {
 
       expect(result.items).toHaveLength(20);
       expect(result.nextCursor).not.toBeNull();
+    });
+  });
+
+  describe('cash_exchanges 마이그레이션 비교 로직', () => {
+    beforeEach(() => {
+      repository.clear();
+      slackSpy.mockClear();
+    });
+
+    it('sumExchangePointToCash와 sumCashExchangeDone이 일치하면 슬랙 알림이 없다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point_amount: -5000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+      ]);
+      repository.setCashExchanges(userId, [
+        {
+          id: 100,
+          point_action_id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          amount: 5000,
+          status: 'done',
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      expect(result.receivedCashback).toBe(5000);
+      expect(slackSpy).not.toHaveBeenCalled();
+    });
+
+    it('sumExchangePointToCash와 sumCashExchangeDone이 다르면 슬랙 알림이 발송된다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point_amount: -5000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+      ]);
+      // cash_exchanges에는 다른 금액
+      repository.setCashExchanges(userId, [
+        {
+          id: 100,
+          point_action_id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          amount: 4000,
+          status: 'done',
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      // 응답은 legacy 기준
+      expect(result.receivedCashback).toBe(5000);
+      // 슬랙 알림 호출 확인
+      expect(slackSpy).toHaveBeenCalledTimes(1);
+      expect(slackSpy.mock.calls[0][0]).toContain('sumExchangePointToCash mismatch');
+    });
+
+    it('cashbackList에서 cash_exchanges와 일치하면 슬랙 알림이 없다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point_amount: -5000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+      ]);
+      repository.setCashExchanges(userId, [
+        {
+          id: 100,
+          point_action_id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          amount: 5000,
+          status: 'done',
+        },
+      ]);
+
+      await service.getCashbackList(userId, null, 20);
+
+      expect(slackSpy).not.toHaveBeenCalled();
+    });
+
+    it('cashbackList에서 cash_exchanges 건수가 다르면 슬랙 알림이 발송된다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point_amount: -5000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+      ]);
+      // cash_exchanges에는 행 없음
+      repository.setCashExchanges(userId, []);
+
+      await service.getCashbackList(userId, null, 20);
+
+      expect(slackSpy).toHaveBeenCalledTimes(1);
+      expect(slackSpy.mock.calls[0][0]).toContain('cashbackList count mismatch');
+    });
+
+    it('cashbackList에서 status가 다르면 슬랙 알림이 발송된다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          point_amount: -5000,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          status: 'done',
+          additional_data: null,
+        },
+      ]);
+      repository.setCashExchanges(userId, [
+        {
+          id: 100,
+          point_action_id: 1,
+          created_at: '2026-03-24T10:00:00Z',
+          amount: 5000,
+          status: 'pending',
+        },
+      ]);
+
+      await service.getCashbackList(userId, null, 20);
+
+      expect(slackSpy).toHaveBeenCalledTimes(1);
+      expect(slackSpy.mock.calls[0][0]).toContain('cashbackList mismatch');
     });
   });
 });

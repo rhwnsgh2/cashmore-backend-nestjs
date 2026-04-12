@@ -140,6 +140,14 @@ export interface RawNaverPayExchange {
   status: string;
 }
 
+export interface RawCashExchange {
+  id: number;
+  point_action_id: number | null;
+  created_at: string;
+  amount: number;
+  status: string;
+}
+
 // Repository 인터페이스
 export interface ICashbackRepository {
   findEveryReceipts(
@@ -191,6 +199,14 @@ export interface ICashbackRepository {
   sumCompletedClaimCashback(userId: string): Promise<number>;
 
   sumExchangePointToCash(userId: string): Promise<number>;
+
+  sumCashExchangeDone(userId: string): Promise<number>;
+
+  findCashExchanges(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<RawCashExchange[]>;
 }
 
 // DI 토큰

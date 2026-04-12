@@ -92,6 +92,21 @@ export class SupabaseCashExchangeRepository implements ICashExchangeRepository {
     }
   }
 
+  async findByUserId(userId: string): Promise<CashExchange[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as CashExchange[]) || [];
+  }
+
   async findByStatus(status: CashExchangeStatus): Promise<CashExchange[]> {
     const { data, error } = await this.supabaseService
       .getClient()

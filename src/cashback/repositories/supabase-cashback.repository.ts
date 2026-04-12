@@ -11,6 +11,7 @@ import {
   type RawAttendancePointAction,
   type RawClaim,
   type RawNaverPayExchange,
+  type RawCashExchange,
 } from '../interfaces/cashback-repository.interface';
 
 @Injectable()
@@ -199,6 +200,43 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
         acc + (row.point_amount ?? 0) * -1,
       0,
     );
+  }
+
+  async sumCashExchangeDone(userId: string): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('status', 'done');
+
+    if (error || !data) return 0;
+    return data.reduce(
+      (acc: number, row: { amount: number | null }) => acc + (row.amount ?? 0),
+      0,
+    );
+  }
+
+  async findCashExchanges(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<RawCashExchange[]> {
+    let query = this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('id, point_action_id, created_at, amount, status')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (cursor) {
+      query = query.lt('created_at', cursor);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data as unknown as RawCashExchange[];
   }
 
   async findNaverPayExchanges(

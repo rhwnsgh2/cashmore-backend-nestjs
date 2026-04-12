@@ -11,10 +11,15 @@ import { FcmService } from '../fcm/fcm.service';
 import type { IUserRepository } from '../user/interfaces/user-repository.interface';
 import { USER_REPOSITORY } from '../user/interfaces/user-repository.interface';
 import { AccountInfoService } from '../account-info/account-info.service';
+import { SlackService } from '../slack/slack.service';
 import type { IExchangePointRepository } from './interfaces/exchange-point-repository.interface';
 import { EXCHANGE_POINT_REPOSITORY } from './interfaces/exchange-point-repository.interface';
-import type { ICashExchangeRepository } from './interfaces/cash-exchange-repository.interface';
+import type {
+  CashExchange,
+  ICashExchangeRepository,
+} from './interfaces/cash-exchange-repository.interface';
 import { CASH_EXCHANGE_REPOSITORY } from './interfaces/cash-exchange-repository.interface';
+import type { ExchangePoint } from './interfaces/exchange-point-repository.interface';
 
 export interface ExchangePointResponse {
   id: number;
@@ -67,6 +72,7 @@ export class ExchangePointService {
     private userRepository: IUserRepository,
     private accountInfoService: AccountInfoService,
     private fcmService: FcmService,
+    private slackService: SlackService,
   ) {}
 
   async getPendingWithAccountInfo(): Promise<GetPendingWithAccountInfoResult> {
@@ -128,14 +134,120 @@ export class ExchangePointService {
   }
 
   async getExchangeHistory(userId: string): Promise<ExchangePointResponse[]> {
-    const exchanges = await this.exchangePointRepository.findByUserId(userId);
+    const [legacy, cashExchanges] = await Promise.all([
+      this.exchangePointRepository.findByUserId(userId),
+      this.safeFindCashExchangesByUserId(userId),
+    ]);
 
-    return exchanges.map((e) => ({
+    if (cashExchanges !== null) {
+      this.compareExchangeHistory(userId, legacy, cashExchanges);
+    }
+
+    return legacy.map((e) => ({
       id: e.id,
       createdAt: e.created_at,
       amount: e.point_amount,
       status: e.status,
     }));
+  }
+
+  private async safeFindCashExchangesByUserId(
+    userId: string,
+  ): Promise<CashExchange[] | null> {
+    try {
+      return await this.cashExchangeRepository.findByUserId(userId);
+    } catch (error) {
+      this.logger.error(
+        `[CashExchangeMigration] cash_exchanges read failed userId=${userId}`,
+        error,
+      );
+      void this.slackService.reportBugToSlack(
+        `🚨 [CashExchangeMigration] getExchangeHistory read failed userId=${userId} error=${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
+  }
+
+  private compareExchangeHistory(
+    userId: string,
+    legacy: ExchangePoint[],
+    cashExchanges: CashExchange[],
+  ): void {
+    // legacy의 id(point_actions.id)와 cash_exchanges의 point_action_id를 매칭
+    const legacyMap = new Map(legacy.map((e) => [e.id, e]));
+    const newMap = new Map<number, CashExchange>();
+    for (const ce of cashExchanges) {
+      if (ce.point_action_id !== null) {
+        newMap.set(ce.point_action_id, ce);
+      }
+    }
+
+    const mismatches: Array<{
+      pointActionId: number | null;
+      reason: string;
+      legacy?: { status: string; amount: number };
+      new?: { status: string; amount: number };
+    }> = [];
+
+    for (const [id, legacyItem] of legacyMap) {
+      const newItem = newMap.get(id);
+      if (!newItem) {
+        mismatches.push({
+          pointActionId: id,
+          reason: 'missing_in_cash_exchanges',
+          legacy: {
+            status: legacyItem.status,
+            amount: legacyItem.point_amount,
+          },
+        });
+        continue;
+      }
+      if (legacyItem.status !== newItem.status) {
+        mismatches.push({
+          pointActionId: id,
+          reason: 'status_mismatch',
+          legacy: {
+            status: legacyItem.status,
+            amount: legacyItem.point_amount,
+          },
+          new: { status: newItem.status, amount: Number(newItem.amount) },
+        });
+      }
+      if (Math.abs(legacyItem.point_amount) !== Number(newItem.amount)) {
+        mismatches.push({
+          pointActionId: id,
+          reason: 'amount_mismatch',
+          legacy: {
+            status: legacyItem.status,
+            amount: legacyItem.point_amount,
+          },
+          new: { status: newItem.status, amount: Number(newItem.amount) },
+        });
+      }
+    }
+
+    for (const [pointActionId, ce] of newMap) {
+      if (!legacyMap.has(pointActionId)) {
+        mismatches.push({
+          pointActionId,
+          reason: 'missing_in_point_actions',
+          new: { status: ce.status, amount: Number(ce.amount) },
+        });
+      }
+    }
+
+    if (mismatches.length === 0) {
+      return;
+    }
+
+    const details = {
+      legacyCount: legacy.length,
+      newCount: cashExchanges.length,
+      mismatches: mismatches.slice(0, 10),
+    };
+    const message = `[CashExchangeMigration] getExchangeHistory mismatch userId=${userId} ${JSON.stringify(details)}`;
+    this.logger.warn(message);
+    void this.slackService.reportBugToSlack(`🚨 ${message}`);
   }
 
   async requestExchange(

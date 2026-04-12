@@ -40,6 +40,7 @@ export interface ICashExchangeRepository {
     },
   ): Promise<void>;
   findByStatus(status: CashExchangeStatus): Promise<CashExchange[]>;
+  findByUserId(userId: string): Promise<CashExchange[]>;
 }
 
 export const CASH_EXCHANGE_REPOSITORY = Symbol('CASH_EXCHANGE_REPOSITORY');

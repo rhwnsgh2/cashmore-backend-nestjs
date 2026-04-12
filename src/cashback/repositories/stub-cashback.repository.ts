@@ -8,6 +8,7 @@ import type {
   RawAttendancePointAction,
   RawClaim,
   RawNaverPayExchange,
+  RawCashExchange,
 } from '../interfaces/cashback-repository.interface';
 
 export class StubCashbackRepository implements ICashbackRepository {
@@ -20,6 +21,7 @@ export class StubCashbackRepository implements ICashbackRepository {
     new Map();
   private claims: Map<string, RawClaim[]> = new Map();
   private naverPayExchanges: Map<string, RawNaverPayExchange[]> = new Map();
+  private cashExchanges: Map<string, RawCashExchange[]> = new Map();
 
   // 데이터 설정 메서드들
   setEveryReceipts(userId: string, data: RawEveryReceipt[]): void {
@@ -57,6 +59,10 @@ export class StubCashbackRepository implements ICashbackRepository {
     this.naverPayExchanges.set(userId, data);
   }
 
+  setCashExchanges(userId: string, data: RawCashExchange[]): void {
+    this.cashExchanges.set(userId, data);
+  }
+
   clear(): void {
     this.everyReceipts.clear();
     this.pointActions.clear();
@@ -66,6 +72,7 @@ export class StubCashbackRepository implements ICashbackRepository {
     this.attendancePointActions.clear();
     this.claims.clear();
     this.naverPayExchanges.clear();
+    this.cashExchanges.clear();
   }
 
   // ICashbackRepository 구현
@@ -164,10 +171,25 @@ export class StubCashbackRepository implements ICashbackRepository {
   sumExchangePointToCash(userId: string): Promise<number> {
     const actions = this.pointActions.get(userId) || [];
     const sum = actions
-      .filter(
-        (a) => a.type === 'EXCHANGE_POINT_TO_CASH' && a.status === 'done',
-      )
+      .filter((a) => a.type === 'EXCHANGE_POINT_TO_CASH' && a.status === 'done')
       .reduce((acc, a) => acc + (a.point_amount || 0) * -1, 0);
     return Promise.resolve(sum);
+  }
+
+  sumCashExchangeDone(userId: string): Promise<number> {
+    const exchanges = this.cashExchanges.get(userId) || [];
+    const sum = exchanges
+      .filter((e) => e.status === 'done')
+      .reduce((acc, e) => acc + (e.amount || 0), 0);
+    return Promise.resolve(sum);
+  }
+
+  findCashExchanges(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<RawCashExchange[]> {
+    const data = this.cashExchanges.get(userId) || [];
+    return Promise.resolve(this.applyPagination(data, cursor, limit));
   }
 }
