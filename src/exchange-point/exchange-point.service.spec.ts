@@ -459,4 +459,312 @@ describe('ExchangePointService', () => {
     });
   });
 
+  // ============================================================
+  // Phase 3: 네이버페이 패턴 (point_actions 원장화) 검증
+  // ============================================================
+  describe('Phase 3: 네이버페이 패턴 검증', () => {
+    describe('requestExchange — point_actions에 status="done"으로 INSERT', () => {
+      it('신청 시 point_actions에 -amount, status="done"으로 INSERT된다', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        await service.requestExchange(userId, 5000);
+
+        const exchanges = repository['exchanges'].get(userId)!;
+        expect(exchanges).toHaveLength(1);
+        expect(exchanges[0]).toMatchObject({
+          user_id: userId,
+          type: 'EXCHANGE_POINT_TO_CASH',
+          point_amount: -5000,
+          status: 'done', // ⚠️ Phase 3: pending이 아닌 done
+        });
+      });
+
+      it('신청 즉시 cash_exchanges에는 status="pending"으로 INSERT된다', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        await service.requestExchange(userId, 5000);
+
+        const cashExchanges = cashExchangeRepository.getAll();
+        expect(cashExchanges).toHaveLength(1);
+        expect(cashExchanges[0]).toMatchObject({
+          user_id: userId,
+          amount: 5000,
+          status: 'pending',
+          point_action_id: 1,
+        });
+      });
+
+      it('신청 즉시 잔액에서 차감된다 (point_actions의 합)', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        await service.requestExchange(userId, 5000);
+
+        const total = await repository.getTotalPoints(userId);
+        expect(total).toBe(5000); // 10000 - 5000
+      });
+    });
+
+    describe('cancelExchange — 복원 행 INSERT 패턴', () => {
+      it('취소 시 point_actions에 +amount 복원 행이 INSERT된다 (원본 행은 그대로)', async () => {
+        repository.setTotalPoints(userId, 10000);
+        await service.requestExchange(userId, 5000);
+        const originalId = repository['exchanges'].get(userId)![0].id;
+
+        await service.cancelExchange(userId, originalId);
+
+        const exchanges = repository['exchanges'].get(userId)!;
+        expect(exchanges).toHaveLength(2);
+        // 원본 deduct 행 (status='done', -5000) — 그대로
+        expect(exchanges[0]).toMatchObject({
+          id: originalId,
+          point_amount: -5000,
+          status: 'done', // ⚠️ cancelled로 변경 안 됨
+        });
+        // 복원 행 (status='done', +5000)
+        expect(exchanges[1]).toMatchObject({
+          point_amount: 5000,
+          status: 'done',
+          additional_data: expect.objectContaining({
+            original_point_action_id: originalId,
+            reason: 'cancelled',
+          }),
+        });
+      });
+
+      it('취소 후 잔액 net = 0 (deduct + restore)', async () => {
+        repository.setTotalPoints(userId, 10000);
+        await service.requestExchange(userId, 5000);
+        const originalId = repository['exchanges'].get(userId)![0].id;
+
+        await service.cancelExchange(userId, originalId);
+
+        const total = await repository.getTotalPoints(userId);
+        expect(total).toBe(10000); // 차감 -5000 + 복원 +5000 = 0, 잔액 그대로
+      });
+
+      it('취소 시 cash_exchanges status는 cancelled로 변경된다', async () => {
+        repository.setTotalPoints(userId, 10000);
+        await service.requestExchange(userId, 5000);
+        const originalId = repository['exchanges'].get(userId)![0].id;
+
+        await service.cancelExchange(userId, originalId);
+
+        const cashExchanges = cashExchangeRepository.getAll();
+        expect(cashExchanges[0].status).toBe('cancelled');
+        expect(cashExchanges[0].cancelled_at).toBeTruthy();
+      });
+    });
+
+    describe('approveExchanges — point_actions 변동 없음', () => {
+      it('승인 시 point_actions에 추가 INSERT나 UPDATE가 없다', async () => {
+        repository.setTotalPoints(userId, 10000);
+        await service.requestExchange(userId, 5000);
+        const originalId = repository['exchanges'].get(userId)![0].id;
+
+        await service.approveExchanges([originalId]);
+
+        const exchanges = repository['exchanges'].get(userId)!;
+        // 신청 시 INSERT된 1행 그대로
+        expect(exchanges).toHaveLength(1);
+        expect(exchanges[0]).toMatchObject({
+          point_amount: -5000,
+          status: 'done', // 변경 없음
+        });
+      });
+
+      it('승인 후 잔액은 -amount (영구 차감)', async () => {
+        repository.setTotalPoints(userId, 10000);
+        await service.requestExchange(userId, 5000);
+        const originalId = repository['exchanges'].get(userId)![0].id;
+
+        await service.approveExchanges([originalId]);
+
+        const total = await repository.getTotalPoints(userId);
+        expect(total).toBe(5000); // 차감 영구
+      });
+
+      it('승인 시 cash_exchanges status는 done으로 변경된다', async () => {
+        repository.setTotalPoints(userId, 10000);
+        await service.requestExchange(userId, 5000);
+        const originalId = repository['exchanges'].get(userId)![0].id;
+
+        await service.approveExchanges([originalId]);
+
+        const cashExchanges = cashExchangeRepository.getAll();
+        expect(cashExchanges[0].status).toBe('done');
+        expect(cashExchanges[0].confirmed_at).toBeTruthy();
+      });
+    });
+
+    describe('rejectExchange — 복원 행 INSERT 패턴', () => {
+      it('거절 시 point_actions에 +amount 복원 행이 INSERT된다 (원본 행은 그대로)', async () => {
+        repository.setTotalPoints(userId, 10000);
+        await service.requestExchange(userId, 5000);
+        const originalId = repository['exchanges'].get(userId)![0].id;
+
+        await service.rejectExchange(originalId, 'invalid_account_number');
+
+        const exchanges = repository['exchanges'].get(userId)!;
+        expect(exchanges).toHaveLength(2);
+        expect(exchanges[0]).toMatchObject({
+          id: originalId,
+          point_amount: -5000,
+          status: 'done',
+        });
+        expect(exchanges[1]).toMatchObject({
+          point_amount: 5000,
+          status: 'done',
+          additional_data: expect.objectContaining({
+            original_point_action_id: originalId,
+            reason: 'rejected_invalid_account_number',
+          }),
+        });
+      });
+
+      it('거절 후 잔액 net = 0', async () => {
+        repository.setTotalPoints(userId, 10000);
+        await service.requestExchange(userId, 5000);
+        const originalId = repository['exchanges'].get(userId)![0].id;
+
+        await service.rejectExchange(originalId, 'invalid_account_number');
+
+        const total = await repository.getTotalPoints(userId);
+        expect(total).toBe(10000); // 차감 + 복원 = 0
+      });
+    });
+
+    describe('통합 시나리오 — 잔액 정합성 검증 (가장 중요)', () => {
+      it('시나리오 1: 5000 신청만 → 잔액 5000', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        await service.requestExchange(userId, 5000);
+
+        expect(await repository.getTotalPoints(userId)).toBe(5000);
+      });
+
+      it('시나리오 2: 5000 신청 → 취소 → 잔액 10000 (원복)', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        await service.requestExchange(userId, 5000);
+        const id = repository['exchanges'].get(userId)![0].id;
+        await service.cancelExchange(userId, id);
+
+        expect(await repository.getTotalPoints(userId)).toBe(10000);
+      });
+
+      it('시나리오 3: 5000 신청 → 승인 → 잔액 5000 (영구 차감)', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        await service.requestExchange(userId, 5000);
+        const id = repository['exchanges'].get(userId)![0].id;
+        await service.approveExchanges([id]);
+
+        expect(await repository.getTotalPoints(userId)).toBe(5000);
+      });
+
+      it('시나리오 4: 5000 신청 → 거절 → 잔액 10000 (원복)', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        await service.requestExchange(userId, 5000);
+        const id = repository['exchanges'].get(userId)![0].id;
+        await service.rejectExchange(id, 'invalid_account_number');
+
+        expect(await repository.getTotalPoints(userId)).toBe(10000);
+      });
+
+      it('시나리오 5: 5000 + 3000 신청 → 그 중 3000 취소 → 잔액 5000', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        await service.requestExchange(userId, 5000);
+        const firstId = repository['exchanges'].get(userId)![0].id;
+        await service.requestExchange(userId, 3000);
+        const secondId = repository['exchanges'].get(userId)![1].id;
+
+        // 8000 차감
+        expect(await repository.getTotalPoints(userId)).toBe(2000);
+
+        await service.cancelExchange(userId, secondId);
+
+        // 3000 복원
+        expect(await repository.getTotalPoints(userId)).toBe(5000);
+
+        // first는 그대로, 자동 검증
+        const exchanges = repository['exchanges'].get(userId)!;
+        expect(exchanges).toHaveLength(3); // deduct 2 + restore 1
+      });
+
+      it('시나리오 6: 신청 → 승인 → 잔액 변동 후 다시 신청 → 잔액 정확', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        // 5000 신청 + 승인
+        await service.requestExchange(userId, 5000);
+        const firstId = repository['exchanges'].get(userId)![0].id;
+        await service.approveExchanges([firstId]);
+        expect(await repository.getTotalPoints(userId)).toBe(5000);
+
+        // 추가로 3000 신청
+        await service.requestExchange(userId, 3000);
+        expect(await repository.getTotalPoints(userId)).toBe(2000);
+      });
+
+      it('시나리오 7: 신청 → 취소 → 다시 신청 → 잔액 정확', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        // 5000 신청 + 취소
+        await service.requestExchange(userId, 5000);
+        const firstId = repository['exchanges'].get(userId)![0].id;
+        await service.cancelExchange(userId, firstId);
+        expect(await repository.getTotalPoints(userId)).toBe(10000);
+
+        // 다시 5000 신청
+        await service.requestExchange(userId, 5000);
+        expect(await repository.getTotalPoints(userId)).toBe(5000);
+      });
+
+      it('시나리오 8: 5000 신청 → 거절 → 다시 5000 신청 → 승인 → 잔액 5000', async () => {
+        repository.setTotalPoints(userId, 10000);
+
+        // 첫 신청 + 거절
+        await service.requestExchange(userId, 5000);
+        const firstId = repository['exchanges'].get(userId)![0].id;
+        await service.rejectExchange(firstId, 'invalid_account_number');
+        expect(await repository.getTotalPoints(userId)).toBe(10000);
+
+        // 두 번째 신청 + 승인
+        await service.requestExchange(userId, 5000);
+        const secondId = repository['exchanges'].get(userId)![2].id; // [0]: deduct, [1]: restore, [2]: 새 deduct
+        await service.approveExchanges([secondId]);
+        expect(await repository.getTotalPoints(userId)).toBe(5000);
+      });
+
+      it('시나리오 9: 여러 건 일괄 승인 — 일부는 done, 일부는 pending', async () => {
+        repository.setTotalPoints(userId, 20000);
+
+        // 3건 신청
+        await service.requestExchange(userId, 5000);
+        const id1 = repository['exchanges'].get(userId)![0].id;
+        await service.requestExchange(userId, 3000);
+        const id2 = repository['exchanges'].get(userId)![1].id;
+        await service.requestExchange(userId, 2000);
+        const id3 = repository['exchanges'].get(userId)![2].id;
+
+        expect(await repository.getTotalPoints(userId)).toBe(10000); // 20000 - 10000
+
+        // id2는 먼저 취소
+        await service.cancelExchange(userId, id2);
+        expect(await repository.getTotalPoints(userId)).toBe(13000); // 10000 + 3000 복원
+
+        // id1, id3 일괄 승인
+        await service.approveExchanges([id1, id3]);
+        expect(await repository.getTotalPoints(userId)).toBe(13000); // 변동 없음
+
+        // 최종 cash_exchanges 상태
+        const cashExchanges = cashExchangeRepository.getAll();
+        const sortedById = [...cashExchanges].sort((a, b) => a.id - b.id);
+        expect(sortedById[0].status).toBe('done'); // id1
+        expect(sortedById[1].status).toBe('cancelled'); // id2
+        expect(sortedById[2].status).toBe('done'); // id3
+      });
+    });
+  });
 });

@@ -4,6 +4,7 @@ import type {
   IExchangePointRepository,
   ExchangePoint,
   InsertExchangePointData,
+  InsertRestoreActionData,
 } from '../interfaces/exchange-point-repository.interface';
 
 @Injectable()
@@ -35,6 +36,32 @@ export class SupabaseExchangePointRepository implements IExchangePointRepository
       .getClient()
       .from('point_actions')
       .insert(data)
+      .select('id')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return { id: (result as { id: number }).id };
+  }
+
+  async insertRestoreAction(
+    data: InsertRestoreActionData,
+  ): Promise<{ id: number }> {
+    const { data: result, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .insert({
+        user_id: data.user_id,
+        type: 'EXCHANGE_POINT_TO_CASH',
+        point_amount: data.amount, // 양수 (복원)
+        status: 'done',
+        additional_data: {
+          original_point_action_id: data.original_point_action_id,
+          reason: data.reason ?? null,
+        },
+      })
       .select('id')
       .single();
 

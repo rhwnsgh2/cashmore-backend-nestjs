@@ -2,6 +2,7 @@ import type {
   IExchangePointRepository,
   ExchangePoint,
   InsertExchangePointData,
+  InsertRestoreActionData,
 } from '../interfaces/exchange-point-repository.interface';
 
 export class StubExchangePointRepository implements IExchangePointRepository {
@@ -48,6 +49,36 @@ export class StubExchangePointRepository implements IExchangePointRepository {
     // 잔액 차감
     const currentTotal = this.totalPoints.get(data.user_id) ?? 0;
     this.totalPoints.set(data.user_id, currentTotal + data.point_amount);
+
+    return Promise.resolve({ id });
+  }
+
+  insertRestoreAction(data: InsertRestoreActionData): Promise<{ id: number }> {
+    const id = this.nextId++;
+    const additionalData: Record<string, unknown> = {
+      original_point_action_id: data.original_point_action_id,
+    };
+    if (data.reason) {
+      additionalData.reason = data.reason;
+    }
+
+    const exchange: ExchangePoint = {
+      id,
+      user_id: data.user_id,
+      type: 'EXCHANGE_POINT_TO_CASH',
+      point_amount: data.amount, // 양수 (복원)
+      status: 'done',
+      created_at: new Date().toISOString(),
+      additional_data: additionalData,
+    };
+
+    const userExchanges = this.exchanges.get(data.user_id) || [];
+    userExchanges.push(exchange);
+    this.exchanges.set(data.user_id, userExchanges);
+
+    // 잔액 복원
+    const currentTotal = this.totalPoints.get(data.user_id) ?? 0;
+    this.totalPoints.set(data.user_id, currentTotal + data.amount);
 
     return Promise.resolve({ id });
   }

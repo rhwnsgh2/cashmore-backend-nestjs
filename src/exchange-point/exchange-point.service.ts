@@ -169,7 +169,7 @@ export class ExchangePointService {
     );
 
     const exchangePoints: SearchExchangeItem[] = exchanges.map((e) => ({
-      id: (e.point_action_id ?? e.id) as number,
+      id: e.point_action_id ?? e.id,
       userId: e.user_id,
       status: e.status,
       amount: Number(e.amount),
@@ -231,11 +231,15 @@ export class ExchangePointService {
       throw new BadRequestException('Insufficient points');
     }
 
+    // Phase 3.1: status='done'으로 INSERT (네이버페이 패턴)
+    // - 신청 즉시 차감 (잔액 영향 동일)
+    // - point_actions는 mutable status 머신이 아닌 append-only 원장
+    // - 출금의 진짜 상태(pending/done/cancelled/rejected)는 cash_exchanges에서 관리
     const result = await this.exchangePointRepository.insertExchangeRequest({
       user_id: userId,
       type: 'EXCHANGE_POINT_TO_CASH',
       point_amount: -amount,
-      status: 'pending',
+      status: 'done',
     });
 
     try {
@@ -278,19 +282,21 @@ export class ExchangePointService {
       throw new BadRequestException('Can only cancel pending requests');
     }
 
-    // dual-write: point_actions UPDATE는 그대로
-    await this.exchangePointRepository.cancelExchangeRequest(id, userId);
+    // Phase 3.2: 복원 행 INSERT (네이버페이 패턴)
+    // - 원본 deduct 행은 그대로 (status='done', -amount)
+    // - 새 복원 행 INSERT (status='done', +amount)
+    // - net = 0 → 잔액 복원
+    await this.exchangePointRepository.insertRestoreAction({
+      user_id: userId,
+      amount: Number(cashExchange.amount),
+      original_point_action_id: id,
+      reason: 'cancelled',
+    });
 
-    try {
-      await this.cashExchangeRepository.updateStatus(id, 'cancelled', {
-        cancelled_at: new Date().toISOString(),
-      });
-    } catch (error) {
-      this.logger.error(
-        `cash_exchanges dual-write cancel failed for point_action_id=${id}`,
-        error,
-      );
-    }
+    // cash_exchanges 상태 업데이트
+    await this.cashExchangeRepository.updateStatus(id, 'cancelled', {
+      cancelled_at: new Date().toISOString(),
+    });
 
     return { success: true };
   }
@@ -322,21 +328,15 @@ export class ExchangePointService {
         point_amount: -Number(ce.amount),
       }));
 
-    // dual-write: point_actions UPDATE는 그대로
-    await this.exchangePointRepository.approveExchangeRequests(pendingIds);
+    // Phase 3.3: point_actions UPDATE 제거
+    // - 신청 시점에 이미 status='done'으로 INSERT됨
+    // - 승인은 cash_exchanges 상태만 변경하면 됨
 
-    // dual-write: cash_exchanges 일괄 상태 업데이트
+    // cash_exchanges 일괄 상태 업데이트
     const confirmedAt = new Date().toISOString();
-    try {
-      await this.cashExchangeRepository.updateStatusBulk(pendingIds, 'done', {
-        confirmed_at: confirmedAt,
-      });
-    } catch (error) {
-      this.logger.error(
-        `cash_exchanges dual-write approve failed for ${pendingIds.length} ids`,
-        error,
-      );
-    }
+    await this.cashExchangeRepository.updateStatusBulk(pendingIds, 'done', {
+      confirmed_at: confirmedAt,
+    });
 
     // 알림은 30초 후 비동기로 처리
     setTimeout(() => {
@@ -362,21 +362,19 @@ export class ExchangePointService {
       throw new BadRequestException('Can only reject pending requests');
     }
 
-    // dual-write: point_actions UPDATE는 그대로
-    await this.exchangePointRepository.rejectExchangeRequest(id, reason);
+    // Phase 3.4: 복원 행 INSERT (네이버페이 패턴)
+    await this.exchangePointRepository.insertRestoreAction({
+      user_id: cashExchange.user_id,
+      amount: Number(cashExchange.amount),
+      original_point_action_id: id,
+      reason: `rejected_${reason}`,
+    });
 
-    // dual-write: cash_exchanges 상태 업데이트
-    try {
-      await this.cashExchangeRepository.updateStatus(id, 'rejected', {
-        rejected_at: new Date().toISOString(),
-        reason,
-      });
-    } catch (error) {
-      this.logger.error(
-        `cash_exchanges dual-write reject failed for point_action_id=${id}`,
-        error,
-      );
-    }
+    // cash_exchanges 상태 업데이트
+    await this.cashExchangeRepository.updateStatus(id, 'rejected', {
+      rejected_at: new Date().toISOString(),
+      reason,
+    });
 
     // 푸시 알림
     try {

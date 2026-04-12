@@ -748,5 +748,4 @@ describe('CashbackService', () => {
       expect(result.nextCursor).not.toBeNull();
     });
   });
-
 });

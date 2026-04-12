@@ -38,7 +38,11 @@ export class AdminCashExchangeController {
   @Get('search')
   @ApiOperation({ summary: '이메일로 출금 내역 검색 (어드민)' })
   @ApiHeader({ name: 'x-admin-api-key', required: true })
-  @ApiQuery({ name: 'email', required: true, description: '검색할 이메일 (3자 이상)' })
+  @ApiQuery({
+    name: 'email',
+    required: true,
+    description: '검색할 이메일 (3자 이상)',
+  })
   @ApiResponse({ status: 200, description: '검색 결과' })
   async searchByEmail(
     @Headers('x-admin-api-key') apiKey: string,

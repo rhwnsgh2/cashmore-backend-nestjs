@@ -17,9 +17,17 @@ export interface InsertExchangePointData {
   status: string;
 }
 
+export interface InsertRestoreActionData {
+  user_id: string;
+  amount: number; // 양수 (복원 금액)
+  original_point_action_id: number;
+  reason?: string;
+}
+
 export interface IExchangePointRepository {
   getTotalPoints(userId: string): Promise<number>;
   insertExchangeRequest(data: InsertExchangePointData): Promise<{ id: number }>;
+  insertRestoreAction(data: InsertRestoreActionData): Promise<{ id: number }>;
   findById(id: number, userId: string): Promise<ExchangePoint | null>;
   findByIds(ids: number[]): Promise<ExchangePoint[]>;
   cancelExchangeRequest(id: number, userId: string): Promise<void>;
