@@ -676,7 +676,6 @@ describe('ExchangePointService', () => {
         repository.setTotalPoints(userId, 10000);
 
         await service.requestExchange(userId, 5000);
-        const firstId = repository.getExchangesByUserId(userId)[0].id;
         await service.requestExchange(userId, 3000);
         const secondId = repository.getExchangesByUserId(userId)[1].id;
 
