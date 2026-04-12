@@ -22,9 +22,7 @@ describe('LocationEngagementService', () => {
       ],
     }).compile();
 
-    service = module.get<LocationEngagementService>(
-      LocationEngagementService,
-    );
+    service = module.get<LocationEngagementService>(LocationEngagementService);
   });
 
   afterEach(() => {

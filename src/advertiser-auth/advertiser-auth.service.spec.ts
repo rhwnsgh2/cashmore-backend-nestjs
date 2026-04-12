@@ -64,9 +64,9 @@ describe('AdvertiserAuthService', () => {
     it('존재하지 않는 login_id로 로그인 시 UnauthorizedException', async () => {
       repository.setAdvertisers([]);
 
-      await expect(
-        service.login('nonexistent', 'password'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.login('nonexistent', 'password')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('잘못된 비밀번호로 로그인 시 UnauthorizedException', async () => {
@@ -121,7 +121,10 @@ describe('AdvertiserAuthService', () => {
       ]);
 
       const result = await service.login('test', 'password');
-      const payload = jwt.decode(result.accessToken) as { exp: number; iat: number };
+      const payload = jwt.decode(result.accessToken) as {
+        exp: number;
+        iat: number;
+      };
 
       expect(payload.exp).toBeDefined();
       expect(payload.exp - payload.iat).toBe(24 * 60 * 60); // 24시간
@@ -131,8 +134,18 @@ describe('AdvertiserAuthService', () => {
       const hash1 = await bcrypt.hash('pass1', 10);
       const hash2 = await bcrypt.hash('pass2', 10);
       repository.setAdvertisers([
-        { id: 1, login_id: 'corp_a', password_hash: hash1, company_name: 'A사' },
-        { id: 2, login_id: 'corp_b', password_hash: hash2, company_name: 'B사' },
+        {
+          id: 1,
+          login_id: 'corp_a',
+          password_hash: hash1,
+          company_name: 'A사',
+        },
+        {
+          id: 2,
+          login_id: 'corp_b',
+          password_hash: hash2,
+          company_name: 'B사',
+        },
       ]);
 
       const result = await service.login('corp_b', 'pass2');
@@ -149,8 +162,18 @@ describe('AdvertiserAuthService', () => {
   describe('findAllAdvertisers', () => {
     it('전체 광고주 목록을 camelCase로 반환한다', async () => {
       repository.setAdvertisers([
-        { id: 1, login_id: 'corp_a', password_hash: 'hash1', company_name: 'A사' },
-        { id: 2, login_id: 'corp_b', password_hash: 'hash2', company_name: 'B사' },
+        {
+          id: 1,
+          login_id: 'corp_a',
+          password_hash: 'hash1',
+          company_name: 'A사',
+        },
+        {
+          id: 2,
+          login_id: 'corp_b',
+          password_hash: 'hash2',
+          company_name: 'B사',
+        },
       ]);
 
       const result = await service.findAllAdvertisers();
@@ -178,7 +201,12 @@ describe('AdvertiserAuthService', () => {
 
     it('password_hash는 응답에 포함되지 않는다', async () => {
       repository.setAdvertisers([
-        { id: 1, login_id: 'corp_a', password_hash: 'secret-hash', company_name: 'A사' },
+        {
+          id: 1,
+          login_id: 'corp_a',
+          password_hash: 'secret-hash',
+          company_name: 'A사',
+        },
       ]);
 
       const result = await service.findAllAdvertisers();

@@ -530,7 +530,9 @@ describe('ExchangePointService', () => {
       await service.getExchangeHistory(userId);
 
       expect(slackSpy).toHaveBeenCalledTimes(1);
-      expect(slackSpy.mock.calls[0][0]).toContain('getExchangeHistory mismatch');
+      expect(slackSpy.mock.calls[0][0]).toContain(
+        'getExchangeHistory mismatch',
+      );
       expect(slackSpy.mock.calls[0][0]).toContain('missing_in_cash_exchanges');
     });
 

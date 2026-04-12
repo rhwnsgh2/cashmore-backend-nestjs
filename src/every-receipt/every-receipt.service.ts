@@ -78,12 +78,16 @@ export class EveryReceiptService {
     return { success: true, reReview };
   }
 
-  async getReReviewTickets(
-    userId: string,
-  ): Promise<{ ticketCount: number; usedTickets: number; totalTickets: number }> {
+  async getReReviewTickets(userId: string): Promise<{
+    ticketCount: number;
+    usedTickets: number;
+    totalTickets: number;
+  }> {
     const mondayStart = this.getThisWeekMonday();
-    const reReviews =
-      await this.everyReceiptRepository.findReReviewsSince(userId, mondayStart);
+    const reReviews = await this.everyReceiptRepository.findReReviewsSince(
+      userId,
+      mondayStart,
+    );
 
     const usedTickets = reReviews.filter(
       (r) => r.status === 'pending' || r.status === 'rejected',
@@ -109,9 +113,7 @@ export class EveryReceiptService {
     return monday.toISOString();
   }
 
-  async getCompletedCount(
-    userId: string,
-  ): Promise<{ count: number }> {
+  async getCompletedCount(userId: string): Promise<{ count: number }> {
     const count =
       await this.everyReceiptRepository.countCompletedByUserId(userId);
     return { count };

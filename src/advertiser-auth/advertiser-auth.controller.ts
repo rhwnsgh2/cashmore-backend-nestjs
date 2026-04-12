@@ -19,15 +19,16 @@ export class AdvertiserAuthController {
   @Post('login')
   @ApiOperation({
     summary: '광고주 로그인',
-    description:
-      '광고주 ID와 비밀번호로 로그인하여 JWT 토큰을 발급받습니다.',
+    description: '광고주 ID와 비밀번호로 로그인하여 JWT 토큰을 발급받습니다.',
   })
   @ApiResponse({
     status: 201,
     description: '로그인 성공',
     type: AdvertiserLoginResponseDto,
   })
-  @ApiUnauthorizedResponse({ description: '로그인 실패 (ID 또는 비밀번호 불일치)' })
+  @ApiUnauthorizedResponse({
+    description: '로그인 실패 (ID 또는 비밀번호 불일치)',
+  })
   async login(
     @Body() dto: AdvertiserLoginDto,
   ): Promise<AdvertiserLoginResponseDto> {

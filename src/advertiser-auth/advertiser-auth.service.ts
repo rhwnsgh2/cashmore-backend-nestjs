@@ -70,8 +70,7 @@ export class AdvertiserAuthService {
     password: string,
     companyName: string,
   ): Promise<{ id: number; loginId: string; companyName: string }> {
-    const existing =
-      await this.advertiserAuthRepository.findByLoginId(loginId);
+    const existing = await this.advertiserAuthRepository.findByLoginId(loginId);
     if (existing) {
       throw new BadRequestException('Login ID already exists');
     }

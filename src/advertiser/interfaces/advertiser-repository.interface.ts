@@ -22,9 +22,7 @@ export interface IAdvertiserRepository {
     startDate: string,
     endDate: string,
   ): Promise<BannerAdDailyStat[]>;
-  findBannersByAdvertiserId(
-    advertiserId: number,
-  ): Promise<AdvertiserBanner[]>;
+  findBannersByAdvertiserId(advertiserId: number): Promise<AdvertiserBanner[]>;
 }
 
 export const ADVERTISER_REPOSITORY = Symbol('ADVERTISER_REPOSITORY');

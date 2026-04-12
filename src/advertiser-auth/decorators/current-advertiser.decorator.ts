@@ -6,10 +6,7 @@ export interface CurrentAdvertiserData {
 }
 
 export const CurrentAdvertiser = createParamDecorator(
-  (
-    data: keyof CurrentAdvertiserData | undefined,
-    ctx: ExecutionContext,
-  ) => {
+  (data: keyof CurrentAdvertiserData | undefined, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
     const user = request.user as CurrentAdvertiserData;
 

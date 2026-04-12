@@ -32,8 +32,7 @@ export class RetailerController {
   @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
   @ApiOperation({
     summary: '매장 목록 조회',
-    description:
-      '가시 상태인 매장 목록을 썸네일 이미지와 함께 조회합니다.',
+    description: '가시 상태인 매장 목록을 썸네일 이미지와 함께 조회합니다.',
   })
   @ApiResponse({ status: 200, description: '매장 목록 조회 성공' })
   async getRetailers() {

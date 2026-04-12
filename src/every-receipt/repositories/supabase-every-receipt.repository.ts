@@ -280,7 +280,10 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
   async findEveryReceiptForReReview(
     receiptId: number,
     userId: string,
-  ): Promise<{ id: number; score_data: Record<string, unknown> | null } | null> {
+  ): Promise<{
+    id: number;
+    score_data: Record<string, unknown> | null;
+  } | null> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('every_receipt')
@@ -334,7 +337,8 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
         requested_items: params.requestedItems,
         user_note: params.userNote || '',
         status: 'pending',
-        before_score_data: params.beforeScoreData as unknown as import('../../supabase/database.types').Json,
+        before_score_data:
+          params.beforeScoreData as unknown as import('../../supabase/database.types').Json,
         user_id: params.userId,
       })
       .select()

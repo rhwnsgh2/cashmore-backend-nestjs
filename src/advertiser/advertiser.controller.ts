@@ -54,7 +54,9 @@ export class AdvertiserController {
     description: '광고 통계 목록',
     type: AdvertiserStatsResponseDto,
   })
-  @ApiUnauthorizedResponse({ description: '인증 실패 (토큰 없음, 만료, 유효하지 않음)' })
+  @ApiUnauthorizedResponse({
+    description: '인증 실패 (토큰 없음, 만료, 유효하지 않음)',
+  })
   async getStats(
     @CurrentAdvertiser('advertiserId') advertiserId: number,
     @Query() query: AdvertiserStatsQueryDto,

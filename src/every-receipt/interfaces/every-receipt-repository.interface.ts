@@ -82,10 +82,7 @@ export interface IEveryReceiptRepository {
     point: number,
   ): Promise<void>;
   isFirstReceipt(userId: string, receiptId: number): Promise<boolean>;
-  findReReviewsSince(
-    userId: string,
-    since: string,
-  ): Promise<ReReviewRecord[]>;
+  findReReviewsSince(userId: string, since: string): Promise<ReReviewRecord[]>;
 
   findEveryReceiptForReReview(
     receiptId: number,
@@ -94,10 +91,7 @@ export interface IEveryReceiptRepository {
 
   hasExistingReReview(receiptId: number): Promise<boolean>;
 
-  deletePointAction(
-    userId: string,
-    everyReceiptId: number,
-  ): Promise<void>;
+  deletePointAction(userId: string, everyReceiptId: number): Promise<void>;
 
   createReReview(params: {
     everyReceiptId: number;

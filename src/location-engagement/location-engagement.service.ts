@@ -32,9 +32,7 @@ export class LocationEngagementService {
     private repository: ILocationEngagementRepository,
   ) {}
 
-  async getRankings(
-    sigunguCode?: string,
-  ): Promise<LocationEngagementResult> {
+  async getRankings(sigunguCode?: string): Promise<LocationEngagementResult> {
     const latest = await this.repository.findLatestTimestamp();
     if (!latest) {
       throw new NotFoundException('최신 데이터를 찾을 수 없습니다');

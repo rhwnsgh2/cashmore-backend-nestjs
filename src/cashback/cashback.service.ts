@@ -27,11 +27,12 @@ export class CashbackService {
   async getReceivedCashback(
     userId: string,
   ): Promise<{ receivedCashback: number }> {
-    const [claimCashback, exchangeAmount, newExchangeAmount] = await Promise.all([
-      this.cashbackRepository.sumCompletedClaimCashback(userId),
-      this.cashbackRepository.sumExchangePointToCash(userId),
-      this.safeSumCashExchangeDone(userId),
-    ]);
+    const [claimCashback, exchangeAmount, newExchangeAmount] =
+      await Promise.all([
+        this.cashbackRepository.sumCompletedClaimCashback(userId),
+        this.cashbackRepository.sumExchangePointToCash(userId),
+        this.safeSumCashExchangeDone(userId),
+      ]);
 
     if (newExchangeAmount !== null && newExchangeAmount !== exchangeAmount) {
       const message = `[CashExchangeMigration] sumExchangePointToCash mismatch userId=${userId} ${JSON.stringify(

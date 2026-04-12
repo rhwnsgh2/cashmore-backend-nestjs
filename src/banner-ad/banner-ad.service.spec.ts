@@ -165,7 +165,10 @@ describe('BannerAdService', () => {
 
       await service.updateAdvertiserId(100, 5);
 
-      const ads = repository['ads'] as Array<{ id: number; advertiser_id?: number }>;
+      const ads = repository['ads'] as Array<{
+        id: number;
+        advertiser_id?: number;
+      }>;
       expect(ads[0].advertiser_id).toBe(5);
     });
   });

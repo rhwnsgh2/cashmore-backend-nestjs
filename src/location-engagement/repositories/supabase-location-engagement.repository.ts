@@ -7,9 +7,7 @@ import type {
 } from '../interfaces/location-engagement-repository.interface';
 
 @Injectable()
-export class SupabaseLocationEngagementRepository
-  implements ILocationEngagementRepository
-{
+export class SupabaseLocationEngagementRepository implements ILocationEngagementRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async findLatestTimestamp(): Promise<LatestTimestamp | null> {

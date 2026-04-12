@@ -7,13 +7,12 @@ import type {
 } from '../interfaces/advertiser-auth-repository.interface';
 
 @Injectable()
-export class SupabaseAdvertiserAuthRepository
-  implements IAdvertiserAuthRepository
-{
+export class SupabaseAdvertiserAuthRepository implements IAdvertiserAuthRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async findByLoginId(loginId: string): Promise<Advertiser | null> {
-    const client = this.supabaseService.getClient() as unknown as SupabaseClient;
+    const client =
+      this.supabaseService.getClient() as unknown as SupabaseClient;
 
     const { data, error } = await client
       .from('advertisers')
@@ -29,7 +28,8 @@ export class SupabaseAdvertiserAuthRepository
   }
 
   async findAll(): Promise<Advertiser[]> {
-    const client = this.supabaseService.getClient() as unknown as SupabaseClient;
+    const client =
+      this.supabaseService.getClient() as unknown as SupabaseClient;
 
     const { data, error } = await client
       .from('advertisers')

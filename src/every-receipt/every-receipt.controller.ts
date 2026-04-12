@@ -86,14 +86,15 @@ export class EveryReceiptController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '재검수 티켓 조회',
-    description:
-      '이번주 재검수 티켓 사용 현황을 조회합니다. 주당 3개 제공.',
+    description: '이번주 재검수 티켓 사용 현황을 조회합니다. 주당 3개 제공.',
   })
   @ApiResponse({ status: 200, description: '재검수 티켓 조회 성공' })
   @ApiUnauthorizedResponse({ description: '인증 실패' })
-  async getReReviewTickets(
-    @CurrentUser('userId') userId: string,
-  ): Promise<{ ticketCount: number; usedTickets: number; totalTickets: number }> {
+  async getReReviewTickets(@CurrentUser('userId') userId: string): Promise<{
+    ticketCount: number;
+    usedTickets: number;
+    totalTickets: number;
+  }> {
     return this.everyReceiptService.getReReviewTickets(userId);
   }
 
@@ -102,8 +103,7 @@ export class EveryReceiptController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '완료 영수증 총 개수 조회',
-    description:
-      '사용자의 완료(completed) 상태 영수증 총 개수를 조회합니다.',
+    description: '사용자의 완료(completed) 상태 영수증 총 개수를 조회합니다.',
   })
   @ApiResponse({
     status: 200,

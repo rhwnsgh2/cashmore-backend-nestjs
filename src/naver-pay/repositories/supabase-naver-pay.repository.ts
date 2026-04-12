@@ -155,9 +155,7 @@ export class SupabaseNaverPayRepository implements INaverPayRepository {
     );
   }
 
-  async getCompletedDailyStats(
-    sinceIso: string,
-  ): Promise<NaverPayDailyStat[]> {
+  async getCompletedDailyStats(sinceIso: string): Promise<NaverPayDailyStat[]> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('naver_pay_exchanges')

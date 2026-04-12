@@ -4,9 +4,7 @@ import type {
   LocationEngagementRow,
 } from '../interfaces/location-engagement-repository.interface';
 
-export class StubLocationEngagementRepository
-  implements ILocationEngagementRepository
-{
+export class StubLocationEngagementRepository implements ILocationEngagementRepository {
   private latestTimestamp: LatestTimestamp | null = null;
   private rows: Map<string, LocationEngagementRow[]> = new Map();
 

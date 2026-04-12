@@ -34,7 +34,12 @@ export class RetailerService {
   ) {}
 
   async getRetailersCashback(): Promise<
-    { retailerId: number; cashbackPercent: number; type: string; reason: string }[]
+    {
+      retailerId: number;
+      cashbackPercent: number;
+      type: string;
+      reason: string;
+    }[]
   > {
     const [locations, cashbackRates] = await Promise.all([
       this.repository.findVisibleLocations(),

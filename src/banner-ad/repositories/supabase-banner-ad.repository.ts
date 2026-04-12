@@ -16,7 +16,9 @@ export class SupabaseBannerAdRepository implements IBannerAdRepository {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('banner_ads')
-      .select('id, title, image_url, click_url, placement, priority, advertiser_id')
+      .select(
+        'id, title, image_url, click_url, placement, priority, advertiser_id',
+      )
       .order('id', { ascending: true });
 
     if (error) {

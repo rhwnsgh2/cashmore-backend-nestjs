@@ -240,8 +240,9 @@ export class SupabaseUserRepository implements IUserRepository {
       .eq('device_id', deviceId);
 
     if (error || !data) return [];
-    return data
-      .filter((u): u is { id: string; auth_id: string } => u.auth_id !== null);
+    return data.filter(
+      (u): u is { id: string; auth_id: string } => u.auth_id !== null,
+    );
   }
 
   async getPointTotal(userId: string): Promise<number> {

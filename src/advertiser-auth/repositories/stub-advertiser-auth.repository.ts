@@ -3,9 +3,7 @@ import type {
   IAdvertiserAuthRepository,
 } from '../interfaces/advertiser-auth-repository.interface';
 
-export class StubAdvertiserAuthRepository
-  implements IAdvertiserAuthRepository
-{
+export class StubAdvertiserAuthRepository implements IAdvertiserAuthRepository {
   private advertisers: Advertiser[] = [];
 
   setAdvertisers(advertisers: Advertiser[]): void {

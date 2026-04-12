@@ -822,7 +822,9 @@ describe('CashbackService', () => {
       expect(result.receivedCashback).toBe(5000);
       // 슬랙 알림 호출 확인
       expect(slackSpy).toHaveBeenCalledTimes(1);
-      expect(slackSpy.mock.calls[0][0]).toContain('sumExchangePointToCash mismatch');
+      expect(slackSpy.mock.calls[0][0]).toContain(
+        'sumExchangePointToCash mismatch',
+      );
     });
 
     it('cashbackList에서 cash_exchanges와 일치하면 슬랙 알림이 없다', async () => {
@@ -868,7 +870,9 @@ describe('CashbackService', () => {
       await service.getCashbackList(userId, null, 20);
 
       expect(slackSpy).toHaveBeenCalledTimes(1);
-      expect(slackSpy.mock.calls[0][0]).toContain('cashbackList count mismatch');
+      expect(slackSpy.mock.calls[0][0]).toContain(
+        'cashbackList count mismatch',
+      );
     });
 
     it('cashbackList에서 status가 다르면 슬랙 알림이 발송된다', async () => {

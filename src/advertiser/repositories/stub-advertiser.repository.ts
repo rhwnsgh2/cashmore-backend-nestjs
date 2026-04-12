@@ -12,9 +12,7 @@ export class StubAdvertiserRepository implements IAdvertiserRepository {
     this.stats = stats;
   }
 
-  setBanners(
-    banners: (AdvertiserBanner & { advertiser_id: number })[],
-  ): void {
+  setBanners(banners: (AdvertiserBanner & { advertiser_id: number })[]): void {
     this.banners = banners;
   }
 
@@ -29,9 +27,7 @@ export class StubAdvertiserRepository implements IAdvertiserRepository {
     endDate: string,
   ): Promise<BannerAdDailyStat[]> {
     return this.stats
-      .filter(
-        (s) => s.stat_date >= startDate && s.stat_date <= endDate,
-      )
+      .filter((s) => s.stat_date >= startDate && s.stat_date <= endDate)
       .sort((a, b) => {
         if (a.stat_date !== b.stat_date) {
           return b.stat_date.localeCompare(a.stat_date);

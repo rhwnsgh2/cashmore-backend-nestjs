@@ -16,7 +16,8 @@ export class SupabaseAdvertiserRepository implements IAdvertiserRepository {
     startDate: string,
     endDate: string,
   ): Promise<BannerAdDailyStat[]> {
-    const client = this.supabaseService.getClient() as unknown as SupabaseClient;
+    const client =
+      this.supabaseService.getClient() as unknown as SupabaseClient;
 
     // banner_ads에서 해당 광고주의 광고 ID 목록 조회
     const { data: ads, error: adsError } = await client
@@ -70,11 +71,14 @@ export class SupabaseAdvertiserRepository implements IAdvertiserRepository {
   async findBannersByAdvertiserId(
     advertiserId: number,
   ): Promise<AdvertiserBanner[]> {
-    const client = this.supabaseService.getClient() as unknown as SupabaseClient;
+    const client =
+      this.supabaseService.getClient() as unknown as SupabaseClient;
 
     const { data, error } = await client
       .from('banner_ads')
-      .select('id, title, image_url, click_url, is_active, start_date, end_date')
+      .select(
+        'id, title, image_url, click_url, is_active, start_date, end_date',
+      )
       .eq('advertiser_id', advertiserId)
       .order('id', { ascending: true });
 

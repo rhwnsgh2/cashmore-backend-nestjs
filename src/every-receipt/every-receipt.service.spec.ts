@@ -448,7 +448,12 @@ describe('EveryReceiptService', () => {
         score_data: { total_score: 90 },
       });
 
-      await service.requestReReview(userId, 1, ['items', 'date_validity'], '메모');
+      await service.requestReReview(
+        userId,
+        1,
+        ['items', 'date_validity'],
+        '메모',
+      );
 
       const deleted = repository.getDeletedPointActions();
       expect(deleted).toEqual([{ userId, everyReceiptId: 1 }]);

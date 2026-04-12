@@ -181,10 +181,7 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     return Promise.resolve(this.firstReceiptMap.get(userId) === receiptId);
   }
 
-  findReReviewsSince(
-    userId: string,
-    since: string,
-  ): Promise<ReReviewRecord[]> {
+  findReReviewsSince(userId: string, since: string): Promise<ReReviewRecord[]> {
     const records = this.reReviewRecords.get(userId) || [];
     const filtered = records.filter((r) => r.created_at >= since);
     return Promise.resolve(filtered);
@@ -195,7 +192,8 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     { id: number; score_data: Record<string, unknown> | null }
   >();
   private existingReReviews = new Set<number>();
-  private deletedPointActions: { userId: string; everyReceiptId: number }[] = [];
+  private deletedPointActions: { userId: string; everyReceiptId: number }[] =
+    [];
   private createdReReviews: Record<string, unknown>[] = [];
   private reReviewStatusUpdates: number[] = [];
 
@@ -226,7 +224,10 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
   findEveryReceiptForReReview(
     receiptId: number,
     userId: string,
-  ): Promise<{ id: number; score_data: Record<string, unknown> | null } | null> {
+  ): Promise<{
+    id: number;
+    score_data: Record<string, unknown> | null;
+  } | null> {
     return Promise.resolve(
       this.reReviewReceiptData.get(`${userId}:${receiptId}`) ?? null,
     );
