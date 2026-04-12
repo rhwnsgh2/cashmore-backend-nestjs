@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
 import { createTestUser } from './helpers/user.helper';
-import { createPointActions } from './helpers/point.helper';
+import { createCashExchange } from './helpers/cash-exchange.helper';
 import { createUserModal } from './helpers/modal.helper';
 import { generateTestToken } from './helpers/auth.helper';
 
@@ -78,15 +78,12 @@ describe('NpsSurvey API (e2e)', () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      await createPointActions(supabase, [
-        {
-          user_id: testUser.id,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'done',
-          created_at: new Date().toISOString(),
-        },
-      ]);
+      await createCashExchange(supabase, {
+        user_id: testUser.id,
+        amount: 5000,
+        status: 'done',
+        created_at: new Date().toISOString(),
+      });
 
       const response = await request(app.getHttpServer())
         .get('/nps-survey/target')
@@ -106,22 +103,18 @@ describe('NpsSurvey API (e2e)', () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      await createPointActions(supabase, [
-        {
-          user_id: testUser.id,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -800,
-          status: 'done',
-          created_at: yesterday.toISOString(),
-        },
-        {
-          user_id: testUser.id,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -300,
-          status: 'done',
-          created_at: yesterday.toISOString(),
-        },
-      ]);
+      await createCashExchange(supabase, {
+        user_id: testUser.id,
+        amount: 800,
+        status: 'done',
+        created_at: yesterday.toISOString(),
+      });
+      await createCashExchange(supabase, {
+        user_id: testUser.id,
+        amount: 300,
+        status: 'done',
+        created_at: yesterday.toISOString(),
+      });
 
       const response = await request(app.getHttpServer())
         .get('/nps-survey/target')
@@ -149,15 +142,12 @@ describe('NpsSurvey API (e2e)', () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      await createPointActions(supabase, [
-        {
-          user_id: testUser.id,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -500,
-          status: 'done',
-          created_at: yesterday.toISOString(),
-        },
-      ]);
+      await createCashExchange(supabase, {
+        user_id: testUser.id,
+        amount: 500,
+        status: 'done',
+        created_at: yesterday.toISOString(),
+      });
 
       const response = await request(app.getHttpServer())
         .get('/nps-survey/target')
@@ -174,15 +164,12 @@ describe('NpsSurvey API (e2e)', () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      await createPointActions(supabase, [
-        {
-          user_id: testUser.id,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'pending',
-          created_at: yesterday.toISOString(),
-        },
-      ]);
+      await createCashExchange(supabase, {
+        user_id: testUser.id,
+        amount: 5000,
+        status: 'pending',
+        created_at: yesterday.toISOString(),
+      });
 
       const response = await request(app.getHttpServer())
         .get('/nps-survey/target')

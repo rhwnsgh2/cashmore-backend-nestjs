@@ -10,3 +10,4 @@ export * from './buzzvil.helper';
 export * from './onboarding.helper';
 export * from './cashback.helper';
 export * from './account-info.helper';
+export * from './cash-exchange.helper';
