@@ -45,6 +45,41 @@ export class StubCashExchangeRepository implements ICashExchangeRepository {
     return Promise.resolve(this.exchanges.filter((e) => e.user_id === userId));
   }
 
+  findByPointActionId(
+    pointActionId: number,
+  ): Promise<CashExchange | null> {
+    const found = this.exchanges.find(
+      (e) => e.point_action_id === pointActionId,
+    );
+    return Promise.resolve(found ?? null);
+  }
+
+  findByPointActionIds(pointActionIds: number[]): Promise<CashExchange[]> {
+    if (pointActionIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    const result = this.exchanges.filter(
+      (e) =>
+        e.point_action_id !== null &&
+        pointActionIds.includes(e.point_action_id),
+    );
+    return Promise.resolve(result);
+  }
+
+  findByUserIds(userIds: string[], limit: number): Promise<CashExchange[]> {
+    if (userIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    const result = this.exchanges
+      .filter((e) => userIds.includes(e.user_id))
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      .slice(0, limit);
+    return Promise.resolve(result);
+  }
+
   updateStatusBulk(
     pointActionIds: number[],
     status: CashExchangeStatus,

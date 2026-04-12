@@ -4,10 +4,17 @@ import {
   Post,
   Body,
   Param,
+  Query,
   Headers,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { ExchangePointService } from '../exchange-point/exchange-point.service';
 
@@ -26,6 +33,19 @@ export class AdminCashExchangeController {
   async getPending(@Headers('x-admin-api-key') apiKey: string) {
     this.validateApiKey(apiKey);
     return this.exchangePointService.getPendingWithAccountInfo();
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: '이메일로 출금 내역 검색 (어드민)' })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiQuery({ name: 'email', required: true, description: '검색할 이메일 (3자 이상)' })
+  @ApiResponse({ status: 200, description: '검색 결과' })
+  async searchByEmail(
+    @Headers('x-admin-api-key') apiKey: string,
+    @Query('email') email: string,
+  ) {
+    this.validateApiKey(apiKey);
+    return this.exchangePointService.searchByEmail(email);
   }
 
   @Post('approve')

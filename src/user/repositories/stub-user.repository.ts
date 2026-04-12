@@ -83,6 +83,14 @@ export class StubUserRepository implements IUserRepository {
     return Promise.resolve(result);
   }
 
+  searchByEmail(email: string, limit: number): Promise<User[]> {
+    const lower = email.toLowerCase();
+    const result = Array.from(this.users.values())
+      .filter((u) => u.email !== null && u.email.toLowerCase().includes(lower))
+      .slice(0, limit);
+    return Promise.resolve(result);
+  }
+
   findByAuthId(authId: string): Promise<User | null> {
     const user = Array.from(this.users.values()).find(
       (u) => u.auth_id === authId,

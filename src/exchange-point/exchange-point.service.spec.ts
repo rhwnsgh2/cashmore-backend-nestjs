@@ -272,6 +272,12 @@ describe('ExchangePointService', () => {
           additional_data: null,
         },
       ]);
+      // 검증 source: cash_exchanges
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 5000,
+        point_action_id: 1,
+      });
 
       const result = await service.cancelExchange(userId, 1);
 
@@ -310,6 +316,15 @@ describe('ExchangePointService', () => {
           additional_data: null,
         },
       ]);
+      // 검증 source: cash_exchanges (status='done'으로 setup)
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 5000,
+        point_action_id: 1,
+      });
+      await cashExchangeRepository.updateStatus(1, 'done', {
+        confirmed_at: new Date().toISOString(),
+      });
 
       await expect(service.cancelExchange(userId, 1)).rejects.toThrow(
         BadRequestException,
@@ -325,26 +340,17 @@ describe('ExchangePointService', () => {
 
   describe('approveExchanges', () => {
     it('pending 상태 출금을 일괄 승인한다', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'pending',
-          created_at: '2025-01-01T00:00:00Z',
-          additional_data: null,
-        },
-        {
-          id: 2,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -3000,
-          status: 'pending',
-          created_at: '2025-01-01T00:00:00Z',
-          additional_data: null,
-        },
-      ]);
+      // 검증 source: cash_exchanges
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 5000,
+        point_action_id: 1,
+      });
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 3000,
+        point_action_id: 2,
+      });
 
       const result = await service.approveExchanges([1, 2]);
 
@@ -352,26 +358,21 @@ describe('ExchangePointService', () => {
     });
 
     it('pending이 아닌 건은 무시하고 pending만 승인한다', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'pending',
-          created_at: '2025-01-01T00:00:00Z',
-          additional_data: null,
-        },
-        {
-          id: 2,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -3000,
-          status: 'done',
-          created_at: '2025-01-01T00:00:00Z',
-          additional_data: null,
-        },
-      ]);
+      // pending 건
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 5000,
+        point_action_id: 1,
+      });
+      // done 건
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 3000,
+        point_action_id: 2,
+      });
+      await cashExchangeRepository.updateStatus(2, 'done', {
+        confirmed_at: new Date().toISOString(),
+      });
 
       const result = await service.approveExchanges([1, 2]);
 
@@ -379,17 +380,14 @@ describe('ExchangePointService', () => {
     });
 
     it('pending 건이 없으면 BadRequestException', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'done',
-          created_at: '2025-01-01T00:00:00Z',
-          additional_data: null,
-        },
-      ]);
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 5000,
+        point_action_id: 1,
+      });
+      await cashExchangeRepository.updateStatus(1, 'done', {
+        confirmed_at: new Date().toISOString(),
+      });
 
       await expect(service.approveExchanges([1])).rejects.toThrow(
         BadRequestException,
@@ -413,17 +411,11 @@ describe('ExchangePointService', () => {
 
   describe('rejectExchange', () => {
     it('pending 상태 출금을 거절한다', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'pending',
-          created_at: '2025-01-01T00:00:00Z',
-          additional_data: null,
-        },
-      ]);
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 5000,
+        point_action_id: 1,
+      });
 
       const result = await service.rejectExchange(1, 'invalid_account_number');
 
@@ -437,17 +429,14 @@ describe('ExchangePointService', () => {
     });
 
     it('pending이 아닌 출금은 거절 불가', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'done',
-          created_at: '2025-01-01T00:00:00Z',
-          additional_data: null,
-        },
-      ]);
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 5000,
+        point_action_id: 1,
+      });
+      await cashExchangeRepository.updateStatus(1, 'done', {
+        confirmed_at: new Date().toISOString(),
+      });
 
       await expect(
         service.rejectExchange(1, 'invalid_account_number'),

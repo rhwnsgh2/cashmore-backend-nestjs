@@ -52,6 +52,22 @@ export interface GetPendingWithAccountInfoResult {
   accountInfoName: AccountInfoNameItem[];
 }
 
+export interface SearchExchangeItem {
+  id: number;
+  userId: string;
+  status: string;
+  amount: number;
+  createdAt: string;
+  email: string;
+  confirmedAt: string | null;
+}
+
+export interface SearchExchangesResult {
+  exchangePoints: SearchExchangeItem[];
+  pendingAccountInfo: PendingAccountInfoItem[];
+  accountInfoName: AccountInfoNameItem[];
+}
+
 @Injectable()
 export class ExchangePointService {
   private readonly logger = new Logger(ExchangePointService.name);
@@ -127,6 +143,65 @@ export class ExchangePointService {
     };
   }
 
+  async searchByEmail(email: string): Promise<SearchExchangesResult> {
+    if (!email || email.length < 3) {
+      throw new BadRequestException('이메일은 3자 이상 입력해주세요.');
+    }
+
+    // 1. 이메일로 유저 검색 (최대 10명)
+    const users = await this.userRepository.searchByEmail(email, 10);
+
+    if (users.length === 0) {
+      return {
+        exchangePoints: [],
+        pendingAccountInfo: [],
+        accountInfoName: [],
+      };
+    }
+
+    const userIds = users.map((u) => u.id);
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    // 2. 해당 유저들의 출금 내역 조회 (최대 100건)
+    const exchanges = await this.cashExchangeRepository.findByUserIds(
+      userIds,
+      100,
+    );
+
+    const exchangePoints: SearchExchangeItem[] = exchanges.map((e) => ({
+      id: (e.point_action_id ?? e.id) as number,
+      userId: e.user_id,
+      status: e.status,
+      amount: Number(e.amount),
+      createdAt: e.created_at,
+      email: userMap.get(e.user_id)?.email ?? '',
+      confirmedAt: e.confirmed_at,
+    }));
+
+    // 3. 계좌 정보 조회
+    const pendingUserIds = Array.from(
+      new Set(
+        exchanges.filter((e) => e.status === 'pending').map((e) => e.user_id),
+      ),
+    );
+    const uniqueUserIds = Array.from(new Set(exchanges.map((e) => e.user_id)));
+
+    const [pendingAccountInfo, accountInfoName] = await Promise.all([
+      pendingUserIds.length > 0
+        ? this.accountInfoService.getBulkAccountInfo(pendingUserIds)
+        : Promise.resolve([]),
+      uniqueUserIds.length > 0
+        ? this.accountInfoService.getBulkAccountInfoName(uniqueUserIds)
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      exchangePoints,
+      pendingAccountInfo,
+      accountInfoName,
+    };
+  }
+
   async getExchangeHistory(userId: string): Promise<ExchangePointResponse[]> {
     const cashExchanges =
       await this.cashExchangeRepository.findByUserId(userId);
@@ -187,16 +262,23 @@ export class ExchangePointService {
       throw new BadRequestException('Missing id parameter');
     }
 
-    const exchange = await this.exchangePointRepository.findById(id, userId);
+    // 검증 source: cash_exchanges
+    const cashExchange =
+      await this.cashExchangeRepository.findByPointActionId(id);
 
-    if (!exchange) {
+    if (!cashExchange) {
       throw new NotFoundException('Exchange request not found');
     }
 
-    if (exchange.status !== 'pending') {
+    if (cashExchange.user_id !== userId) {
+      throw new NotFoundException('Exchange request not found');
+    }
+
+    if (cashExchange.status !== 'pending') {
       throw new BadRequestException('Can only cancel pending requests');
     }
 
+    // dual-write: point_actions UPDATE는 그대로
     await this.exchangePointRepository.cancelExchangeRequest(id, userId);
 
     try {
@@ -216,15 +298,31 @@ export class ExchangePointService {
   async approveExchanges(
     ids: number[],
   ): Promise<{ success: boolean; count: number }> {
-    const exchanges = await this.exchangePointRepository.findByIds(ids);
-    const pendingExchanges = exchanges.filter((e) => e.status === 'pending');
+    // 검증 source: cash_exchanges (point_actions.id == cash_exchanges.point_action_id)
+    const cashExchanges =
+      await this.cashExchangeRepository.findByPointActionIds(ids);
+    const pendingCashExchanges = cashExchanges.filter(
+      (ce) => ce.status === 'pending',
+    );
 
-    if (pendingExchanges.length === 0) {
+    if (pendingCashExchanges.length === 0) {
       throw new BadRequestException('No pending exchanges found');
     }
 
-    const pendingIds = pendingExchanges.map((e) => e.id);
+    const pendingIds = pendingCashExchanges
+      .map((ce) => ce.point_action_id)
+      .filter((id): id is number => id !== null);
 
+    // 알림용 데이터 (point_amount는 음수로 변환)
+    const pendingExchanges = pendingCashExchanges
+      .filter((ce) => ce.point_action_id !== null)
+      .map((ce) => ({
+        id: ce.point_action_id as number,
+        user_id: ce.user_id,
+        point_amount: -Number(ce.amount),
+      }));
+
+    // dual-write: point_actions UPDATE는 그대로
     await this.exchangePointRepository.approveExchangeRequests(pendingIds);
 
     // dual-write: cash_exchanges 일괄 상태 업데이트
@@ -252,18 +350,19 @@ export class ExchangePointService {
     id: number,
     reason: string = 'invalid_account_number',
   ): Promise<{ success: boolean }> {
-    const exchanges = await this.exchangePointRepository.findByIds([id]);
+    // 검증 source: cash_exchanges
+    const cashExchange =
+      await this.cashExchangeRepository.findByPointActionId(id);
 
-    if (exchanges.length === 0) {
+    if (!cashExchange) {
       throw new NotFoundException('Exchange request not found');
     }
 
-    const exchange = exchanges[0];
-
-    if (exchange.status !== 'pending') {
+    if (cashExchange.status !== 'pending') {
       throw new BadRequestException('Can only reject pending requests');
     }
 
+    // dual-write: point_actions UPDATE는 그대로
     await this.exchangePointRepository.rejectExchangeRequest(id, reason);
 
     // dual-write: cash_exchanges 상태 업데이트
@@ -282,13 +381,13 @@ export class ExchangePointService {
     // 푸시 알림
     try {
       await this.fcmService.pushNotification(
-        exchange.user_id,
+        cashExchange.user_id,
         '계좌 번호가 올바르지 않습니다.',
         '계좌 정보를 확인해주세요.',
       );
     } catch (error) {
       this.logger.error(
-        `Push notification failed for user=${exchange.user_id}`,
+        `Push notification failed for user=${cashExchange.user_id}`,
         error,
       );
     }

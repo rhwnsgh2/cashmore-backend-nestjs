@@ -107,6 +107,66 @@ export class SupabaseCashExchangeRepository implements ICashExchangeRepository {
     return (data as CashExchange[]) || [];
   }
 
+  async findByPointActionId(
+    pointActionId: number,
+  ): Promise<CashExchange | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('*')
+      .eq('point_action_id', pointActionId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data as CashExchange;
+  }
+
+  async findByPointActionIds(
+    pointActionIds: number[],
+  ): Promise<CashExchange[]> {
+    if (pointActionIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('*')
+      .in('point_action_id', pointActionIds);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as CashExchange[]) || [];
+  }
+
+  async findByUserIds(
+    userIds: string[],
+    limit: number,
+  ): Promise<CashExchange[]> {
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('*')
+      .in('user_id', userIds)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as CashExchange[]) || [];
+  }
+
   async findByStatus(status: CashExchangeStatus): Promise<CashExchange[]> {
     const { data, error } = await this.supabaseService
       .getClient()

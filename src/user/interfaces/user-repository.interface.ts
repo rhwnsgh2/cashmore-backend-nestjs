@@ -46,6 +46,11 @@ export interface IUserRepository {
   findBulkByUserIds(userIds: string[]): Promise<User[]>;
 
   /**
+   * 이메일 부분 일치로 사용자 검색 (어드민용, limit 지원)
+   */
+  searchByEmail(email: string, limit: number): Promise<User[]>;
+
+  /**
    * auth_id로 사용자 조회
    */
   findByAuthId(authId: string): Promise<User | null>;

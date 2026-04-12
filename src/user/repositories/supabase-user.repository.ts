@@ -30,6 +30,23 @@ export class SupabaseUserRepository implements IUserRepository {
     return data as User;
   }
 
+  async searchByEmail(email: string, limit: number): Promise<User[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('user')
+      .select(
+        'id, email, auth_id, created_at, marketing_info, is_banned, nickname, provider',
+      )
+      .ilike('email', `%${email}%`)
+      .limit(limit);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as User[]) || [];
+  }
+
   async findBulkByUserIds(userIds: string[]): Promise<User[]> {
     if (userIds.length === 0) {
       return [];
