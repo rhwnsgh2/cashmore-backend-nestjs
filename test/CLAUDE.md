@@ -16,3 +16,7 @@
 | #1238 | 8:50 PM | 🔵 | NAT Gateway Traffic Monitoring Investigation | ~411 |
 | #1216 | 8:28 PM | ⚖️ | Cost Analysis Discussion for Infrastructure Scaling | ~476 |
 </claude-mem-context>
+
+## 테스트 DB 기동
+
+테스트용 Supabase는 `scripts/test-db/start-test-db.sh` 로 띄운다. 이 스크립트는 `supabase start` 후 `tune-postgres.sh` 를 호출해 fsync/synchronous_commit 등을 끄고 컨테이너를 재시작한다. 테스트 전용 튜닝이며 운영/개발(`supabase/`)에는 절대 적용하지 않는다.
