@@ -6,12 +6,6 @@ dotenv.config({ path: '.env.test' });
 
 let client: Client | null = null;
 
-// Per-table baseline of n_tup_ins+upd+del. A table is "dirty" when its current
-// counter exceeds the baseline. TRUNCATE doesn't bump these counters, so after
-// truncating we re-read and store the post-truncate values as the new baseline.
-// null = no baseline yet → next call truncates everything (cold start).
-let dirtyBaseline: Map<string, number> | null = null;
-
 export async function getTestDbClient(): Promise<Client> {
   if (!client) {
     client = new Client({
@@ -37,44 +31,23 @@ export async function closeTestDbClient(): Promise<void> {
 export async function truncateAllTables(): Promise<void> {
   const db = await getTestDbClient();
 
-  let dirty: string[];
+  // Get all tables in public schema (excluding system tables)
+  const result = await db.query(`
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+    AND tablename NOT IN ('schema_migrations', 'supabase_migrations')
+  `);
 
-  if (dirtyBaseline === null) {
-    // Cold start: truncate every public table to get to a known clean state.
-    const all = await db.query<{ tablename: string }>(`
-      SELECT tablename FROM pg_tables
-      WHERE schemaname = 'public'
-        AND tablename NOT IN ('schema_migrations', 'supabase_migrations')
-    `);
-    dirty = all.rows.map((r) => r.tablename);
-  } else {
-    await db.query('SELECT pg_stat_clear_snapshot()');
-    const { rows } = await db.query<{ relname: string; total: string }>(`
-      SELECT relname, (n_tup_ins + n_tup_upd + n_tup_del)::text AS total
-      FROM pg_stat_user_tables
-      WHERE schemaname = 'public'
-    `);
-    dirty = rows
-      .filter((r) => Number(r.total) > (dirtyBaseline!.get(r.relname) ?? 0))
-      .map((r) => r.relname);
-  }
+  const tables = result.rows.map((r) => r.tablename);
 
-  if (dirty.length > 0) {
+  if (tables.length > 0) {
+    // TRUNCATE with CASCADE to handle foreign key constraints
+    // RESTART IDENTITY to reset auto-increment counters
     await db.query(`
-      TRUNCATE TABLE ${dirty.map((t) => `"${t}"`).join(', ')}
+      TRUNCATE TABLE ${tables.map((t) => `"${t}"`).join(', ')}
       RESTART IDENTITY CASCADE
     `);
   }
-
-  // Refresh baseline. TRUNCATE doesn't reset n_tup_* counters, so we record
-  // the post-truncate totals and treat any future increase as "dirty".
-  await db.query('SELECT pg_stat_clear_snapshot()');
-  const after = await db.query<{ relname: string; total: string }>(`
-    SELECT relname, (n_tup_ins + n_tup_upd + n_tup_del)::text AS total
-    FROM pg_stat_user_tables
-    WHERE schemaname = 'public'
-  `);
-  dirtyBaseline = new Map(after.rows.map((r) => [r.relname, Number(r.total)]));
 }
 
 export async function truncateTables(...tableNames: string[]): Promise<void> {
