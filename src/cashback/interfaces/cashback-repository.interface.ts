@@ -198,21 +198,13 @@ export interface ICashbackRepository {
 
   sumCompletedClaimCashback(userId: string): Promise<number>;
 
-  sumExchangePointToCash(userId: string): Promise<number>;
-
   sumCashExchangeDone(userId: string): Promise<number>;
-
-  findCashExchangesByPointActionIds(
-    pointActionIds: number[],
-  ): Promise<RawCashExchange[]>;
 
   findCashExchangesPaged(
     userId: string,
     cursor: string | null,
     limit: number,
   ): Promise<RawCashExchange[]>;
-
-  findPointActionsByIds(ids: number[]): Promise<RawPointAction[]>;
 }
 
 // DI 토큰

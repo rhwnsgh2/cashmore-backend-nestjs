@@ -168,40 +168,12 @@ export class StubCashbackRepository implements ICashbackRepository {
     return Promise.resolve(sum);
   }
 
-  sumExchangePointToCash(userId: string): Promise<number> {
-    const actions = this.pointActions.get(userId) || [];
-    const sum = actions
-      .filter((a) => a.type === 'EXCHANGE_POINT_TO_CASH' && a.status === 'done')
-      .reduce((acc, a) => acc + (a.point_amount || 0) * -1, 0);
-    return Promise.resolve(sum);
-  }
-
   sumCashExchangeDone(userId: string): Promise<number> {
     const exchanges = this.cashExchanges.get(userId) || [];
     const sum = exchanges
       .filter((e) => e.status === 'done')
       .reduce((acc, e) => acc + (e.amount || 0), 0);
     return Promise.resolve(sum);
-  }
-
-  findCashExchangesByPointActionIds(
-    pointActionIds: number[],
-  ): Promise<RawCashExchange[]> {
-    if (pointActionIds.length === 0) {
-      return Promise.resolve([]);
-    }
-    const result: RawCashExchange[] = [];
-    for (const exchanges of this.cashExchanges.values()) {
-      for (const ex of exchanges) {
-        if (
-          ex.point_action_id !== null &&
-          pointActionIds.includes(ex.point_action_id)
-        ) {
-          result.push(ex);
-        }
-      }
-    }
-    return Promise.resolve(result);
   }
 
   findCashExchangesPaged(
@@ -211,20 +183,5 @@ export class StubCashbackRepository implements ICashbackRepository {
   ): Promise<RawCashExchange[]> {
     const data = this.cashExchanges.get(userId) || [];
     return Promise.resolve(this.applyPagination(data, cursor, limit));
-  }
-
-  findPointActionsByIds(ids: number[]): Promise<RawPointAction[]> {
-    if (ids.length === 0) {
-      return Promise.resolve([]);
-    }
-    const result: RawPointAction[] = [];
-    for (const actions of this.pointActions.values()) {
-      for (const a of actions) {
-        if (ids.includes(a.id)) {
-          result.push(a);
-        }
-      }
-    }
-    return Promise.resolve(result);
   }
 }

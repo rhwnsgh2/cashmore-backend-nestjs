@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ExchangePointService } from './exchange-point.service';
@@ -12,7 +12,6 @@ import { FcmService } from '../fcm/fcm.service';
 import { USER_REPOSITORY } from '../user/interfaces/user-repository.interface';
 import { StubUserRepository } from '../user/repositories/stub-user.repository';
 import { AccountInfoService } from '../account-info/account-info.service';
-import { SlackService } from '../slack/slack.service';
 
 const stubFcmService = {
   pushNotification: async () => {},
@@ -29,14 +28,12 @@ describe('ExchangePointService', () => {
   let repository: StubExchangePointRepository;
   let cashExchangeRepository: StubCashExchangeRepository;
   let userRepository: StubUserRepository;
-  let slackSpy: ReturnType<typeof vi.fn>;
   const userId = 'test-user-id';
 
   beforeEach(async () => {
     repository = new StubExchangePointRepository();
     cashExchangeRepository = new StubCashExchangeRepository();
     userRepository = new StubUserRepository();
-    slackSpy = vi.fn().mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -65,10 +62,6 @@ describe('ExchangePointService', () => {
           provide: FcmService,
           useValue: stubFcmService,
         },
-        {
-          provide: SlackService,
-          useValue: { reportBugToSlack: slackSpy },
-        },
       ],
     }).compile();
 
@@ -77,18 +70,6 @@ describe('ExchangePointService', () => {
 
   describe('getExchangeHistory', () => {
     it('출금 내역을 반환한다 (cash_exchanges에서 조회 + 응답 형식 유지)', async () => {
-      // legacy(point_actions)와 cash_exchanges 둘 다 setup (병행 검증을 위해)
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'pending',
-          created_at: '2025-01-01T00:00:00Z',
-          additional_data: null,
-        },
-      ]);
       await cashExchangeRepository.insert({
         user_id: userId,
         amount: 5000,
@@ -489,106 +470,4 @@ describe('ExchangePointService', () => {
     });
   });
 
-  describe('getExchangeHistory cash_exchanges 비교 로직', () => {
-    beforeEach(() => {
-      slackSpy.mockClear();
-    });
-
-    it('legacy와 cash_exchanges가 일치하면 슬랙 알림이 없다', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'pending',
-          created_at: '2026-03-24T10:00:00Z',
-          additional_data: null,
-        },
-      ]);
-      await cashExchangeRepository.insert({
-        user_id: userId,
-        amount: 5000,
-        point_action_id: 1,
-      });
-
-      const result = await service.getExchangeHistory(userId);
-
-      expect(result).toHaveLength(1);
-      expect(slackSpy).not.toHaveBeenCalled();
-    });
-
-    it('cash_exchanges에 누락된 건이 있으면 슬랙 알림이 발송된다', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 999,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'pending',
-          created_at: '2026-03-24T10:00:00Z',
-          additional_data: null,
-        },
-      ]);
-      // cash_exchanges에는 행 없음
-
-      await service.getExchangeHistory(userId);
-
-      expect(slackSpy).toHaveBeenCalledTimes(1);
-      expect(slackSpy.mock.calls[0][0]).toContain(
-        'getExchangeHistory mismatch',
-      );
-      expect(slackSpy.mock.calls[0][0]).toContain('missing_in_cash_exchanges');
-    });
-
-    it('amount가 다르면 슬랙 알림이 발송된다', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'pending',
-          created_at: '2026-03-24T10:00:00Z',
-          additional_data: null,
-        },
-      ]);
-      // cash_exchanges에 다른 금액
-      await cashExchangeRepository.insert({
-        user_id: userId,
-        amount: 4000,
-        point_action_id: 1,
-      });
-
-      await service.getExchangeHistory(userId);
-
-      expect(slackSpy).toHaveBeenCalledTimes(1);
-      expect(slackSpy.mock.calls[0][0]).toContain('amount_mismatch');
-    });
-
-    it('status가 다르면 슬랙 알림이 발송된다', async () => {
-      repository.setExchanges(userId, [
-        {
-          id: 1,
-          user_id: userId,
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -5000,
-          status: 'done',
-          created_at: '2026-03-24T10:00:00Z',
-          additional_data: null,
-        },
-      ]);
-      await cashExchangeRepository.insert({
-        user_id: userId,
-        amount: 5000,
-        point_action_id: 1,
-      });
-      // cash_exchanges는 pending 상태로 남아있음
-
-      await service.getExchangeHistory(userId);
-
-      expect(slackSpy).toHaveBeenCalledTimes(1);
-      expect(slackSpy.mock.calls[0][0]).toContain('status_mismatch');
-    });
-  });
 });

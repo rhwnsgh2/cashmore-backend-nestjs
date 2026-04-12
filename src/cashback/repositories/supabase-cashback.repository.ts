@@ -185,23 +185,6 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     );
   }
 
-  async sumExchangePointToCash(userId: string): Promise<number> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .select('point_amount')
-      .eq('user_id', userId)
-      .eq('type', 'EXCHANGE_POINT_TO_CASH')
-      .eq('status', 'done');
-
-    if (error || !data) return 0;
-    return data.reduce(
-      (acc: number, row: { point_amount: number | null }) =>
-        acc + (row.point_amount ?? 0) * -1,
-      0,
-    );
-  }
-
   async sumCashExchangeDone(userId: string): Promise<number> {
     const { data, error } = await this.supabaseService
       .getClient()
@@ -215,23 +198,6 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
       (acc: number, row: { amount: number | null }) => acc + (row.amount ?? 0),
       0,
     );
-  }
-
-  async findCashExchangesByPointActionIds(
-    pointActionIds: number[],
-  ): Promise<RawCashExchange[]> {
-    if (pointActionIds.length === 0) {
-      return [];
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('cash_exchanges')
-      .select('id, point_action_id, created_at, amount, status')
-      .in('point_action_id', pointActionIds);
-
-    if (error || !data) return [];
-    return data as unknown as RawCashExchange[];
   }
 
   async findCashExchangesPaged(
@@ -254,21 +220,6 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     const { data, error } = await query;
     if (error || !data) return [];
     return data as unknown as RawCashExchange[];
-  }
-
-  async findPointActionsByIds(ids: number[]): Promise<RawPointAction[]> {
-    if (ids.length === 0) {
-      return [];
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .select('id, created_at, point_amount, type, status, additional_data')
-      .in('id', ids);
-
-    if (error || !data) return [];
-    return data as unknown as RawPointAction[];
   }
 
   async findNaverPayExchanges(

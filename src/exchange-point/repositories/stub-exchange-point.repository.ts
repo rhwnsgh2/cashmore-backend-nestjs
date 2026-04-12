@@ -23,10 +23,6 @@ export class StubExchangePointRepository implements IExchangePointRepository {
     this.nextId = 1;
   }
 
-  findByUserId(userId: string): Promise<ExchangePoint[]> {
-    return Promise.resolve(this.exchanges.get(userId) || []);
-  }
-
   getTotalPoints(userId: string): Promise<number> {
     return Promise.resolve(this.totalPoints.get(userId) ?? 0);
   }

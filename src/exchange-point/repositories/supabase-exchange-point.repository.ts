@@ -10,23 +10,6 @@ import type {
 export class SupabaseExchangePointRepository implements IExchangePointRepository {
   constructor(private supabaseService: SupabaseService) {}
 
-  async findByUserId(userId: string): Promise<ExchangePoint[]> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .select(
-        'id, user_id, type, point_amount, status, created_at, additional_data',
-      )
-      .eq('user_id', userId)
-      .eq('type', 'EXCHANGE_POINT_TO_CASH');
-
-    if (error) {
-      throw error;
-    }
-
-    return (data as ExchangePoint[]) || [];
-  }
-
   async getTotalPoints(userId: string): Promise<number> {
     const { data, error } = await this.supabaseService
       .getClient()

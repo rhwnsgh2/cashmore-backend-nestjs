@@ -1,144 +1,30 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import type {
-  ICashbackRepository,
-  RawCashExchange,
-  RawPointAction,
-} from './interfaces/cashback-repository.interface';
+import { Inject, Injectable } from '@nestjs/common';
+import type { ICashbackRepository } from './interfaces/cashback-repository.interface';
 import {
   CASHBACK_REPOSITORY,
   POINT_ACTION_TYPE_MAP,
   type CashbackItem,
   type CashbackListResult,
 } from './interfaces/cashback-repository.interface';
-import { SlackService } from '../slack/slack.service';
 
 const DEFAULT_LIMIT = 20;
 
 @Injectable()
 export class CashbackService {
-  private readonly logger = new Logger(CashbackService.name);
-
   constructor(
     @Inject(CASHBACK_REPOSITORY)
     private cashbackRepository: ICashbackRepository,
-    private slackService: SlackService,
   ) {}
 
   async getReceivedCashback(
     userId: string,
   ): Promise<{ receivedCashback: number }> {
-    const [claimCashback, exchangeAmount, legacyExchangeAmount] =
-      await Promise.all([
-        this.cashbackRepository.sumCompletedClaimCashback(userId),
-        this.cashbackRepository.sumCashExchangeDone(userId),
-        this.safeSumLegacyExchangePointToCash(userId),
-      ]);
-
-    if (legacyExchangeAmount !== null && legacyExchangeAmount !== exchangeAmount) {
-      const message = `[CashExchangeMigration] sumExchangePointToCash mismatch userId=${userId} ${JSON.stringify(
-        {
-          legacy: legacyExchangeAmount,
-          new: exchangeAmount,
-          diff: legacyExchangeAmount - exchangeAmount,
-        },
-      )}`;
-      this.logger.warn(message);
-      void this.slackService.reportBugToSlack(`🚨 ${message}`);
-    }
+    const [claimCashback, exchangeAmount] = await Promise.all([
+      this.cashbackRepository.sumCompletedClaimCashback(userId),
+      this.cashbackRepository.sumCashExchangeDone(userId),
+    ]);
 
     return { receivedCashback: claimCashback + exchangeAmount };
-  }
-
-  private async safeSumLegacyExchangePointToCash(
-    userId: string,
-  ): Promise<number | null> {
-    try {
-      return await this.cashbackRepository.sumExchangePointToCash(userId);
-    } catch (error) {
-      this.logger.error(
-        `[CashExchangeMigration] sumExchangePointToCash legacy read failed userId=${userId}`,
-        error,
-      );
-      void this.slackService.reportBugToSlack(
-        `🚨 [CashExchangeMigration] sumExchangePointToCash legacy read failed userId=${userId} error=${error instanceof Error ? error.message : String(error)}`,
-      );
-      return null;
-    }
-  }
-
-  private async compareCashbackListExchangesAsync(
-    userId: string,
-    cashExchanges: RawCashExchange[],
-  ): Promise<void> {
-    const exchangesWithPointActionId = cashExchanges.filter(
-      (ce) => ce.point_action_id !== null,
-    );
-    if (exchangesWithPointActionId.length === 0) {
-      return;
-    }
-
-    const ids = exchangesWithPointActionId.map(
-      (ce) => ce.point_action_id as number,
-    );
-
-    let legacyByPointActionId: RawPointAction[];
-    try {
-      legacyByPointActionId =
-        await this.cashbackRepository.findPointActionsByIds(ids);
-    } catch (error) {
-      this.logger.error(
-        `[CashExchangeMigration] findPointActionsByIds failed userId=${userId}`,
-        error,
-      );
-      void this.slackService.reportBugToSlack(
-        `🚨 [CashExchangeMigration] findPointActionsByIds failed userId=${userId} error=${error instanceof Error ? error.message : String(error)}`,
-      );
-      return;
-    }
-
-    const legacyMap = new Map<number, RawPointAction>();
-    for (const pa of legacyByPointActionId) {
-      legacyMap.set(pa.id, pa);
-    }
-
-    const mismatches: Array<{
-      pointActionId: number;
-      reason: string;
-    }> = [];
-
-    for (const ce of exchangesWithPointActionId) {
-      const pointActionId = ce.point_action_id as number;
-      const legacyItem = legacyMap.get(pointActionId);
-      if (!legacyItem) {
-        mismatches.push({
-          pointActionId,
-          reason: 'missing_in_point_actions',
-        });
-        continue;
-      }
-      if (Math.abs(legacyItem.point_amount ?? 0) !== Number(ce.amount)) {
-        mismatches.push({
-          pointActionId,
-          reason: 'amount_mismatch',
-        });
-      }
-      if ((legacyItem.status ?? '') !== ce.status) {
-        mismatches.push({
-          pointActionId,
-          reason: 'status_mismatch',
-        });
-      }
-    }
-
-    if (mismatches.length > 0) {
-      const message = `[CashExchangeMigration] cashbackList mismatch userId=${userId} ${JSON.stringify(
-        {
-          mismatches: mismatches.slice(0, 10),
-        },
-      )}`;
-      this.logger.warn(message);
-      void this.slackService.reportBugToSlack(`🚨 ${message}`);
-    }
   }
 
   async getCashbackList(
@@ -165,10 +51,6 @@ export class CashbackService {
       this.cashbackRepository.findNaverPayExchanges(userId, cursor, limit),
       this.cashbackRepository.findCashExchangesPaged(userId, cursor, limit),
     ]);
-
-    // 비교는 응답 후 비동기로 (fire-and-forget)
-    // cash_exchanges 결과의 point_action_id로 point_actions 조회 → 1:1 비교
-    void this.compareCashbackListExchangesAsync(userId, cashExchanges);
 
     // attendance는 point_actions 매칭이 필요
     let attendancePointActions: Awaited<
