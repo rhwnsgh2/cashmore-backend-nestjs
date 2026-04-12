@@ -134,35 +134,40 @@ export class ExchangePointService {
   }
 
   async getExchangeHistory(userId: string): Promise<ExchangePointResponse[]> {
-    const [legacy, cashExchanges] = await Promise.all([
-      this.exchangePointRepository.findByUserId(userId),
-      this.safeFindCashExchangesByUserId(userId),
+    const [cashExchanges, legacy] = await Promise.all([
+      this.cashExchangeRepository.findByUserId(userId),
+      this.safeFindLegacyExchangesByUserId(userId),
     ]);
 
-    if (cashExchanges !== null) {
+    if (legacy !== null) {
       this.compareExchangeHistory(userId, legacy, cashExchanges);
     }
 
-    return legacy.map((e) => ({
-      id: e.id,
-      createdAt: e.created_at,
-      amount: e.point_amount,
-      status: e.status,
-    }));
+    // 응답: cash_exchanges를 source로, 기존 응답 형식 유지
+    // - id: point_action_id (호환성)
+    // - amount: 음수로 변환 (point_actions와 동일)
+    return cashExchanges
+      .filter((ce) => ce.point_action_id !== null)
+      .map((ce) => ({
+        id: ce.point_action_id as number,
+        createdAt: ce.created_at,
+        amount: -Number(ce.amount),
+        status: ce.status,
+      }));
   }
 
-  private async safeFindCashExchangesByUserId(
+  private async safeFindLegacyExchangesByUserId(
     userId: string,
-  ): Promise<CashExchange[] | null> {
+  ): Promise<ExchangePoint[] | null> {
     try {
-      return await this.cashExchangeRepository.findByUserId(userId);
+      return await this.exchangePointRepository.findByUserId(userId);
     } catch (error) {
       this.logger.error(
-        `[CashExchangeMigration] cash_exchanges read failed userId=${userId}`,
+        `[CashExchangeMigration] point_actions read failed userId=${userId}`,
         error,
       );
       void this.slackService.reportBugToSlack(
-        `🚨 [CashExchangeMigration] getExchangeHistory read failed userId=${userId} error=${error instanceof Error ? error.message : String(error)}`,
+        `🚨 [CashExchangeMigration] getExchangeHistory legacy read failed userId=${userId} error=${error instanceof Error ? error.message : String(error)}`,
       );
       return null;
     }

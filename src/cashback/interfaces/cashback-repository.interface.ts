@@ -38,8 +38,8 @@ export interface CashbackListResult {
 }
 
 // point_actions에서 조회할 타입들
+// EXCHANGE_POINT_TO_CASH는 cash_exchanges 테이블에서 직접 조회하므로 여기서 제외
 export const CASHBACK_POINT_ACTION_TYPES = [
-  'EXCHANGE_POINT_TO_CASH',
   'INVITE_REWARD',
   'INVITED_USER_REWARD',
   'INVITE_5_REWARD',
@@ -205,6 +205,14 @@ export interface ICashbackRepository {
   findCashExchangesByPointActionIds(
     pointActionIds: number[],
   ): Promise<RawCashExchange[]>;
+
+  findCashExchangesPaged(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<RawCashExchange[]>;
+
+  findPointActionsByIds(ids: number[]): Promise<RawPointAction[]>;
 }
 
 // DI 토큰

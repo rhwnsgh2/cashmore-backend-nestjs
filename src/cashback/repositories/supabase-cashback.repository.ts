@@ -234,6 +234,43 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     return data as unknown as RawCashExchange[];
   }
 
+  async findCashExchangesPaged(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<RawCashExchange[]> {
+    let query = this.supabaseService
+      .getClient()
+      .from('cash_exchanges')
+      .select('id, point_action_id, created_at, amount, status')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (cursor) {
+      query = query.lt('created_at', cursor);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data as unknown as RawCashExchange[];
+  }
+
+  async findPointActionsByIds(ids: number[]): Promise<RawPointAction[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .select('id, created_at, point_amount, type, status, additional_data')
+      .in('id', ids);
+
+    if (error || !data) return [];
+    return data as unknown as RawPointAction[];
+  }
+
   async findNaverPayExchanges(
     userId: string,
     cursor: string | null,

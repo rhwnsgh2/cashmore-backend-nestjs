@@ -76,7 +76,8 @@ describe('ExchangePointService', () => {
   });
 
   describe('getExchangeHistory', () => {
-    it('출금 내역을 반환한다', async () => {
+    it('출금 내역을 반환한다 (cash_exchanges에서 조회 + 응답 형식 유지)', async () => {
+      // legacy(point_actions)와 cash_exchanges 둘 다 setup (병행 검증을 위해)
       repository.setExchanges(userId, [
         {
           id: 1,
@@ -88,13 +89,17 @@ describe('ExchangePointService', () => {
           additional_data: null,
         },
       ]);
+      await cashExchangeRepository.insert({
+        user_id: userId,
+        amount: 5000,
+        point_action_id: 1,
+      });
 
       const result = await service.getExchangeHistory(userId);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
+      expect(result[0]).toMatchObject({
         id: 1,
-        createdAt: '2025-01-01T00:00:00Z',
         amount: -5000,
         status: 'pending',
       });

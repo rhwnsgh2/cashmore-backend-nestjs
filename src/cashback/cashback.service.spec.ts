@@ -97,6 +97,24 @@ describe('CashbackService', () => {
     });
 
     it('EXCHANGE_POINT_TO_CASH의 done 상태 point_amount를 음수 반전하여 합산한다', async () => {
+      // swap 후 source는 cash_exchanges
+      repository.setCashExchanges(userId, [
+        {
+          id: 100,
+          point_action_id: 10,
+          created_at: '2026-03-24T10:00:00Z',
+          amount: 5000,
+          status: 'done',
+        },
+        {
+          id: 101,
+          point_action_id: 11,
+          created_at: '2026-03-24T09:00:00Z',
+          amount: 3000,
+          status: 'done',
+        },
+      ]);
+      // legacy 검증을 위해 point_actions도 동일하게 setup
       repository.setPointActions(userId, [
         {
           id: 10,
@@ -121,7 +139,23 @@ describe('CashbackService', () => {
       expect(result.receivedCashback).toBe(8000);
     });
 
-    it('done이 아닌 EXCHANGE_POINT_TO_CASH는 합산에서 제외한다', async () => {
+    it('done이 아닌 cash_exchanges는 합산에서 제외한다', async () => {
+      repository.setCashExchanges(userId, [
+        {
+          id: 100,
+          point_action_id: 10,
+          created_at: '2026-03-24T10:00:00Z',
+          amount: 5000,
+          status: 'done',
+        },
+        {
+          id: 101,
+          point_action_id: 11,
+          created_at: '2026-03-24T09:00:00Z',
+          amount: 3000,
+          status: 'pending',
+        },
+      ]);
       repository.setPointActions(userId, [
         {
           id: 10,
@@ -154,6 +188,15 @@ describe('CashbackService', () => {
           cashback_amount: 1000,
           status: 'completed',
           location_info: null,
+        },
+      ]);
+      repository.setCashExchanges(userId, [
+        {
+          id: 100,
+          point_action_id: 10,
+          created_at: '2026-03-24T09:00:00Z',
+          amount: 2000,
+          status: 'done',
         },
       ]);
       repository.setPointActions(userId, [
@@ -818,8 +861,8 @@ describe('CashbackService', () => {
 
       const result = await service.getReceivedCashback(userId);
 
-      // 응답은 legacy 기준
-      expect(result.receivedCashback).toBe(5000);
+      // 응답은 swap 후 cash_exchanges(=new) 기준
+      expect(result.receivedCashback).toBe(4000);
       // 슬랙 알림 호출 확인
       expect(slackSpy).toHaveBeenCalledTimes(1);
       expect(slackSpy.mock.calls[0][0]).toContain(
@@ -854,19 +897,19 @@ describe('CashbackService', () => {
       expect(slackSpy).not.toHaveBeenCalled();
     });
 
-    it('cashbackList에서 cash_exchanges에 누락된 건이 있으면 슬랙 알림이 발송된다', async () => {
-      repository.setPointActions(userId, [
+    it('cashbackList에서 point_actions에 누락된 건이 있으면 슬랙 알림이 발송된다', async () => {
+      // cash_exchanges가 source인 swap 후, 검증용 point_actions에 없는 케이스
+      repository.setCashExchanges(userId, [
         {
-          id: 1,
+          id: 100,
+          point_action_id: 1,
           created_at: '2026-03-24T10:00:00Z',
-          point_amount: -5000,
-          type: 'EXCHANGE_POINT_TO_CASH',
+          amount: 5000,
           status: 'done',
-          additional_data: null,
         },
       ]);
-      // cash_exchanges에는 행 없음
-      repository.setCashExchanges(userId, []);
+      // point_actions에는 행 없음
+      repository.setPointActions(userId, []);
 
       await service.getCashbackList(userId, null, 20);
       // fire-and-forget이라 microtask 처리 대기
@@ -874,7 +917,7 @@ describe('CashbackService', () => {
 
       expect(slackSpy).toHaveBeenCalledTimes(1);
       expect(slackSpy.mock.calls[0][0]).toContain('cashbackList mismatch');
-      expect(slackSpy.mock.calls[0][0]).toContain('missing_in_cash_exchanges');
+      expect(slackSpy.mock.calls[0][0]).toContain('missing_in_point_actions');
     });
 
     it('cashbackList에서 status가 다르면 슬랙 알림이 발송된다', async () => {
