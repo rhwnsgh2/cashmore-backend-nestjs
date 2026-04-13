@@ -3,6 +3,7 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as elbv2_targets from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cw_actions from 'aws-cdk-lib/aws-cloudwatch-actions';
@@ -357,6 +358,17 @@ export class InfrastructureStack extends cdk.Stack {
       validation: acm.CertificateValidation.fromDns(),
     });
 
+    // 인바운드 고정 IP 전용 서브도메인 인증서
+    // 후이즈에 ACM DNS 검증 CNAME을 수동 등록해야 한다.
+    const externalCertificate = new acm.Certificate(
+      this,
+      'CashmoreExternalCertificate',
+      {
+        domainName: 'api-external.cashmore.kr',
+        validation: acm.CertificateValidation.fromDns(),
+      },
+    );
+
     // ECS Service
     const service = new ecs.FargateService(this, 'CashmoreService', {
       cluster,
@@ -379,9 +391,10 @@ export class InfrastructureStack extends cdk.Stack {
     service.connections.allowFrom(alb, ec2.Port.tcp(8000));
 
     // HTTPS Listener (port 443)
+    // ALB는 SNI 기반으로 인증서를 매칭한다 — api.cashmore.kr과 api-external.cashmore.kr 둘 다 처리
     const httpsListener = alb.addListener('CashmoreHttpsListener', {
       port: 443,
-      certificates: [certificate],
+      certificates: [certificate, externalCertificate],
     });
 
     // HTTP Listener (port 80) - Redirect to HTTPS
@@ -404,6 +417,78 @@ export class InfrastructureStack extends cdk.Stack {
         healthyThresholdCount: 2,
         unhealthyThresholdCount: 3,
       },
+    });
+
+    // 인바운드 고정 IP: NLB + Elastic IP (ALB 앞단)
+    // api-external.cashmore.kr 전용 — 업체에 EIP 2개를 전달하여 외부 방화벽 허용 IP로 등록시킨다.
+    // 기존 api.cashmore.kr 트래픽은 ALB로 직결 유지 (전환 리스크 없음).
+    const eip1 = new ec2.CfnEIP(this, 'NlbEip1', {
+      domain: 'vpc',
+      tags: [{ key: 'Name', value: 'cashmore-nlb-eip-az1' }],
+    });
+    const eip2 = new ec2.CfnEIP(this, 'NlbEip2', {
+      domain: 'vpc',
+      tags: [{ key: 'Name', value: 'cashmore-nlb-eip-az2' }],
+    });
+
+    const nlb = new elbv2.NetworkLoadBalancer(this, 'CashmoreNlb', {
+      vpc,
+      internetFacing: true,
+      crossZoneEnabled: true,
+      subnetMappings: [
+        {
+          subnet: vpc.publicSubnets[0],
+          allocationId: eip1.attrAllocationId,
+        },
+        {
+          subnet: vpc.publicSubnets[1],
+          allocationId: eip2.attrAllocationId,
+        },
+      ],
+    });
+
+    // NLB는 TCP 패스스루 — TLS 종료는 기존 ALB에서 유지
+    const nlbListener = nlb.addListener('NlbTcpListener', {
+      port: 443,
+      protocol: elbv2.Protocol.TCP,
+    });
+
+    // NLB → ALB 헬스체크는 HTTP:80 사용
+    // (HTTPS로 하면 ACM 인증서 hostname과 NLB→ALB 내부 호출의 SNI 불일치로 실패할 수 있음)
+    // ALB의 HTTP:80 리스너는 HTTPS로 301 리다이렉트 — NLB는 301도 healthy로 간주
+    nlbListener.addTargets('NlbAlbTarget', {
+      targets: [new elbv2_targets.AlbListenerTarget(httpsListener)],
+      port: 443,
+      healthCheck: {
+        enabled: true,
+        protocol: elbv2.Protocol.HTTP,
+        port: '80',
+        path: '/',
+        interval: cdk.Duration.seconds(30),
+      },
+    });
+
+    // 인터넷 → NLB 443 허용 (Public ingress)
+    nlb.connections.allowFromAnyIpv4(
+      ec2.Port.tcp(443),
+      'Public HTTPS to NLB',
+    );
+
+    // NLB → ALB 트래픽 허용 (패스스루 443 + 헬스체크 80)
+    nlb.connections.allowTo(alb, ec2.Port.tcp(443), 'NLB passthrough to ALB');
+    nlb.connections.allowTo(alb, ec2.Port.tcp(80), 'NLB health check to ALB');
+
+    new cdk.CfnOutput(this, 'NlbDnsName', {
+      value: nlb.loadBalancerDnsName,
+      description: 'NLB DNS 이름 (디버깅용, 실제 클라이언트는 api-external.cashmore.kr 사용)',
+    });
+    new cdk.CfnOutput(this, 'InboundStaticIp1', {
+      value: eip1.ref,
+      description: 'api-external.cashmore.kr 고정 IP #1 (AZ-a) - 업체 전달용',
+    });
+    new cdk.CfnOutput(this, 'InboundStaticIp2', {
+      value: eip2.ref,
+      description: 'api-external.cashmore.kr 고정 IP #2 (AZ-c) - 업체 전달용',
     });
 
     // Auto Scaling
