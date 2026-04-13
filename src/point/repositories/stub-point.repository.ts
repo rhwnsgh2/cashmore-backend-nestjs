@@ -2,8 +2,6 @@ import {
   type IPointRepository,
   type PointAction,
   type PointSnapshot,
-  type MonthlyEarnedPoint,
-  type WithdrawalAction,
   type EarnedPointAction,
   POINT_ADD_TYPES,
 } from '../interfaces/point-repository.interface';
@@ -15,8 +13,6 @@ import {
 export class StubPointRepository implements IPointRepository {
   private snapshots: Map<string, PointSnapshot> = new Map();
   private pointActions: Map<string, PointAction[]> = new Map();
-  private monthlyEarnedPoints: Map<string, MonthlyEarnedPoint[]> = new Map();
-  private withdrawalActions: Map<string, WithdrawalAction[]> = new Map();
   private insertedPointActions: {
     id: number;
     userId: string;
@@ -40,14 +36,6 @@ export class StubPointRepository implements IPointRepository {
     this.pointActions.set(userId, actions);
   }
 
-  setMonthlyEarnedPoints(userId: string, points: MonthlyEarnedPoint[]): void {
-    this.monthlyEarnedPoints.set(userId, points);
-  }
-
-  setWithdrawalActions(userId: string, actions: WithdrawalAction[]): void {
-    this.withdrawalActions.set(userId, actions);
-  }
-
   getInsertedPointActions() {
     return this.insertedPointActions;
   }
@@ -55,8 +43,6 @@ export class StubPointRepository implements IPointRepository {
   clear(): void {
     this.snapshots.clear();
     this.pointActions.clear();
-    this.monthlyEarnedPoints.clear();
-    this.withdrawalActions.clear();
     this.insertedPointActions = [];
     this.nextPointActionId = 1;
   }
@@ -77,18 +63,6 @@ export class StubPointRepository implements IPointRepository {
 
   findAllPointActions(userId: string): Promise<PointAction[]> {
     return Promise.resolve(this.pointActions.get(userId) || []);
-  }
-
-  findMonthlyEarnedPointsUntil(
-    userId: string,
-    _yearMonth: string,
-  ): Promise<MonthlyEarnedPoint[]> {
-    // 실제로는 yearMonth 필터링이 필요하지만, 테스트에서는 설정한 값 그대로 반환
-    return Promise.resolve(this.monthlyEarnedPoints.get(userId) || []);
-  }
-
-  findWithdrawalActions(userId: string): Promise<WithdrawalAction[]> {
-    return Promise.resolve(this.withdrawalActions.get(userId) || []);
   }
 
   findEarnedPointsBetween(

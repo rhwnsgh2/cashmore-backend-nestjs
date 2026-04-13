@@ -1,5 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { POINT_EXPIRATION_MONTHS } from '../common/constants/point.constants';
+import { Inject, Injectable } from '@nestjs/common';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
@@ -7,11 +6,8 @@ import type { IPointRepository } from './interfaces/point-repository.interface';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import {
   calculatePointAmount,
-  calculatePointAmountSimple,
-  calculatePointAmountWithSnapshot,
   calculateExpiringPoints,
 } from './utils/calculate-point.util';
-import { SlackService } from '../slack/slack.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -27,19 +23,16 @@ export interface PointTotalResult {
 
 @Injectable()
 export class PointService {
-  private readonly logger = new Logger(PointService.name);
-
   constructor(
     @Inject(POINT_REPOSITORY)
     private pointRepository: IPointRepository,
-    private slackService: SlackService,
   ) {}
 
   async getPointTotal(userId: string): Promise<PointTotalResult> {
     const now = dayjs().tz('Asia/Seoul');
 
     const totalPoint = await this.calculateTotalPoint(userId);
-    const expiringPoints = await this.calculateExpiringPoints(userId);
+    const expiringPoints = calculateExpiringPoints();
     const expiringDate = now.endOf('month').format('YYYY-MM-DD');
 
     // 오늘
@@ -102,81 +95,11 @@ export class PointService {
         userId,
         dayjs(snapshot.updated_at).toISOString(),
       );
-
-      const legacyTotal = calculatePointAmountWithSnapshot(
-        snapshot.point_balance,
-        pointActions,
-      );
-      const simpleTotal =
-        snapshot.point_balance + calculatePointAmountSimple(pointActions);
-
-      this.comparePointCalculation(userId, legacyTotal, simpleTotal);
-
-      return legacyTotal;
+      return snapshot.point_balance + calculatePointAmount(pointActions);
     }
 
     const pointActions = await this.pointRepository.findAllPointActions(userId);
-    const legacyTotal = calculatePointAmount(pointActions);
-    const simpleTotal = calculatePointAmountSimple(pointActions);
-
-    this.comparePointCalculation(userId, legacyTotal, simpleTotal);
-
-    return legacyTotal;
-  }
-
-  /**
-   * [Phase 5 검증] 기존 status 분기 계산과 단순 SUM 계산을 비교하여
-   * 차이가 발견되면 슬랙으로 알림을 보냅니다. (fire-and-forget)
-   */
-  private comparePointCalculation(
-    userId: string,
-    legacyTotal: number,
-    simpleTotal: number,
-  ): void {
-    if (legacyTotal === simpleTotal) {
-      return;
-    }
-
-    const message = `[PointCalculation] mismatch userId=${userId} ${JSON.stringify(
-      {
-        legacy: legacyTotal,
-        simple: simpleTotal,
-        diff: legacyTotal - simpleTotal,
-      },
-    )}`;
-    this.logger.warn(message);
-    void this.slackService.reportBugToSlack(`🚨 ${message}`);
-  }
-
-  private async calculateExpiringPoints(userId: string): Promise<number> {
-    const baseDate = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
-
-    // 소멸 기준월 계산
-    const expirationMonth = dayjs(baseDate)
-      .startOf('month')
-      .subtract(POINT_EXPIRATION_MONTHS, 'month')
-      .format('YYYY-MM-DD');
-
-    // 소멸 기준월까지의 월별 적립 포인트 조회
-    const monthlyPoints =
-      await this.pointRepository.findMonthlyEarnedPointsUntil(
-        userId,
-        expirationMonth,
-      );
-
-    const totalEarnedBeforeExpiration = monthlyPoints.reduce(
-      (sum, row) => sum + (row.earned_points || 0),
-      0,
-    );
-
-    // 전체 출금/차감 포인트 조회
-    const withdrawalActions =
-      await this.pointRepository.findWithdrawalActions(userId);
-
-    return calculateExpiringPoints(
-      totalEarnedBeforeExpiration,
-      withdrawalActions,
-    );
+    return calculatePointAmount(pointActions);
   }
 
   async deductPoint(

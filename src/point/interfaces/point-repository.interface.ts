@@ -36,16 +36,6 @@ export interface PointSnapshot {
   updated_at: string;
 }
 
-export interface MonthlyEarnedPoint {
-  earned_points: number;
-}
-
-export interface WithdrawalAction {
-  point_amount: number;
-  status: string;
-  type: string;
-}
-
 export interface EarnedPointAction {
   point_amount: number;
   created_at: string;
@@ -56,11 +46,6 @@ export interface IPointRepository {
   findLatestSnapshot(userId: string): Promise<PointSnapshot | null>;
   findPointActionsSince(userId: string, since: string): Promise<PointAction[]>;
   findAllPointActions(userId: string): Promise<PointAction[]>;
-  findMonthlyEarnedPointsUntil(
-    userId: string,
-    yearMonth: string,
-  ): Promise<MonthlyEarnedPoint[]>;
-  findWithdrawalActions(userId: string): Promise<WithdrawalAction[]>;
   findEarnedPointsBetween(
     userId: string,
     startDate: string,

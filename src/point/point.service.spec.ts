@@ -6,14 +6,9 @@ import utc from 'dayjs/plugin/utc';
 import { PointService } from './point.service';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import { StubPointRepository } from './repositories/stub-point.repository';
-import { SlackService } from '../slack/slack.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-
-const stubSlackService = {
-  reportBugToSlack: async () => {},
-};
 
 describe('PointService', () => {
   let service: PointService;
@@ -28,10 +23,6 @@ describe('PointService', () => {
         {
           provide: POINT_REPOSITORY,
           useValue: repository,
-        },
-        {
-          provide: SlackService,
-          useValue: stubSlackService,
         },
       ],
     }).compile();
@@ -88,26 +79,6 @@ describe('PointService', () => {
       const result = await service.getPointTotal(userId);
 
       expect(result.totalPoint).toBe(1050);
-    });
-
-    it('소멸 예정 포인트를 계산한다', async () => {
-      repository.setMonthlyEarnedPoints(userId, [
-        { earned_points: 3000 },
-        { earned_points: 2000 },
-      ]);
-
-      repository.setWithdrawalActions(userId, [
-        {
-          type: 'EXCHANGE_POINT_TO_CASH',
-          point_amount: -1000,
-          status: 'done',
-        },
-      ]);
-
-      const result = await service.getPointTotal(userId);
-
-      // 5000 (6개월전 적립) - 1000 (출금) = 4000
-      expect(result.expiringPoints).toBe(4000);
     });
 
     it('응답에 expiringDate가 포함된다', async () => {
