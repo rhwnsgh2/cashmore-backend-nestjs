@@ -647,7 +647,9 @@ export class UserService {
       trimmed,
     );
 
-    this.logger.log(`[NICKNAME] userId=${userId} ${beforeNickname} -> ${trimmed}`);
+    this.logger.log(
+      `[NICKNAME] userId=${userId} ${beforeNickname} -> ${trimmed}`,
+    );
 
     return { success: true };
   }
