@@ -1,4 +1,10 @@
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   IUserRepository,
   UserRole,
@@ -615,6 +621,48 @@ export class UserService {
     }
 
     return this.processOnboarding(deviceId, userId);
+  }
+
+  async updateNickname(
+    userId: string,
+    nickname: string,
+  ): Promise<{ success: boolean }> {
+    const trimmed = nickname.trim();
+
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+    const beforeNickname = user.nickname ?? '';
+
+    const duplicate = await this.userRepository.findByNickname(trimmed, userId);
+    if (duplicate) {
+      throw new ConflictException('이미 사용 중인 닉네임입니다.');
+    }
+
+    await this.userRepository.updateNickname(userId, trimmed);
+    await this.userRepository.insertNicknameHistory(
+      userId,
+      beforeNickname,
+      trimmed,
+    );
+
+    this.logger.log(`[NICKNAME] userId=${userId} ${beforeNickname} -> ${trimmed}`);
+
+    return { success: true };
+  }
+
+  async checkNicknameDuplicate(
+    userId: string,
+    nickname: string,
+  ): Promise<{ isDuplicate: boolean }> {
+    const trimmed = nickname.trim();
+    if (!trimmed) {
+      return { isDuplicate: false };
+    }
+
+    const duplicate = await this.userRepository.findByNickname(trimmed, userId);
+    return { isDuplicate: duplicate !== null };
   }
 
   private async handleInviteRewardModal(userId: string): Promise<void> {

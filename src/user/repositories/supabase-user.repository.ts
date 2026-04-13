@@ -91,6 +91,44 @@ export class SupabaseUserRepository implements IUserRepository {
     }
   }
 
+  async findByNickname(
+    nickname: string,
+    excludeUserId?: string,
+  ): Promise<{ id: string } | null> {
+    let query = this.supabaseService
+      .getClient()
+      .from('user')
+      .select('id')
+      .eq('nickname', nickname);
+
+    if (excludeUserId) {
+      query = query.neq('id', excludeUserId);
+    }
+
+    const { data, error } = await query.limit(1).maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data as { id: string };
+  }
+
+  async insertNicknameHistory(
+    userId: string,
+    before: string,
+    after: string,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('nickname_history')
+      .insert({ user_id: userId, before, after });
+
+    if (error) {
+      throw error;
+    }
+  }
+
   async findBanReason(authId: string): Promise<string | null> {
     const { data, error } = await this.supabaseService
       .getClient()

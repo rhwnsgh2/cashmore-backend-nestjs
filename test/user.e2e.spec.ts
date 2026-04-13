@@ -224,6 +224,210 @@ describe('User API (e2e) - Real DB', () => {
     });
   });
 
+  describe('PUT /user/nickname', () => {
+    let testUser: TestUser;
+    let token: string;
+
+    beforeEach(async () => {
+      testUser = await createTestUser(supabase, { nickname: 'oldnick' });
+      token = generateTestToken(testUser.auth_id);
+    });
+
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .send({ nickname: 'newnick' })
+        .expect(401);
+    });
+
+    it('닉네임을 변경하고 이력을 저장한다', async () => {
+      const response = await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: 'newnick' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+
+      const { data: user } = await supabase
+        .from('user')
+        .select('nickname')
+        .eq('id', testUser.id)
+        .single();
+      expect(user?.nickname).toBe('newnick');
+
+      const { data: history } = await supabase
+        .from('nickname_history')
+        .select('before, after, user_id')
+        .eq('user_id', testUser.id);
+      expect(history).toHaveLength(1);
+      expect(history![0].before).toBe('oldnick');
+      expect(history![0].after).toBe('newnick');
+    });
+
+    it('앞뒤 공백은 trim 후 저장한다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: '  spaced  ' })
+        .expect(200);
+
+      const { data: user } = await supabase
+        .from('user')
+        .select('nickname')
+        .eq('id', testUser.id)
+        .single();
+      expect(user?.nickname).toBe('spaced');
+    });
+
+    it('2자 미만이면 400을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: 'a' })
+        .expect(400);
+    });
+
+    it('12자 초과면 400을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: '1234567890123' })
+        .expect(400);
+    });
+
+    it('trim 후 2자 미만이면 400을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: ' a ' })
+        .expect(400);
+    });
+
+    it('정확히 2자는 허용된다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: '가나' })
+        .expect(200);
+    });
+
+    it('정확히 12자는 허용된다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: '123456789012' })
+        .expect(200);
+    });
+
+    it('nickname이 없으면 400을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(400);
+    });
+
+    it('다른 유저가 이미 사용 중이면 409를 반환한다', async () => {
+      await createTestUser(supabase, { nickname: 'taken' });
+
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: 'taken' })
+        .expect(409);
+    });
+
+    it('본인의 기존 닉네임과 같아도 성공한다', async () => {
+      await request(app.getHttpServer())
+        .put('/user/nickname')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: 'oldnick' })
+        .expect(200);
+    });
+  });
+
+  describe('POST /user/nickname/check', () => {
+    let testUser: TestUser;
+    let token: string;
+
+    beforeEach(async () => {
+      testUser = await createTestUser(supabase, { nickname: 'mynick' });
+      token = generateTestToken(testUser.auth_id);
+    });
+
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/user/nickname/check')
+        .send({ nickname: 'anything' })
+        .expect(401);
+    });
+
+    it('사용 가능한 닉네임이면 isDuplicate: false', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/user/nickname/check')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: 'available' })
+        .expect(200);
+
+      expect(response.body.isDuplicate).toBe(false);
+    });
+
+    it('다른 유저가 사용 중이면 isDuplicate: true', async () => {
+      await createTestUser(supabase, { nickname: 'taken' });
+
+      const response = await request(app.getHttpServer())
+        .post('/user/nickname/check')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: 'taken' })
+        .expect(200);
+
+      expect(response.body.isDuplicate).toBe(true);
+    });
+
+    it('본인의 닉네임은 isDuplicate: false', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/user/nickname/check')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: 'mynick' })
+        .expect(200);
+
+      expect(response.body.isDuplicate).toBe(false);
+    });
+
+    it('빈 문자열은 isDuplicate: false', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/user/nickname/check')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: '' })
+        .expect(200);
+
+      expect(response.body.isDuplicate).toBe(false);
+    });
+
+    it('공백만 있는 문자열은 isDuplicate: false', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/user/nickname/check')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: '   ' })
+        .expect(200);
+
+      expect(response.body.isDuplicate).toBe(false);
+    });
+
+    it('앞뒤 공백은 trim 후 비교한다', async () => {
+      await createTestUser(supabase, { nickname: 'taken' });
+
+      const response = await request(app.getHttpServer())
+        .post('/user/nickname/check')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nickname: '  taken  ' })
+        .expect(200);
+
+      expect(response.body.isDuplicate).toBe(true);
+    });
+  });
+
   describe('POST /user', () => {
     /**
      * auth.users에만 유저를 생성하고 user 테이블에는 생성하지 않는 헬퍼.

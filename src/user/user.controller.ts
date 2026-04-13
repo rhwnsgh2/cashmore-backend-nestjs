@@ -5,8 +5,10 @@ import {
   Delete,
   Get,
   Header,
+  HttpCode,
   NotFoundException,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -28,6 +30,14 @@ import {
   CreateUserResponseDto,
 } from './dto/create-user.dto';
 import { CompleteOnboardingResponseDto } from './dto/complete-onboarding.dto';
+import {
+  UpdateNicknameRequestDto,
+  UpdateNicknameResponseDto,
+} from './dto/update-nickname.dto';
+import {
+  CheckNicknameRequestDto,
+  CheckNicknameResponseDto,
+} from './dto/check-nickname.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtAuthOnlyGuard } from '../auth/guards/jwt-auth-only.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -156,5 +166,52 @@ export class UserController {
     @CurrentUser('userId') userId: string,
   ): Promise<CompleteOnboardingResponseDto> {
     return this.userService.completeOnboarding(userId);
+  }
+
+  @Put('nickname')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '닉네임 변경',
+    description:
+      '현재 사용자의 닉네임을 변경합니다. 변경 이력은 nickname_history에 저장됩니다.',
+  })
+  @ApiBody({ type: UpdateNicknameRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: '닉네임 변경 성공',
+    type: UpdateNicknameResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  @ApiNotFoundResponse({ description: '사용자를 찾을 수 없음' })
+  @ApiConflictResponse({ description: '이미 사용 중인 닉네임' })
+  async updateNickname(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: UpdateNicknameRequestDto,
+  ): Promise<UpdateNicknameResponseDto> {
+    return this.userService.updateNickname(userId, dto.nickname);
+  }
+
+  @Post('nickname/check')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '닉네임 중복 확인',
+    description:
+      '닉네임이 다른 사용자에 의해 사용 중인지 확인합니다. 본인 닉네임은 제외됩니다.',
+  })
+  @ApiBody({ type: CheckNicknameRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: '중복 확인 결과',
+    type: CheckNicknameResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async checkNicknameDuplicate(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CheckNicknameRequestDto,
+  ): Promise<CheckNicknameResponseDto> {
+    return this.userService.checkNicknameDuplicate(userId, dto.nickname);
   }
 }

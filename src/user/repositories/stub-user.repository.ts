@@ -24,6 +24,11 @@ export class StubUserRepository implements IUserRepository {
   private authProviders: Map<string, UserProvider> = new Map();
   private deviceIdMap: Map<string, string> = new Map(); // userId → deviceId
   private pointTotals: Map<string, number> = new Map();
+  private nicknameHistory: {
+    userId: string;
+    before: string;
+    after: string;
+  }[] = [];
 
   // 데이터 설정 메서드
   setUser(user: User): void {
@@ -121,6 +126,29 @@ export class StubUserRepository implements IUserRepository {
       this.users.set(userId, user);
     }
     return Promise.resolve();
+  }
+
+  findByNickname(
+    nickname: string,
+    excludeUserId?: string,
+  ): Promise<{ id: string } | null> {
+    const found = Array.from(this.users.values()).find(
+      (u) => u.nickname === nickname && u.id !== excludeUserId,
+    );
+    return Promise.resolve(found ? { id: found.id } : null);
+  }
+
+  insertNicknameHistory(
+    userId: string,
+    before: string,
+    after: string,
+  ): Promise<void> {
+    this.nicknameHistory.push({ userId, before, after });
+    return Promise.resolve();
+  }
+
+  getNicknameHistory() {
+    return this.nicknameHistory;
   }
 
   findBanReason(authId: string): Promise<string | null> {

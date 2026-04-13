@@ -66,6 +66,23 @@ export interface IUserRepository {
   updateNickname(userId: string, nickname: string): Promise<void>;
 
   /**
+   * 닉네임으로 사용자 조회 (중복 체크용). excludeUserId가 주어지면 해당 사용자는 제외
+   */
+  findByNickname(
+    nickname: string,
+    excludeUserId?: string,
+  ): Promise<{ id: string } | null>;
+
+  /**
+   * 닉네임 변경 이력 저장
+   */
+  insertNicknameHistory(
+    userId: string,
+    before: string,
+    after: string,
+  ): Promise<void>;
+
+  /**
    * auth_id로 차단 사유 조회
    */
   findBanReason(authId: string): Promise<string | null>;

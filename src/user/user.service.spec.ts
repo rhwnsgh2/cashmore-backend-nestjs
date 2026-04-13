@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { USER_REPOSITORY } from './interfaces/user-repository.interface';
 import { StubUserRepository } from './repositories/stub-user.repository';
@@ -533,6 +533,160 @@ describe('UserService', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('디바이스 정보를 찾을 수 없습니다.');
+    });
+  });
+
+  describe('updateNickname', () => {
+    const userId = 'user-1';
+
+    function seedUser(nickname: string | null = 'oldnick') {
+      repository.setUser({
+        id: userId,
+        email: 'a@test.com',
+        auth_id: 'auth-1',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname,
+        provider: 'kakao',
+      });
+    }
+
+    it('닉네임을 변경하고 이력을 저장한다', async () => {
+      seedUser('oldnick');
+
+      const result = await service.updateNickname(userId, 'newnick');
+
+      expect(result.success).toBe(true);
+      const user = await repository.findById(userId);
+      expect(user?.nickname).toBe('newnick');
+      const history = repository.getNicknameHistory();
+      expect(history).toHaveLength(1);
+      expect(history[0]).toEqual({
+        userId,
+        before: 'oldnick',
+        after: 'newnick',
+      });
+    });
+
+    it('앞뒤 공백을 제거한 뒤 저장한다', async () => {
+      seedUser('oldnick');
+
+      await service.updateNickname(userId, '  spaced  ');
+
+      const user = await repository.findById(userId);
+      expect(user?.nickname).toBe('spaced');
+      expect(repository.getNicknameHistory()[0].after).toBe('spaced');
+    });
+
+    it('이전 닉네임이 null이면 before는 빈 문자열로 기록된다', async () => {
+      seedUser(null);
+
+      await service.updateNickname(userId, 'first');
+
+      expect(repository.getNicknameHistory()[0].before).toBe('');
+    });
+
+    it('다른 유저가 같은 닉네임을 쓰면 ConflictException', async () => {
+      seedUser('oldnick');
+      repository.setUser({
+        id: 'user-2',
+        email: 'b@test.com',
+        auth_id: 'auth-2',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'taken',
+        provider: 'kakao',
+      });
+
+      await expect(service.updateNickname(userId, 'taken')).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('본인 닉네임과 동일해도 중복으로 치지 않는다', async () => {
+      seedUser('samenick');
+
+      const result = await service.updateNickname(userId, 'samenick');
+
+      expect(result.success).toBe(true);
+    });
+
+    it('존재하지 않는 유저면 NotFoundException', async () => {
+      await expect(
+        service.updateNickname('missing', 'anything'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('checkNicknameDuplicate', () => {
+    const userId = 'user-1';
+
+    beforeEach(() => {
+      repository.setUser({
+        id: userId,
+        email: 'a@test.com',
+        auth_id: 'auth-1',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'mynick',
+        provider: 'kakao',
+      });
+    });
+
+    it('다른 유저가 같은 닉네임을 쓰면 isDuplicate: true', async () => {
+      repository.setUser({
+        id: 'user-2',
+        email: 'b@test.com',
+        auth_id: 'auth-2',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'taken',
+        provider: 'kakao',
+      });
+
+      const result = await service.checkNicknameDuplicate(userId, 'taken');
+
+      expect(result.isDuplicate).toBe(true);
+    });
+
+    it('아무도 안 쓰는 닉네임이면 isDuplicate: false', async () => {
+      const result = await service.checkNicknameDuplicate(userId, 'available');
+      expect(result.isDuplicate).toBe(false);
+    });
+
+    it('본인 닉네임은 중복이 아니다', async () => {
+      const result = await service.checkNicknameDuplicate(userId, 'mynick');
+      expect(result.isDuplicate).toBe(false);
+    });
+
+    it('빈 문자열은 isDuplicate: false', async () => {
+      const result = await service.checkNicknameDuplicate(userId, '');
+      expect(result.isDuplicate).toBe(false);
+    });
+
+    it('공백만 있는 문자열은 isDuplicate: false', async () => {
+      const result = await service.checkNicknameDuplicate(userId, '   ');
+      expect(result.isDuplicate).toBe(false);
+    });
+
+    it('앞뒤 공백은 제거 후 비교한다', async () => {
+      repository.setUser({
+        id: 'user-2',
+        email: 'b@test.com',
+        auth_id: 'auth-2',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: false,
+        is_banned: false,
+        nickname: 'taken',
+        provider: 'kakao',
+      });
+
+      const result = await service.checkNicknameDuplicate(userId, '  taken  ');
+      expect(result.isDuplicate).toBe(true);
     });
   });
 });
