@@ -317,21 +317,6 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     return !!data;
   }
 
-  async deletePointAction(
-    userId: string,
-    everyReceiptId: number,
-  ): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .delete()
-      .eq('user_id', userId)
-      .eq('type', 'EVERY_RECEIPT')
-      .eq('additional_data->every_receipt_id', everyReceiptId);
-
-    if (error) throw error;
-  }
-
   async insertPointReversal(
     params: InsertPointReversalParams,
   ): Promise<void> {

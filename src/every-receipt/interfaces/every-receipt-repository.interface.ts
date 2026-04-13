@@ -130,11 +130,6 @@ export interface IEveryReceiptRepository {
 
   hasExistingReReview(receiptId: number): Promise<boolean>;
 
-  /**
-   * @deprecated Stage 3 완료 후 제거. append-only 전환 이후엔 insertPointReversal을 사용.
-   */
-  deletePointAction(userId: string, everyReceiptId: number): Promise<void>;
-
   insertPointReversal(params: InsertPointReversalParams): Promise<void>;
 
   createReReview(params: {

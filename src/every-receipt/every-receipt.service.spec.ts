@@ -475,7 +475,6 @@ describe('EveryReceiptService', () => {
       expect(result.success).toBe(true);
       expect(result.reReview).toBeDefined();
       expect(repository.getInsertedPointReversals()).toHaveLength(1);
-      expect(repository.getDeletedPointActions()).toHaveLength(0);
       expect(repository.getReReviewStatusUpdates()).toEqual([1]);
     });
 
@@ -511,9 +510,6 @@ describe('EveryReceiptService', () => {
         ['items', 'date_validity'],
         '메모',
       );
-
-      // DELETE는 호출되지 않아야 함 (append-only 전환)
-      expect(repository.getDeletedPointActions()).toHaveLength(0);
 
       // 재검수 레코드가 먼저 생성되고
       const created = repository.getCreatedReReviews();

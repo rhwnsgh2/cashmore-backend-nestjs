@@ -97,7 +97,6 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     this.reReviewRecords.clear();
     this.reReviewReceiptData.clear();
     this.existingReReviews.clear();
-    this.deletedPointActions = [];
     this.insertedPointReversals = [];
     this.createdReReviews = [];
     this.reReviewStatusUpdates = [];
@@ -214,8 +213,6 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     }
   >();
   private existingReReviews = new Set<number>();
-  private deletedPointActions: { userId: string; everyReceiptId: number }[] =
-    [];
   private insertedPointReversals: InsertPointReversalParams[] = [];
   private createdReReviews: CreatedReReview[] = [];
   private reReviewStatusUpdates: number[] = [];
@@ -234,10 +231,6 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
 
   setExistingReReview(receiptId: number): void {
     this.existingReReviews.add(receiptId);
-  }
-
-  getDeletedPointActions(): { userId: string; everyReceiptId: number }[] {
-    return this.deletedPointActions;
   }
 
   getInsertedPointReversals(): InsertPointReversalParams[] {
@@ -267,11 +260,6 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
 
   hasExistingReReview(receiptId: number): Promise<boolean> {
     return Promise.resolve(this.existingReReviews.has(receiptId));
-  }
-
-  deletePointAction(userId: string, everyReceiptId: number): Promise<void> {
-    this.deletedPointActions.push({ userId, everyReceiptId });
-    return Promise.resolve();
   }
 
   insertPointReversal(params: InsertPointReversalParams): Promise<void> {
