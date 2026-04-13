@@ -22,13 +22,6 @@ export const POINT_ADD_TYPES = [
   'INVITATION_RECEIPT',
 ] as const;
 
-// 포인트 차감 타입 (status가 "done" 또는 "pending"일 때)
-export const POINT_SUBTRACT_TYPES = [
-  'EXCHANGE_POINT_TO_CASH',
-  'EXCHANGE_POINT_TO_NAVERPAY',
-  'POINT_EXPIRATION',
-] as const;
-
 // 타입 정의
 export interface PointAction {
   id: number;
