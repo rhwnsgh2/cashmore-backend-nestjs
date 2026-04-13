@@ -10,6 +10,9 @@ import { AmplitudeService } from '../amplitude/amplitude.service';
 import { EventService } from '../event/event.service';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { FcmService } from '../fcm/fcm.service';
+import { UserModalService } from '../user-modal/user-modal.service';
+import type { UserModalType } from '../user-modal/interfaces/user-modal-repository.interface';
+import { SlackService } from '../slack/slack.service';
 
 interface TrackedEvent {
   eventType: string;
@@ -127,6 +130,48 @@ class StubFcmService {
   }
 }
 
+class StubUserModalService {
+  private created: {
+    userId: string;
+    name: UserModalType;
+    additionalData?: Record<string, unknown>;
+  }[] = [];
+
+  createModal(
+    userId: string,
+    name: UserModalType,
+    additionalData?: Record<string, unknown>,
+  ): Promise<void> {
+    this.created.push({ userId, name, additionalData });
+    return Promise.resolve();
+  }
+
+  getCreatedModals() {
+    return this.created;
+  }
+
+  clear(): void {
+    this.created = [];
+  }
+}
+
+class StubSlackService {
+  private bugReports: string[] = [];
+
+  reportBugToSlack(contents: string): Promise<void> {
+    this.bugReports.push(contents);
+    return Promise.resolve();
+  }
+
+  getBugReports() {
+    return this.bugReports;
+  }
+
+  clear(): void {
+    this.bugReports = [];
+  }
+}
+
 function makeScoreData(overrides: Partial<ScoreData> = {}): ScoreData {
   return {
     items: { score: 10, reason: 'good' },
@@ -152,6 +197,8 @@ describe('EveryReceiptService', () => {
   let eventService: StubEventService;
   let onboardingService: StubOnboardingService;
   let fcmService: StubFcmService;
+  let userModalService: StubUserModalService;
+  let slackService: StubSlackService;
 
   const userId = 'test-user-id';
 
@@ -162,6 +209,8 @@ describe('EveryReceiptService', () => {
     eventService = new StubEventService();
     onboardingService = new StubOnboardingService();
     fcmService = new StubFcmService();
+    userModalService = new StubUserModalService();
+    slackService = new StubSlackService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -172,6 +221,8 @@ describe('EveryReceiptService', () => {
         { provide: EventService, useValue: eventService },
         { provide: OnboardingService, useValue: onboardingService },
         { provide: FcmService, useValue: fcmService },
+        { provide: UserModalService, useValue: userModalService },
+        { provide: SlackService, useValue: slackService },
       ],
     }).compile();
 
@@ -185,6 +236,8 @@ describe('EveryReceiptService', () => {
     eventService.clear();
     onboardingService.clear();
     fcmService.clear();
+    userModalService.clear();
+    slackService.clear();
   });
 
   describe('getEveryReceipts', () => {
@@ -1170,6 +1223,374 @@ describe('EveryReceiptService', () => {
 
       const notifications = fcmService.getPushNotifications();
       expect(notifications[0].body).toBe('아쉽지만 포인트를 지급할 수 없어요');
+    });
+  });
+
+  // ===========================================================================
+  // Admin
+  // ===========================================================================
+
+  describe('adminDeleteReceipt', () => {
+    it('존재하지 않는 영수증이면 NotFoundException을 던진다', async () => {
+      await expect(service.adminDeleteReceipt(999)).rejects.toThrow(
+        '영수증을 찾을 수 없습니다.',
+      );
+    });
+
+    it('completed 상태 영수증은 reversal 행을 추가하고 삭제한다', async () => {
+      repository.setAdminReceipt({
+        id: 1,
+        user_id: userId,
+        status: 'completed',
+        point: 25,
+      });
+
+      const result = await service.adminDeleteReceipt(1);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('영수증이 삭제되었습니다.');
+
+      const reversals = repository.getInsertedPointReversals();
+      expect(reversals).toHaveLength(1);
+      expect(reversals[0]).toEqual({
+        userId,
+        pointAmount: -25,
+        everyReceiptId: 1,
+        reason: 'admin_delete',
+        beforePoint: 25,
+        afterPoint: 0,
+      });
+
+      expect(repository.getDeletedReceiptIds()).toEqual([1]);
+    });
+
+    it('pending 상태 영수증은 reversal 없이 삭제만 한다', async () => {
+      repository.setAdminReceipt({
+        id: 2,
+        user_id: userId,
+        status: 'pending',
+        point: 0,
+      });
+
+      await service.adminDeleteReceipt(2);
+
+      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+      expect(repository.getDeletedReceiptIds()).toEqual([2]);
+    });
+
+    it('rejected 상태 영수증은 reversal 없이 삭제만 한다', async () => {
+      repository.setAdminReceipt({
+        id: 3,
+        user_id: userId,
+        status: 'rejected',
+        point: 0,
+      });
+
+      await service.adminDeleteReceipt(3);
+
+      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+      expect(repository.getDeletedReceiptIds()).toEqual([3]);
+    });
+
+    it('completed 이더라도 point=0이면 reversal은 생략한다', async () => {
+      repository.setAdminReceipt({
+        id: 4,
+        user_id: userId,
+        status: 'completed',
+        point: 0,
+      });
+
+      await service.adminDeleteReceipt(4);
+
+      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+      expect(repository.getDeletedReceiptIds()).toEqual([4]);
+    });
+  });
+
+  describe('adminUpdatePoint', () => {
+    it('존재하지 않는 영수증이면 NotFoundException을 던진다', async () => {
+      await expect(service.adminUpdatePoint(999, 10)).rejects.toThrow(
+        '영수증을 찾을 수 없습니다.',
+      );
+    });
+
+    it('completed 상태에서 포인트를 올리면 +delta reversal 행이 기록된다', async () => {
+      repository.setAdminReceipt({
+        id: 10,
+        user_id: userId,
+        status: 'completed',
+        point: 5,
+      });
+
+      await service.adminUpdatePoint(10, 8);
+
+      expect(repository.getReceiptPointUpdates()).toEqual([
+        { receiptId: 10, newPoint: 8 },
+      ]);
+
+      const reversals = repository.getInsertedPointReversals();
+      expect(reversals).toHaveLength(1);
+      expect(reversals[0]).toEqual({
+        userId,
+        pointAmount: 3,
+        everyReceiptId: 10,
+        reason: 'admin_adjust',
+        beforePoint: 5,
+        afterPoint: 8,
+      });
+    });
+
+    it('completed 상태에서 포인트를 낮추면 -delta reversal 행이 기록된다', async () => {
+      repository.setAdminReceipt({
+        id: 11,
+        user_id: userId,
+        status: 'completed',
+        point: 10,
+      });
+
+      await service.adminUpdatePoint(11, 4);
+
+      const reversals = repository.getInsertedPointReversals();
+      expect(reversals).toHaveLength(1);
+      expect(reversals[0].pointAmount).toBe(-6);
+      expect(reversals[0].beforePoint).toBe(10);
+      expect(reversals[0].afterPoint).toBe(4);
+    });
+
+    it('delta=0 이면 reversal 행은 생략한다', async () => {
+      repository.setAdminReceipt({
+        id: 12,
+        user_id: userId,
+        status: 'completed',
+        point: 15,
+      });
+
+      await service.adminUpdatePoint(12, 15);
+
+      expect(repository.getReceiptPointUpdates()).toEqual([
+        { receiptId: 12, newPoint: 15 },
+      ]);
+      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+    });
+
+    it('completed가 아닌 상태에선 point만 업데이트하고 reversal은 생략한다', async () => {
+      repository.setAdminReceipt({
+        id: 13,
+        user_id: userId,
+        status: 'pending',
+        point: 0,
+      });
+
+      await service.adminUpdatePoint(13, 25);
+
+      expect(repository.getReceiptPointUpdates()).toEqual([
+        { receiptId: 13, newPoint: 25 },
+      ]);
+      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+    });
+  });
+
+  describe('adminCompleteReReview', () => {
+    const afterScoreData = { items: { score: 15, reason: 'better' } };
+
+    it('재검수 요청이 없으면 NotFoundException을 던진다', async () => {
+      await expect(
+        service.adminCompleteReReview({
+          everyReceiptId: 999,
+          afterScoreData,
+          afterPoint: 30,
+          afterTotalScore: 85,
+        }),
+      ).rejects.toThrow('재검수 요청을 찾을 수 없습니다.');
+    });
+
+    it('이미 처리된 재검수 요청은 BadRequestException을 던진다', async () => {
+      repository.setAdminReReview({
+        id: 50,
+        every_receipt_id: 20,
+        status: 'completed',
+      });
+
+      await expect(
+        service.adminCompleteReReview({
+          everyReceiptId: 20,
+          afterScoreData,
+          afterPoint: 30,
+          afterTotalScore: 85,
+        }),
+      ).rejects.toThrow('이미 처리된 재검수 요청입니다.');
+    });
+
+    it('영수증이 없으면 NotFoundException을 던진다', async () => {
+      repository.setAdminReReview({
+        id: 51,
+        every_receipt_id: 21,
+        status: 'pending',
+      });
+      // receipt 미설정
+
+      await expect(
+        service.adminCompleteReReview({
+          everyReceiptId: 21,
+          afterScoreData,
+          afterPoint: 30,
+          afterTotalScore: 85,
+        }),
+      ).rejects.toThrow('영수증을 찾을 수 없습니다.');
+    });
+
+    describe('분기 A: afterPoint <= beforePoint (점수 유지/하락)', () => {
+      it('beforePoint를 재지급 행으로 기록한다', async () => {
+        repository.setAdminReReview({
+          id: 100,
+          every_receipt_id: 30,
+          status: 'pending',
+        });
+        repository.setAdminReceipt({
+          id: 30,
+          user_id: userId,
+          status: 're-review',
+          point: 15,
+        });
+
+        const result = await service.adminCompleteReReview({
+          everyReceiptId: 30,
+          afterScoreData,
+          afterPoint: 12, // 하락
+          afterTotalScore: 70,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.message).toBe('재검수 포인트가 변경되지 않았습니다.');
+
+        expect(repository.getReReviewRejected()).toEqual([100]);
+        expect(repository.getReceiptStatusCompletedUpdates()).toEqual([30]);
+
+        const reversals = repository.getInsertedPointReversals();
+        expect(reversals).toHaveLength(1);
+        expect(reversals[0]).toEqual({
+          userId,
+          pointAmount: 15, // 원래 포인트 재지급
+          everyReceiptId: 30,
+          everyReceiptReReviewId: 100,
+          reason: 're_review_rejected',
+        });
+
+        expect(userModalService.getCreatedModals()).toHaveLength(1);
+        expect(fcmService.getRefreshMessages()).toEqual([
+          { userId, type: 'receipt_update' },
+        ]);
+      });
+
+      it('afterPoint === beforePoint 경계값도 분기 A로 진입한다', async () => {
+        repository.setAdminReReview({
+          id: 101,
+          every_receipt_id: 31,
+          status: 'pending',
+        });
+        repository.setAdminReceipt({
+          id: 31,
+          user_id: userId,
+          status: 're-review',
+          point: 20,
+        });
+
+        const result = await service.adminCompleteReReview({
+          everyReceiptId: 31,
+          afterScoreData,
+          afterPoint: 20,
+          afterTotalScore: 80,
+        });
+
+        expect(result.message).toBe('재검수 포인트가 변경되지 않았습니다.');
+        expect(repository.getReReviewRejected()).toEqual([101]);
+      });
+
+      it('beforePoint가 0이면 재지급 행도 생략한다', async () => {
+        repository.setAdminReReview({
+          id: 102,
+          every_receipt_id: 32,
+          status: 'pending',
+        });
+        repository.setAdminReceipt({
+          id: 32,
+          user_id: userId,
+          status: 're-review',
+          point: 0,
+        });
+
+        await service.adminCompleteReReview({
+          everyReceiptId: 32,
+          afterScoreData,
+          afterPoint: 0,
+          afterTotalScore: 50,
+        });
+
+        expect(repository.getInsertedPointReversals()).toHaveLength(0);
+        expect(repository.getReReviewRejected()).toEqual([102]);
+      });
+    });
+
+    describe('분기 B: afterPoint > beforePoint (점수 상승)', () => {
+      it('afterPoint 지급 행 + 상태 업데이트 + 알림', async () => {
+        repository.setAdminReReview({
+          id: 200,
+          every_receipt_id: 40,
+          status: 'pending',
+        });
+        repository.setAdminReceipt({
+          id: 40,
+          user_id: userId,
+          status: 're-review',
+          point: 10,
+        });
+
+        const result = await service.adminCompleteReReview({
+          everyReceiptId: 40,
+          afterScoreData,
+          afterPoint: 25,
+          afterTotalScore: 85,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.message).toBeUndefined();
+
+        expect(repository.getReReviewCompleted()).toEqual([
+          { reReviewId: 200, afterScoreData },
+        ]);
+
+        const receiptUpdates = repository.getReceiptAfterReReviewUpdates();
+        expect(receiptUpdates).toHaveLength(1);
+        expect(receiptUpdates[0]).toEqual({
+          receiptId: 40,
+          afterScoreData: { ...afterScoreData, total_score: 85 },
+          afterPoint: 25,
+        });
+
+        const reversals = repository.getInsertedPointReversals();
+        expect(reversals).toHaveLength(1);
+        expect(reversals[0]).toEqual({
+          userId,
+          pointAmount: 25,
+          everyReceiptId: 40,
+          everyReceiptReReviewId: 200,
+          reason: 're_review_approved',
+        });
+
+        expect(userModalService.getCreatedModals()).toHaveLength(1);
+        const modal = userModalService.getCreatedModals()[0];
+        expect(modal.name).toBe('every_receipt_re_reviewed');
+        expect(modal.additionalData).toMatchObject({
+          everyReceiptId: 40,
+          beforePoint: 10,
+          afterPoint: 25,
+        });
+
+        expect(fcmService.getPushNotifications()).toHaveLength(1);
+        expect(fcmService.getPushNotifications()[0].title).toBe(
+          '영수증 재검수 완료 💌',
+        );
+      });
     });
   });
 });

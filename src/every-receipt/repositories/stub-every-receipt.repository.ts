@@ -5,6 +5,8 @@ import type {
   ReReviewRecord,
   CreatedReReview,
   InsertPointReversalParams,
+  AdminEveryReceiptRow,
+  AdminReReviewRow,
 } from '../interfaces/every-receipt-repository.interface';
 import {
   IEveryReceiptRepository,
@@ -99,6 +101,14 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     this.insertedPointReversals = [];
     this.createdReReviews = [];
     this.reReviewStatusUpdates = [];
+    this.adminReceiptData.clear();
+    this.adminReReviewData.clear();
+    this.deletedReceiptIds = [];
+    this.receiptPointUpdates = [];
+    this.reReviewRejected = [];
+    this.reReviewCompleted = [];
+    this.receiptAfterReReviewUpdates = [];
+    this.receiptStatusCompletedUpdates = [];
   }
 
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]> {
@@ -286,6 +296,121 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
 
   updateStatusToReReview(receiptId: number): Promise<void> {
     this.reReviewStatusUpdates.push(receiptId);
+    return Promise.resolve();
+  }
+
+  // Admin ---------------------------------------------------------------------
+
+  private adminReceiptData = new Map<number, AdminEveryReceiptRow>();
+  private adminReReviewData = new Map<number, AdminReReviewRow>();
+  private deletedReceiptIds: number[] = [];
+  private receiptPointUpdates: { receiptId: number; newPoint: number }[] = [];
+  private reReviewRejected: number[] = [];
+  private reReviewCompleted: {
+    reReviewId: number;
+    afterScoreData: Record<string, unknown>;
+  }[] = [];
+  private receiptAfterReReviewUpdates: {
+    receiptId: number;
+    afterScoreData: Record<string, unknown>;
+    afterPoint: number;
+  }[] = [];
+  private receiptStatusCompletedUpdates: number[] = [];
+
+  setAdminReceipt(row: AdminEveryReceiptRow): void {
+    this.adminReceiptData.set(row.id, row);
+  }
+
+  setAdminReReview(row: AdminReReviewRow): void {
+    this.adminReReviewData.set(row.every_receipt_id, row);
+  }
+
+  getDeletedReceiptIds(): number[] {
+    return this.deletedReceiptIds;
+  }
+
+  getReceiptPointUpdates(): { receiptId: number; newPoint: number }[] {
+    return this.receiptPointUpdates;
+  }
+
+  getReReviewRejected(): number[] {
+    return this.reReviewRejected;
+  }
+
+  getReReviewCompleted(): {
+    reReviewId: number;
+    afterScoreData: Record<string, unknown>;
+  }[] {
+    return this.reReviewCompleted;
+  }
+
+  getReceiptAfterReReviewUpdates(): {
+    receiptId: number;
+    afterScoreData: Record<string, unknown>;
+    afterPoint: number;
+  }[] {
+    return this.receiptAfterReReviewUpdates;
+  }
+
+  getReceiptStatusCompletedUpdates(): number[] {
+    return this.receiptStatusCompletedUpdates;
+  }
+
+  findReceiptForAdmin(
+    receiptId: number,
+  ): Promise<AdminEveryReceiptRow | null> {
+    return Promise.resolve(this.adminReceiptData.get(receiptId) ?? null);
+  }
+
+  deleteReceipt(receiptId: number): Promise<void> {
+    this.deletedReceiptIds.push(receiptId);
+    this.adminReceiptData.delete(receiptId);
+    return Promise.resolve();
+  }
+
+  updateReceiptPoint(receiptId: number, newPoint: number): Promise<void> {
+    this.receiptPointUpdates.push({ receiptId, newPoint });
+    const existing = this.adminReceiptData.get(receiptId);
+    if (existing) {
+      this.adminReceiptData.set(receiptId, { ...existing, point: newPoint });
+    }
+    return Promise.resolve();
+  }
+
+  findReReviewByReceiptId(
+    everyReceiptId: number,
+  ): Promise<AdminReReviewRow | null> {
+    return Promise.resolve(this.adminReReviewData.get(everyReceiptId) ?? null);
+  }
+
+  updateReReviewToRejected(reReviewId: number): Promise<void> {
+    this.reReviewRejected.push(reReviewId);
+    return Promise.resolve();
+  }
+
+  updateReReviewToCompleted(
+    reReviewId: number,
+    afterScoreData: Record<string, unknown>,
+  ): Promise<void> {
+    this.reReviewCompleted.push({ reReviewId, afterScoreData });
+    return Promise.resolve();
+  }
+
+  updateReceiptAfterReReview(
+    receiptId: number,
+    afterScoreData: Record<string, unknown>,
+    afterPoint: number,
+  ): Promise<void> {
+    this.receiptAfterReReviewUpdates.push({
+      receiptId,
+      afterScoreData,
+      afterPoint,
+    });
+    return Promise.resolve();
+  }
+
+  updateReceiptStatusToCompleted(receiptId: number): Promise<void> {
+    this.receiptStatusCompletedUpdates.push(receiptId);
     return Promise.resolve();
   }
 }

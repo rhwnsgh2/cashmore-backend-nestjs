@@ -3,6 +3,7 @@ import type { IUserModalRepository } from './interfaces/user-modal-repository.in
 import {
   USER_MODAL_REPOSITORY,
   UserModal,
+  UserModalType,
 } from './interfaces/user-modal-repository.interface';
 
 export interface GetUserModalsResult {
@@ -32,5 +33,13 @@ export class UserModalService {
       success: true,
       modals,
     };
+  }
+
+  async createModal(
+    userId: string,
+    name: UserModalType,
+    additionalData?: Record<string, unknown>,
+  ): Promise<void> {
+    await this.userModalRepository.createModal(userId, name, additionalData);
   }
 }

@@ -61,12 +61,34 @@ export interface CreatedReReview {
   [key: string]: unknown;
 }
 
+export type PointReversalReason =
+  | 'user_review'
+  | 're_review_rejected'
+  | 're_review_approved'
+  | 'admin_adjust'
+  | 'admin_delete';
+
 export interface InsertPointReversalParams {
   userId: string;
   pointAmount: number;
   everyReceiptId: number;
-  everyReceiptReReviewId: number;
-  reason: 'user_review';
+  everyReceiptReReviewId?: number;
+  reason: PointReversalReason;
+  beforePoint?: number;
+  afterPoint?: number;
+}
+
+export interface AdminEveryReceiptRow {
+  id: number;
+  user_id: string;
+  status: EveryReceiptStatus | 're-review';
+  point: number;
+}
+
+export interface AdminReReviewRow {
+  id: number;
+  every_receipt_id: number;
+  status: string;
 }
 
 export interface IEveryReceiptRepository {
@@ -124,6 +146,33 @@ export interface IEveryReceiptRepository {
   }): Promise<CreatedReReview>;
 
   updateStatusToReReview(receiptId: number): Promise<void>;
+
+  // Admin 전용 ----------------------------------------------------------------
+
+  findReceiptForAdmin(receiptId: number): Promise<AdminEveryReceiptRow | null>;
+
+  deleteReceipt(receiptId: number): Promise<void>;
+
+  updateReceiptPoint(receiptId: number, newPoint: number): Promise<void>;
+
+  findReReviewByReceiptId(
+    everyReceiptId: number,
+  ): Promise<AdminReReviewRow | null>;
+
+  updateReReviewToRejected(reReviewId: number): Promise<void>;
+
+  updateReReviewToCompleted(
+    reReviewId: number,
+    afterScoreData: Record<string, unknown>,
+  ): Promise<void>;
+
+  updateReceiptAfterReReview(
+    receiptId: number,
+    afterScoreData: Record<string, unknown>,
+    afterPoint: number,
+  ): Promise<void>;
+
+  updateReceiptStatusToCompleted(receiptId: number): Promise<void>;
 }
 
 export const EVERY_RECEIPT_REPOSITORY = Symbol('EVERY_RECEIPT_REPOSITORY');

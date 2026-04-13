@@ -1018,4 +1018,502 @@ describe('EveryReceipt API (e2e)', () => {
       expect(additional.reason).toBe('user_review');
     });
   });
+
+  describe('Admin EveryReceipt API (e2e)', () => {
+    const ADMIN_API_KEY = 'test-batch-api-key';
+
+    describe('DELETE /admin/every-receipt/:id', () => {
+      it('admin 키 없이 요청하면 401을 반환한다', async () => {
+        await request(app.getHttpServer())
+          .delete('/admin/every-receipt/1')
+          .expect(401);
+      });
+
+      it('잘못된 admin 키로 요청하면 401을 반환한다', async () => {
+        await request(app.getHttpServer())
+          .delete('/admin/every-receipt/1')
+          .set('x-admin-api-key', 'wrong-key')
+          .expect(401);
+      });
+
+      it('존재하지 않는 영수증이면 404를 반환한다', async () => {
+        await request(app.getHttpServer())
+          .delete('/admin/every-receipt/999999')
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .expect(404);
+      });
+
+      it('completed 상태 영수증 삭제 시 reversal 행 추가 + every_receipt row 삭제', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 'completed',
+          point: 25,
+        });
+
+        // 원본 point_action
+        await supabase.from('point_actions').insert({
+          user_id: testUser.id,
+          type: 'EVERY_RECEIPT',
+          point_amount: 25,
+          status: 'done',
+          additional_data: { every_receipt_id: receipt.id },
+        });
+
+        const response = await request(app.getHttpServer())
+          .delete(`/admin/every-receipt/${receipt.id}`)
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+
+        // every_receipt가 삭제되어야 함
+        const { data: receiptAfter } = await supabase
+          .from('every_receipt')
+          .select('id')
+          .eq('id', receipt.id)
+          .maybeSingle();
+        expect(receiptAfter).toBeNull();
+
+        // point_actions에는 원본 + reversal 2행이 남아있고 SUM = 0
+        const { data: pointActions } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', testUser.id)
+          .eq('type', 'EVERY_RECEIPT')
+          .order('id', { ascending: true });
+
+        expect(pointActions).toHaveLength(2);
+        const sum = pointActions!.reduce(
+          (acc, row) => acc + Number(row.point_amount),
+          0,
+        );
+        expect(sum).toBe(0);
+
+        // reversal 행의 reason 확인
+        const reversal = pointActions!.find(
+          (row) => Number(row.point_amount) < 0,
+        );
+        expect(reversal).toBeDefined();
+        expect(
+          (reversal!.additional_data as { reason: string }).reason,
+        ).toBe('admin_delete');
+      });
+
+      it('pending 상태 영수증 삭제 시 reversal 없이 삭제만 된다', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 'pending',
+          point: 0,
+        });
+
+        await request(app.getHttpServer())
+          .delete(`/admin/every-receipt/${receipt.id}`)
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .expect(200);
+
+        const { data: pointActions } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', testUser.id)
+          .eq('type', 'EVERY_RECEIPT');
+
+        expect(pointActions).toHaveLength(0);
+      });
+    });
+
+    describe('PATCH /admin/every-receipt/:id/point', () => {
+      it('admin 키 없이 요청하면 401을 반환한다', async () => {
+        await request(app.getHttpServer())
+          .patch('/admin/every-receipt/1/point')
+          .send({ newPoint: 10 })
+          .expect(401);
+      });
+
+      it('newPoint가 음수이면 validation 실패로 400을 반환한다', async () => {
+        await request(app.getHttpServer())
+          .patch('/admin/every-receipt/1/point')
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({ newPoint: -5 })
+          .expect(400);
+      });
+
+      it('존재하지 않는 영수증이면 404를 반환한다', async () => {
+        await request(app.getHttpServer())
+          .patch('/admin/every-receipt/999999/point')
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({ newPoint: 10 })
+          .expect(404);
+      });
+
+      it('completed 상태에서 포인트를 올리면 +delta reversal 행 추가 + every_receipt.point 업데이트', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 'completed',
+          point: 10,
+        });
+
+        // 원본 point_action
+        await supabase.from('point_actions').insert({
+          user_id: testUser.id,
+          type: 'EVERY_RECEIPT',
+          point_amount: 10,
+          status: 'done',
+          additional_data: { every_receipt_id: receipt.id },
+        });
+
+        await request(app.getHttpServer())
+          .patch(`/admin/every-receipt/${receipt.id}/point`)
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({ newPoint: 15 })
+          .expect(200);
+
+        // every_receipt.point 업데이트 확인
+        const { data: updatedReceipt } = await supabase
+          .from('every_receipt')
+          .select('point')
+          .eq('id', receipt.id)
+          .single();
+        expect(updatedReceipt!.point).toBe(15);
+
+        // point_actions: 원본(+10) + admin_adjust(+5)
+        const { data: pointActions } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', testUser.id)
+          .eq('type', 'EVERY_RECEIPT')
+          .order('id', { ascending: true });
+
+        expect(pointActions).toHaveLength(2);
+        expect(pointActions![1].point_amount).toBe(5);
+        expect(pointActions![1].additional_data).toEqual(
+          expect.objectContaining({
+            every_receipt_id: receipt.id,
+            reason: 'admin_adjust',
+            before_point: 10,
+            after_point: 15,
+          }),
+        );
+
+        // SUM = 15 (불변식: SUM == every_receipt.point)
+        const sum = pointActions!.reduce(
+          (acc, row) => acc + Number(row.point_amount),
+          0,
+        );
+        expect(sum).toBe(15);
+      });
+
+      it('delta=0이면 reversal 행 없이 every_receipt.point만 업데이트한다', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 'completed',
+          point: 20,
+        });
+
+        await supabase.from('point_actions').insert({
+          user_id: testUser.id,
+          type: 'EVERY_RECEIPT',
+          point_amount: 20,
+          status: 'done',
+          additional_data: { every_receipt_id: receipt.id },
+        });
+
+        await request(app.getHttpServer())
+          .patch(`/admin/every-receipt/${receipt.id}/point`)
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({ newPoint: 20 })
+          .expect(200);
+
+        const { data: pointActions } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', testUser.id)
+          .eq('type', 'EVERY_RECEIPT');
+        expect(pointActions).toHaveLength(1);
+      });
+
+      it('pending 상태에선 every_receipt.point만 업데이트하고 원장은 안 건드린다', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 'pending',
+          point: 0,
+        });
+
+        await request(app.getHttpServer())
+          .patch(`/admin/every-receipt/${receipt.id}/point`)
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({ newPoint: 25 })
+          .expect(200);
+
+        const { data: updatedReceipt } = await supabase
+          .from('every_receipt')
+          .select('point')
+          .eq('id', receipt.id)
+          .single();
+        expect(updatedReceipt!.point).toBe(25);
+
+        const { data: pointActions } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', testUser.id)
+          .eq('type', 'EVERY_RECEIPT');
+        expect(pointActions).toHaveLength(0);
+      });
+    });
+
+    describe('POST /admin/every-receipt/re-review/complete', () => {
+      const afterScoreData = {
+        items: { score: 15, reason: 'better' },
+        store_name: { score: 5, reason: 'found' },
+        receipt_type: { score: 25, reason: 'offline' },
+        date_validity: { score: 15, reason: 'valid' },
+        image_quality: { score: 10, reason: 'clear', image_quality: 5 },
+        store_details: { score: 5, reason: 'found' },
+        payment_amount: { score: 5, reason: 'found' },
+        payment_method: { score: 5, reason: 'found' },
+        is_duplicate_receipt: false,
+        same_store_count_with_in_7_days: { score: 0, reason: 'first' },
+      };
+
+      it('admin 키 없이 요청하면 401을 반환한다', async () => {
+        await request(app.getHttpServer())
+          .post('/admin/every-receipt/re-review/complete')
+          .send({
+            everyReceiptId: 1,
+            afterScoreData,
+            afterPoint: 30,
+            afterTotalScore: 85,
+          })
+          .expect(401);
+      });
+
+      it('재검수 요청이 없으면 404를 반환한다', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 'completed',
+          point: 15,
+        });
+
+        await request(app.getHttpServer())
+          .post('/admin/every-receipt/re-review/complete')
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({
+            everyReceiptId: receipt.id,
+            afterScoreData,
+            afterPoint: 30,
+            afterTotalScore: 85,
+          })
+          .expect(404);
+      });
+
+      it('분기 A — afterPoint <= beforePoint 이면 원 포인트 재지급 행을 기록한다', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 're-review',
+          point: 20,
+        });
+
+        // 유저가 재검수 요청한 상태를 가정 — 원본 + reversal 존재
+        await supabase.from('point_actions').insert([
+          {
+            user_id: testUser.id,
+            type: 'EVERY_RECEIPT',
+            point_amount: 20,
+            status: 'done',
+            additional_data: { every_receipt_id: receipt.id },
+          },
+          {
+            user_id: testUser.id,
+            type: 'EVERY_RECEIPT',
+            point_amount: -20,
+            status: 'done',
+            additional_data: {
+              every_receipt_id: receipt.id,
+              reason: 'user_review',
+            },
+          },
+        ]);
+
+        await createReceiptReReview(supabase, {
+          every_receipt_id: receipt.id,
+          status: 'pending',
+        });
+
+        const response = await request(app.getHttpServer())
+          .post('/admin/every-receipt/re-review/complete')
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({
+            everyReceiptId: receipt.id,
+            afterScoreData,
+            afterPoint: 15, // 하락
+            afterTotalScore: 75,
+          })
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.message).toBe(
+          '재검수 포인트가 변경되지 않았습니다.',
+        );
+
+        // every_receipt_re_review 상태가 rejected
+        const { data: reReview } = await supabase
+          .from('every_receipt_re_review')
+          .select('status')
+          .eq('every_receipt_id', receipt.id)
+          .single();
+        expect(reReview!.status).toBe('rejected');
+
+        // every_receipt 상태가 completed
+        const { data: updatedReceipt } = await supabase
+          .from('every_receipt')
+          .select('status')
+          .eq('id', receipt.id)
+          .single();
+        expect(updatedReceipt!.status).toBe('completed');
+
+        // point_actions: 원본(+20) + user_review(-20) + re_review_rejected(+20), SUM = 20
+        const { data: pointActions } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', testUser.id)
+          .eq('type', 'EVERY_RECEIPT')
+          .order('id', { ascending: true });
+
+        expect(pointActions).toHaveLength(3);
+        const sum = pointActions!.reduce(
+          (acc, row) => acc + Number(row.point_amount),
+          0,
+        );
+        expect(sum).toBe(20);
+
+        // 마지막 행이 re_review_rejected
+        const lastRow = pointActions![2];
+        expect(lastRow.point_amount).toBe(20);
+        expect(
+          (lastRow.additional_data as { reason: string }).reason,
+        ).toBe('re_review_rejected');
+      });
+
+      it('분기 B — afterPoint > beforePoint 이면 새 포인트를 지급하고 every_receipt 업데이트', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 're-review',
+          point: 10,
+        });
+
+        await supabase.from('point_actions').insert([
+          {
+            user_id: testUser.id,
+            type: 'EVERY_RECEIPT',
+            point_amount: 10,
+            status: 'done',
+            additional_data: { every_receipt_id: receipt.id },
+          },
+          {
+            user_id: testUser.id,
+            type: 'EVERY_RECEIPT',
+            point_amount: -10,
+            status: 'done',
+            additional_data: {
+              every_receipt_id: receipt.id,
+              reason: 'user_review',
+            },
+          },
+        ]);
+
+        await createReceiptReReview(supabase, {
+          every_receipt_id: receipt.id,
+          status: 'pending',
+        });
+
+        const response = await request(app.getHttpServer())
+          .post('/admin/every-receipt/re-review/complete')
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({
+            everyReceiptId: receipt.id,
+            afterScoreData,
+            afterPoint: 30,
+            afterTotalScore: 90,
+          })
+          .expect(200);
+
+        expect(response.body.success).toBe(true);
+
+        // every_receipt 업데이트 확인
+        const { data: updatedReceipt } = await supabase
+          .from('every_receipt')
+          .select('point, status, score_data')
+          .eq('id', receipt.id)
+          .single();
+        expect(updatedReceipt!.point).toBe(30);
+        expect(updatedReceipt!.status).toBe('completed');
+        expect(
+          (updatedReceipt!.score_data as { total_score: number }).total_score,
+        ).toBe(90);
+
+        // every_receipt_re_review 완료
+        const { data: reReview } = await supabase
+          .from('every_receipt_re_review')
+          .select('status, after_score_data')
+          .eq('every_receipt_id', receipt.id)
+          .single();
+        expect(reReview!.status).toBe('completed');
+        expect(reReview!.after_score_data).toEqual(afterScoreData);
+
+        // point_actions: 원본(+10) + user_review(-10) + re_review_approved(+30), SUM = 30
+        const { data: pointActions } = await supabase
+          .from('point_actions')
+          .select('*')
+          .eq('user_id', testUser.id)
+          .eq('type', 'EVERY_RECEIPT')
+          .order('id', { ascending: true });
+
+        expect(pointActions).toHaveLength(3);
+        const sum = pointActions!.reduce(
+          (acc, row) => acc + Number(row.point_amount),
+          0,
+        );
+        expect(sum).toBe(30);
+        expect(updatedReceipt!.point).toBe(sum);
+
+        const lastRow = pointActions![2];
+        expect(lastRow.point_amount).toBe(30);
+        expect(
+          (lastRow.additional_data as { reason: string }).reason,
+        ).toBe('re_review_approved');
+      });
+
+      it('이미 처리된 재검수 요청이면 400을 반환한다', async () => {
+        const testUser = await createTestUser(supabase);
+        const receipt = await createReceiptSubmission(supabase, {
+          user_id: testUser.id,
+          status: 'completed',
+          point: 15,
+        });
+
+        await createReceiptReReview(supabase, {
+          every_receipt_id: receipt.id,
+          status: 'completed',
+        });
+
+        await request(app.getHttpServer())
+          .post('/admin/every-receipt/re-review/complete')
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({
+            everyReceiptId: receipt.id,
+            afterScoreData,
+            afterPoint: 20,
+            afterTotalScore: 85,
+          })
+          .expect(400);
+      });
+    });
+  });
 });

@@ -6,6 +6,8 @@ import type {
   PendingEveryReceipt,
   CreatedReReview,
   InsertPointReversalParams,
+  AdminEveryReceiptRow,
+  AdminReReviewRow,
 } from '../interfaces/every-receipt-repository.interface';
 import {
   IEveryReceiptRepository,
@@ -15,6 +17,7 @@ import {
   ReReviewStatus,
   ScoreData,
 } from '../interfaces/every-receipt-repository.interface';
+import type { Json } from '../../supabase/database.types';
 
 interface EveryReceiptRow {
   id: string;
@@ -332,6 +335,21 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
   async insertPointReversal(
     params: InsertPointReversalParams,
   ): Promise<void> {
+    const additionalData: Record<string, unknown> = {
+      every_receipt_id: params.everyReceiptId,
+      reason: params.reason,
+    };
+
+    if (params.everyReceiptReReviewId !== undefined) {
+      additionalData.every_receipt_re_review_id = params.everyReceiptReReviewId;
+    }
+    if (params.beforePoint !== undefined) {
+      additionalData.before_point = params.beforePoint;
+    }
+    if (params.afterPoint !== undefined) {
+      additionalData.after_point = params.afterPoint;
+    }
+
     const { error } = await this.supabaseService
       .getClient()
       .from('point_actions')
@@ -340,12 +358,123 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
         type: 'EVERY_RECEIPT',
         point_amount: params.pointAmount,
         status: 'done',
-        additional_data: {
-          every_receipt_id: params.everyReceiptId,
-          every_receipt_re_review_id: params.everyReceiptReReviewId,
-          reason: params.reason,
-        },
+        additional_data: additionalData as unknown as Json,
       });
+
+    if (error) throw error;
+  }
+
+  async findReceiptForAdmin(
+    receiptId: number,
+  ): Promise<AdminEveryReceiptRow | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .select('id, user_id, status, point')
+      .eq('id', receiptId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data as unknown as AdminEveryReceiptRow;
+  }
+
+  async deleteReceipt(receiptId: number): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .delete()
+      .eq('id', receiptId);
+
+    if (error) throw error;
+  }
+
+  async updateReceiptPoint(
+    receiptId: number,
+    newPoint: number,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .update({
+        point: newPoint,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', receiptId);
+
+    if (error) throw error;
+  }
+
+  async findReReviewByReceiptId(
+    everyReceiptId: number,
+  ): Promise<AdminReReviewRow | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt_re_review')
+      .select('id, every_receipt_id, status')
+      .eq('every_receipt_id', everyReceiptId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data as unknown as AdminReReviewRow;
+  }
+
+  async updateReReviewToRejected(reReviewId: number): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt_re_review')
+      .update({
+        status: 'rejected',
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', reReviewId);
+
+    if (error) throw error;
+  }
+
+  async updateReReviewToCompleted(
+    reReviewId: number,
+    afterScoreData: Record<string, unknown>,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt_re_review')
+      .update({
+        status: 'completed',
+        after_score_data: afterScoreData as unknown as Json,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', reReviewId);
+
+    if (error) throw error;
+  }
+
+  async updateReceiptAfterReReview(
+    receiptId: number,
+    afterScoreData: Record<string, unknown>,
+    afterPoint: number,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .update({
+        score_data: afterScoreData as unknown as Json,
+        point: afterPoint,
+        status: 'completed',
+      })
+      .eq('id', receiptId);
+
+    if (error) throw error;
+  }
+
+  async updateReceiptStatusToCompleted(receiptId: number): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('every_receipt')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', receiptId);
 
     if (error) throw error;
   }

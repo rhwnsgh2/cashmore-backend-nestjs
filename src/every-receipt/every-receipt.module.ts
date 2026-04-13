@@ -8,9 +8,18 @@ import { ReceiptQueueService } from './receipt-queue.service';
 import { EventModule } from '../event/event.module';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { FcmModule } from '../fcm/fcm.module';
+import { UserModalModule } from '../user-modal/user-modal.module';
+import { SlackModule } from '../slack/slack.module';
 
 @Module({
-  imports: [AuthModule, EventModule, OnboardingModule, FcmModule],
+  imports: [
+    AuthModule,
+    EventModule,
+    OnboardingModule,
+    FcmModule,
+    UserModalModule,
+    SlackModule,
+  ],
   controllers: [EveryReceiptController],
   providers: [
     EveryReceiptService,
@@ -20,6 +29,6 @@ import { FcmModule } from '../fcm/fcm.module';
       useClass: SupabaseEveryReceiptRepository,
     },
   ],
-  exports: [EveryReceiptService],
+  exports: [EveryReceiptService, EVERY_RECEIPT_REPOSITORY],
 })
 export class EveryReceiptModule {}

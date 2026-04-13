@@ -15,11 +15,29 @@ import { EveryReceiptDetailResponseDto } from './dto/get-every-receipt-detail.dt
 import { MonthlyReceiptCountResponseDto } from './dto/get-monthly-receipt-count.dto';
 import { ConfirmUploadResponseDto } from './dto/confirm-upload.dto';
 import { CompleteReceiptResponseDto } from './dto/complete-receipt.dto';
+import { AdminDeleteReceiptResponseDto } from './dto/admin-delete-receipt.dto';
+import { AdminUpdatePointResponseDto } from './dto/admin-update-point.dto';
+import { AdminCompleteReReviewResponseDto } from './dto/admin-complete-re-review.dto';
 import { ReceiptQueueService } from './receipt-queue.service';
 import { AmplitudeService } from '../amplitude/amplitude.service';
 import { EventService } from '../event/event.service';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { FcmService } from '../fcm/fcm.service';
+import { UserModalService } from '../user-modal/user-modal.service';
+import { SlackService } from '../slack/slack.service';
+
+// 포인트 → 등급 계산 (cash-more-web의 getGradeFromPoint 이관)
+function getGradeFromPoint(point: number): string {
+  if (point >= 40) return 'S';
+  if (point >= 30) return 'A+';
+  if (point >= 25) return 'A';
+  if (point >= 20) return 'B+';
+  if (point >= 15) return 'B';
+  if (point >= 10) return 'C';
+  if (point >= 5) return 'D';
+  if (point >= 3) return 'E';
+  return 'F';
+}
 
 @Injectable()
 export class EveryReceiptService {
@@ -33,6 +51,8 @@ export class EveryReceiptService {
     private eventService: EventService,
     private onboardingService: OnboardingService,
     private fcmService: FcmService,
+    private userModalService: UserModalService,
+    private slackService: SlackService,
   ) {}
 
   async getEveryReceipts(userId: string): Promise<EveryReceipt[]> {
@@ -282,5 +302,196 @@ export class EveryReceiptService {
       ...base,
       ...buildScoreResponse(detail.scoreData, detail.pointAmount ?? 0),
     };
+  }
+
+  // Admin ---------------------------------------------------------------------
+
+  async adminDeleteReceipt(
+    receiptId: number,
+  ): Promise<AdminDeleteReceiptResponseDto> {
+    const receipt =
+      await this.everyReceiptRepository.findReceiptForAdmin(receiptId);
+    if (!receipt) {
+      throw new NotFoundException('영수증을 찾을 수 없습니다.');
+    }
+
+    // completed 상태에서만 원장에 기여분이 있으므로 reversal 행 추가
+    if (receipt.status === 'completed' && receipt.point > 0) {
+      await this.everyReceiptRepository.insertPointReversal({
+        userId: receipt.user_id,
+        pointAmount: -receipt.point,
+        everyReceiptId: receipt.id,
+        reason: 'admin_delete',
+        beforePoint: receipt.point,
+        afterPoint: 0,
+      });
+    }
+
+    await this.everyReceiptRepository.deleteReceipt(receiptId);
+
+    return { success: true, message: '영수증이 삭제되었습니다.' };
+  }
+
+  async adminUpdatePoint(
+    receiptId: number,
+    newPoint: number,
+  ): Promise<AdminUpdatePointResponseDto> {
+    const receipt =
+      await this.everyReceiptRepository.findReceiptForAdmin(receiptId);
+    if (!receipt) {
+      throw new NotFoundException('영수증을 찾을 수 없습니다.');
+    }
+
+    const oldPoint = receipt.point;
+
+    // every_receipt.point 업데이트
+    await this.everyReceiptRepository.updateReceiptPoint(receiptId, newPoint);
+
+    // completed 상태일 때만 원장에 delta 행 추가 (불변식 유지)
+    if (receipt.status === 'completed') {
+      const delta = newPoint - oldPoint;
+      if (delta !== 0) {
+        await this.everyReceiptRepository.insertPointReversal({
+          userId: receipt.user_id,
+          pointAmount: delta,
+          everyReceiptId: receipt.id,
+          reason: 'admin_adjust',
+          beforePoint: oldPoint,
+          afterPoint: newPoint,
+        });
+      }
+    }
+
+    return { success: true };
+  }
+
+  async adminCompleteReReview(params: {
+    everyReceiptId: number;
+    afterScoreData: Record<string, unknown>;
+    afterPoint: number;
+    afterTotalScore: number;
+  }): Promise<AdminCompleteReReviewResponseDto> {
+    const { everyReceiptId, afterScoreData, afterPoint, afterTotalScore } =
+      params;
+
+    try {
+      const reReview =
+        await this.everyReceiptRepository.findReReviewByReceiptId(
+          everyReceiptId,
+        );
+      if (!reReview) {
+        throw new NotFoundException('재검수 요청을 찾을 수 없습니다.');
+      }
+      if (reReview.status !== 'pending') {
+        throw new BadRequestException('이미 처리된 재검수 요청입니다.');
+      }
+
+      const receipt =
+        await this.everyReceiptRepository.findReceiptForAdmin(everyReceiptId);
+      if (!receipt) {
+        throw new NotFoundException('영수증을 찾을 수 없습니다.');
+      }
+
+      const beforePoint = receipt.point;
+      const beforeGrade = getGradeFromPoint(beforePoint);
+
+      // 분기 A: 점수 유지/하락 → 원래 포인트 재지급
+      if (afterPoint <= beforePoint) {
+        await this.everyReceiptRepository.updateReReviewToRejected(reReview.id);
+        await this.everyReceiptRepository.updateReceiptStatusToCompleted(
+          everyReceiptId,
+        );
+
+        if (beforePoint > 0) {
+          await this.everyReceiptRepository.insertPointReversal({
+            userId: receipt.user_id,
+            pointAmount: beforePoint,
+            everyReceiptId,
+            everyReceiptReReviewId: reReview.id,
+            reason: 're_review_rejected',
+          });
+        }
+
+        await this.userModalService.createModal(
+          receipt.user_id,
+          'every_receipt_re_reviewed',
+          {
+            everyReceiptId,
+            beforeGrade,
+            beforePoint,
+            afterGrade: beforeGrade,
+            afterPoint: beforePoint,
+          },
+        );
+        await this.fcmService.sendRefreshMessage(
+          receipt.user_id,
+          'receipt_update',
+        );
+
+        return {
+          success: true,
+          message: '재검수 포인트가 변경되지 않았습니다.',
+        };
+      }
+
+      // 분기 B: 점수 상승 → 새 포인트 지급
+      const finalScoreData = {
+        ...afterScoreData,
+        total_score: afterTotalScore,
+      };
+
+      await this.everyReceiptRepository.updateReReviewToCompleted(
+        reReview.id,
+        afterScoreData,
+      );
+      await this.everyReceiptRepository.updateReceiptAfterReReview(
+        everyReceiptId,
+        finalScoreData,
+        afterPoint,
+      );
+
+      await this.everyReceiptRepository.insertPointReversal({
+        userId: receipt.user_id,
+        pointAmount: afterPoint,
+        everyReceiptId,
+        everyReceiptReReviewId: reReview.id,
+        reason: 're_review_approved',
+      });
+
+      const afterGrade = getGradeFromPoint(afterPoint);
+
+      await this.userModalService.createModal(
+        receipt.user_id,
+        'every_receipt_re_reviewed',
+        {
+          everyReceiptId,
+          beforeGrade,
+          beforePoint,
+          afterGrade,
+          afterPoint,
+        },
+      );
+      await this.fcmService.pushNotification(
+        receipt.user_id,
+        '영수증 재검수 완료 💌',
+        '재검수를 통해 영수증 포인트가 상승했어요!',
+        {},
+      );
+
+      return { success: true };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`재검수 완료 처리 중 오류: ${message}`);
+      await this.slackService.reportBugToSlack(
+        `재검수 완료 처리 중 오류 발생 receiptId=${everyReceiptId} ${message}`,
+      );
+      throw error;
+    }
   }
 }
