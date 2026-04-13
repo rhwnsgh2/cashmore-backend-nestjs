@@ -4,6 +4,8 @@ import type {
   InsertEveryReceiptParams,
   InsertedEveryReceipt,
   PendingEveryReceipt,
+  CreatedReReview,
+  InsertPointReversalParams,
 } from '../interfaces/every-receipt-repository.interface';
 import {
   IEveryReceiptRepository,
@@ -282,18 +284,23 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     userId: string,
   ): Promise<{
     id: number;
+    point: number;
     score_data: Record<string, unknown> | null;
   } | null> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('every_receipt')
-      .select('id, score_data')
+      .select('id, point, score_data')
       .eq('id', receiptId)
       .eq('user_id', userId)
       .single();
 
     if (error || !data) return null;
-    return data as { id: number; score_data: Record<string, unknown> | null };
+    return data as {
+      id: number;
+      point: number;
+      score_data: Record<string, unknown> | null;
+    };
   }
 
   async hasExistingReReview(receiptId: number): Promise<boolean> {
@@ -322,13 +329,34 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     if (error) throw error;
   }
 
+  async insertPointReversal(
+    params: InsertPointReversalParams,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .insert({
+        user_id: params.userId,
+        type: 'EVERY_RECEIPT',
+        point_amount: params.pointAmount,
+        status: 'done',
+        additional_data: {
+          every_receipt_id: params.everyReceiptId,
+          every_receipt_re_review_id: params.everyReceiptReReviewId,
+          reason: params.reason,
+        },
+      });
+
+    if (error) throw error;
+  }
+
   async createReReview(params: {
     everyReceiptId: number;
     requestedItems: string[];
     userNote: string;
     userId: string;
     beforeScoreData: Record<string, unknown> | null;
-  }): Promise<Record<string, unknown>> {
+  }): Promise<CreatedReReview> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('every_receipt_re_review')
@@ -345,7 +373,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
       .single();
 
     if (error) throw error;
-    return data as Record<string, unknown>;
+    return data as CreatedReReview;
   }
 
   async updateStatusToReReview(receiptId: number): Promise<void> {

@@ -818,4 +818,204 @@ describe('EveryReceipt API (e2e)', () => {
         .expect(404);
     });
   });
+
+  describe('POST /every_receipt/re_review (append-only)', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/every_receipt/re_review')
+        .send({ id: 1, requestedItems: ['store_name'] })
+        .expect(401);
+    });
+
+    it('존재하지 않는 영수증이면 404를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/every_receipt/re_review')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ id: 999999, requestedItems: ['store_name'], userNote: '' })
+        .expect(404);
+    });
+
+    it('다른 사용자의 영수증으로 재검수 요청하면 404를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const otherUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const receipt = await createReceiptSubmission(supabase, {
+        user_id: otherUser.id,
+        status: 'completed',
+        point: 25,
+      });
+
+      await request(app.getHttpServer())
+        .post('/every_receipt/re_review')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          id: receipt.id,
+          requestedItems: ['store_name'],
+          userNote: '',
+        })
+        .expect(404);
+    });
+
+    it('이미 재검수 요청이 존재하면 400을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const receipt = await createReceiptSubmission(supabase, {
+        user_id: testUser.id,
+        status: 'completed',
+        point: 25,
+      });
+      await createReceiptReReview(supabase, {
+        every_receipt_id: receipt.id,
+        status: 'pending',
+      });
+
+      await request(app.getHttpServer())
+        .post('/every_receipt/re_review')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          id: receipt.id,
+          requestedItems: ['store_name'],
+          userNote: '',
+        })
+        .expect(400);
+    });
+
+    it('재검수 요청 시 원본 point_action은 삭제되지 않고 reversal 행이 추가된다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const receipt = await createReceiptSubmission(supabase, {
+        user_id: testUser.id,
+        status: 'completed',
+        point: 25,
+      });
+
+      // 원본 포인트 액션을 수동으로 만들어둔다 (실제 완료 플로우 대체)
+      const { error: insertError } = await supabase
+        .from('point_actions')
+        .insert({
+          user_id: testUser.id,
+          type: 'EVERY_RECEIPT',
+          point_amount: 25,
+          status: 'done',
+          additional_data: { every_receipt_id: receipt.id },
+        });
+      expect(insertError).toBeNull();
+
+      const response = await request(app.getHttpServer())
+        .post('/every_receipt/re_review')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          id: receipt.id,
+          requestedItems: ['store_name'],
+          userNote: '매장명 잘못됨',
+        })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+
+      // point_actions 상태 검증: 원본 + reversal 2행, SUM = 0
+      const { data: pointActions } = await supabase
+        .from('point_actions')
+        .select('*')
+        .eq('user_id', testUser.id)
+        .eq('type', 'EVERY_RECEIPT')
+        .order('id', { ascending: true });
+
+      expect(pointActions).toHaveLength(2);
+      expect(pointActions![0].point_amount).toBe(25);
+      expect(pointActions![0].additional_data).toEqual(
+        expect.objectContaining({ every_receipt_id: receipt.id }),
+      );
+      // reversal 행
+      expect(pointActions![1].point_amount).toBe(-25);
+      expect(pointActions![1].status).toBe('done');
+      expect(pointActions![1].additional_data).toEqual(
+        expect.objectContaining({
+          every_receipt_id: receipt.id,
+          reason: 'user_review',
+        }),
+      );
+      expect(
+        (
+          pointActions![1].additional_data as {
+            every_receipt_re_review_id: number;
+          }
+        ).every_receipt_re_review_id,
+      ).toBeGreaterThan(0);
+
+      // 원본 + reversal 합계가 0이어야 함
+      const sum = pointActions!.reduce(
+        (acc, row) => acc + Number(row.point_amount),
+        0,
+      );
+      expect(sum).toBe(0);
+
+      // every_receipt.status가 're-review'로 바뀌어야 함
+      const { data: updatedReceipt } = await supabase
+        .from('every_receipt')
+        .select('status')
+        .eq('id', receipt.id)
+        .single();
+      expect(updatedReceipt!.status).toBe('re-review');
+
+      // every_receipt_re_review 행이 생성되었는지 확인
+      const { data: reReviews } = await supabase
+        .from('every_receipt_re_review')
+        .select('*')
+        .eq('every_receipt_id', receipt.id);
+      expect(reReviews).toHaveLength(1);
+      expect(reReviews![0].status).toBe('pending');
+    });
+
+    it('reversal 행의 every_receipt_re_review_id는 실제 생성된 re_review row를 참조한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const receipt = await createReceiptSubmission(supabase, {
+        user_id: testUser.id,
+        status: 'completed',
+        point: 15,
+      });
+
+      await request(app.getHttpServer())
+        .post('/every_receipt/re_review')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          id: receipt.id,
+          requestedItems: ['items'],
+          userNote: '',
+        })
+        .expect(200);
+
+      const { data: reReviews } = await supabase
+        .from('every_receipt_re_review')
+        .select('id')
+        .eq('every_receipt_id', receipt.id)
+        .single();
+
+      const { data: reversalAction } = await supabase
+        .from('point_actions')
+        .select('additional_data')
+        .eq('user_id', testUser.id)
+        .eq('type', 'EVERY_RECEIPT')
+        .eq('additional_data->>reason', 'user_review')
+        .single();
+
+      expect(reversalAction).not.toBeNull();
+      const additional = reversalAction!.additional_data as {
+        every_receipt_id: number;
+        every_receipt_re_review_id: number;
+        reason: string;
+      };
+      expect(additional.every_receipt_re_review_id).toBe(reReviews!.id);
+      expect(additional.every_receipt_id).toBe(receipt.id);
+      expect(additional.reason).toBe('user_review');
+    });
+  });
 });

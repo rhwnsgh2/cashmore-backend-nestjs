@@ -408,6 +408,7 @@ describe('EveryReceiptService', () => {
     it('정상적으로 재검수 요청을 생성한다', async () => {
       repository.setEveryReceiptForReReview(1, userId, {
         id: 1,
+        point: 25,
         score_data: { total_score: 80 },
       });
 
@@ -420,7 +421,8 @@ describe('EveryReceiptService', () => {
 
       expect(result.success).toBe(true);
       expect(result.reReview).toBeDefined();
-      expect(repository.getDeletedPointActions()).toHaveLength(1);
+      expect(repository.getInsertedPointReversals()).toHaveLength(1);
+      expect(repository.getDeletedPointActions()).toHaveLength(0);
       expect(repository.getReReviewStatusUpdates()).toEqual([1]);
     });
 
@@ -433,6 +435,7 @@ describe('EveryReceiptService', () => {
     it('이미 재검수 요청이 있으면 BadRequestException을 던진다', async () => {
       repository.setEveryReceiptForReReview(1, userId, {
         id: 1,
+        point: 25,
         score_data: null,
       });
       repository.setExistingReReview(1);
@@ -442,9 +445,10 @@ describe('EveryReceiptService', () => {
       ).rejects.toThrow('이미 재검수 요청이 존재합니다.');
     });
 
-    it('포인트 환수 후 재검수 레코드를 생성한다', async () => {
+    it('재검수 레코드 생성 후 포인트 환수 행을 INSERT한다', async () => {
       repository.setEveryReceiptForReReview(1, userId, {
         id: 1,
+        point: 30,
         score_data: { total_score: 90 },
       });
 
@@ -455,18 +459,59 @@ describe('EveryReceiptService', () => {
         '메모',
       );
 
-      const deleted = repository.getDeletedPointActions();
-      expect(deleted).toEqual([{ userId, everyReceiptId: 1 }]);
+      // DELETE는 호출되지 않아야 함 (append-only 전환)
+      expect(repository.getDeletedPointActions()).toHaveLength(0);
 
+      // 재검수 레코드가 먼저 생성되고
       const created = repository.getCreatedReReviews();
       expect(created).toHaveLength(1);
       expect(created[0]).toMatchObject({
+        id: 1,
         everyReceiptId: 1,
         requestedItems: ['items', 'date_validity'],
         userNote: '메모',
         userId,
         beforeScoreData: { total_score: 90 },
       });
+
+      // 반대 부호 reversal 행이 INSERT 되어야 함
+      const reversals = repository.getInsertedPointReversals();
+      expect(reversals).toHaveLength(1);
+      expect(reversals[0]).toEqual({
+        userId,
+        pointAmount: -30,
+        everyReceiptId: 1,
+        everyReceiptReReviewId: 1,
+        reason: 'user_review',
+      });
+    });
+
+    it('포인트가 0인 영수증은 0 금액의 reversal 행이 기록된다', async () => {
+      repository.setEveryReceiptForReReview(1, userId, {
+        id: 1,
+        point: 0,
+        score_data: { total_score: 20 },
+      });
+
+      await service.requestReReview(userId, 1, ['store_name'], '');
+
+      const reversals = repository.getInsertedPointReversals();
+      expect(reversals).toHaveLength(1);
+      expect(reversals[0].pointAmount).toBe(0);
+      expect(reversals[0].reason).toBe('user_review');
+    });
+
+    it('userNote가 비어있으면 빈 문자열로 저장된다', async () => {
+      repository.setEveryReceiptForReReview(1, userId, {
+        id: 1,
+        point: 10,
+        score_data: null,
+      });
+
+      await service.requestReReview(userId, 1, ['items'], '');
+
+      const created = repository.getCreatedReReviews();
+      expect(created[0].userNote).toBe('');
     });
   });
 

@@ -56,6 +56,19 @@ export interface ReReviewRecord {
   created_at: string;
 }
 
+export interface CreatedReReview {
+  id: number;
+  [key: string]: unknown;
+}
+
+export interface InsertPointReversalParams {
+  userId: string;
+  pointAmount: number;
+  everyReceiptId: number;
+  everyReceiptReReviewId: number;
+  reason: 'user_review';
+}
+
 export interface IEveryReceiptRepository {
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]>;
   findById(
@@ -87,11 +100,20 @@ export interface IEveryReceiptRepository {
   findEveryReceiptForReReview(
     receiptId: number,
     userId: string,
-  ): Promise<{ id: number; score_data: Record<string, unknown> | null } | null>;
+  ): Promise<{
+    id: number;
+    point: number;
+    score_data: Record<string, unknown> | null;
+  } | null>;
 
   hasExistingReReview(receiptId: number): Promise<boolean>;
 
+  /**
+   * @deprecated Stage 3 완료 후 제거. append-only 전환 이후엔 insertPointReversal을 사용.
+   */
   deletePointAction(userId: string, everyReceiptId: number): Promise<void>;
+
+  insertPointReversal(params: InsertPointReversalParams): Promise<void>;
 
   createReReview(params: {
     everyReceiptId: number;
@@ -99,7 +121,7 @@ export interface IEveryReceiptRepository {
     userNote: string;
     userId: string;
     beforeScoreData: Record<string, unknown> | null;
-  }): Promise<Record<string, unknown>>;
+  }): Promise<CreatedReReview>;
 
   updateStatusToReReview(receiptId: number): Promise<void>;
 }

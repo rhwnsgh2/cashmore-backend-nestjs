@@ -60,16 +60,25 @@ export class EveryReceiptService {
       throw new BadRequestException('이미 재검수 요청이 존재합니다.');
     }
 
-    // 포인트 환수
-    await this.everyReceiptRepository.deletePointAction(userId, receiptId);
-
-    // 재검수 레코드 생성
+    // 재검수 레코드를 먼저 생성해서 reversal 행이 참조할 ID를 확보
     const reReview = await this.everyReceiptRepository.createReReview({
       everyReceiptId: receiptId,
       requestedItems,
       userNote: userNote || '',
       userId,
       beforeScoreData: everyReceipt.score_data,
+    });
+
+    // 포인트 환수 — append-only reversal INSERT
+    // 원본 EVERY_RECEIPT 행은 그대로 두고, 반대 부호 행을 추가한다.
+    // 0점 영수증인 경우 -0이 아닌 0으로 기록한다.
+    const reversalAmount = everyReceipt.point === 0 ? 0 : -everyReceipt.point;
+    await this.everyReceiptRepository.insertPointReversal({
+      userId,
+      pointAmount: reversalAmount,
+      everyReceiptId: receiptId,
+      everyReceiptReReviewId: reReview.id,
+      reason: 'user_review',
     });
 
     // 영수증 상태 업데이트

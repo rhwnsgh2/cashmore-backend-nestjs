@@ -3,6 +3,8 @@ import type {
   InsertedEveryReceipt,
   PendingEveryReceipt,
   ReReviewRecord,
+  CreatedReReview,
+  InsertPointReversalParams,
 } from '../interfaces/every-receipt-repository.interface';
 import {
   IEveryReceiptRepository,
@@ -91,6 +93,12 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     this.pointActionList = [];
     this.firstReceiptMap.clear();
     this.reReviewRecords.clear();
+    this.reReviewReceiptData.clear();
+    this.existingReReviews.clear();
+    this.deletedPointActions = [];
+    this.insertedPointReversals = [];
+    this.createdReReviews = [];
+    this.reReviewStatusUpdates = [];
   }
 
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]> {
@@ -189,18 +197,27 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
 
   private reReviewReceiptData = new Map<
     string,
-    { id: number; score_data: Record<string, unknown> | null }
+    {
+      id: number;
+      point: number;
+      score_data: Record<string, unknown> | null;
+    }
   >();
   private existingReReviews = new Set<number>();
   private deletedPointActions: { userId: string; everyReceiptId: number }[] =
     [];
-  private createdReReviews: Record<string, unknown>[] = [];
+  private insertedPointReversals: InsertPointReversalParams[] = [];
+  private createdReReviews: CreatedReReview[] = [];
   private reReviewStatusUpdates: number[] = [];
 
   setEveryReceiptForReReview(
     receiptId: number,
     userId: string,
-    data: { id: number; score_data: Record<string, unknown> | null },
+    data: {
+      id: number;
+      point: number;
+      score_data: Record<string, unknown> | null;
+    },
   ): void {
     this.reReviewReceiptData.set(`${userId}:${receiptId}`, data);
   }
@@ -213,7 +230,11 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     return this.deletedPointActions;
   }
 
-  getCreatedReReviews(): Record<string, unknown>[] {
+  getInsertedPointReversals(): InsertPointReversalParams[] {
+    return this.insertedPointReversals;
+  }
+
+  getCreatedReReviews(): CreatedReReview[] {
     return this.createdReReviews;
   }
 
@@ -226,6 +247,7 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     userId: string,
   ): Promise<{
     id: number;
+    point: number;
     score_data: Record<string, unknown> | null;
   } | null> {
     return Promise.resolve(
@@ -242,14 +264,22 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     return Promise.resolve();
   }
 
+  insertPointReversal(params: InsertPointReversalParams): Promise<void> {
+    this.insertedPointReversals.push(params);
+    return Promise.resolve();
+  }
+
   createReReview(params: {
     everyReceiptId: number;
     requestedItems: string[];
     userNote: string;
     userId: string;
     beforeScoreData: Record<string, unknown> | null;
-  }): Promise<Record<string, unknown>> {
-    const reReview = { id: this.createdReReviews.length + 1, ...params };
+  }): Promise<CreatedReReview> {
+    const reReview: CreatedReReview = {
+      id: this.createdReReviews.length + 1,
+      ...params,
+    };
     this.createdReReviews.push(reReview);
     return Promise.resolve(reReview);
   }
