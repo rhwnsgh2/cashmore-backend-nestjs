@@ -112,8 +112,7 @@ export class StubExchangePointRepository implements IExchangePointRepository {
         const isRestore =
           e.additional_data &&
           typeof e.additional_data === 'object' &&
-          (e.additional_data as Record<string, unknown>)
-            .original_point_action_id === originalPointActionId;
+          e.additional_data.original_point_action_id === originalPointActionId;
         if (isOriginal || isRestore) {
           results.push(e);
         }

@@ -6,9 +6,14 @@ import utc from 'dayjs/plugin/utc';
 import { PointService } from './point.service';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import { StubPointRepository } from './repositories/stub-point.repository';
+import { SlackService } from '../slack/slack.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
+const stubSlackService = {
+  reportBugToSlack: async () => {},
+};
 
 describe('PointService', () => {
   let service: PointService;
@@ -23,6 +28,10 @@ describe('PointService', () => {
         {
           provide: POINT_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: SlackService,
+          useValue: stubSlackService,
         },
       ],
     }).compile();

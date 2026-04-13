@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { POINT_EXPIRATION_MONTHS } from '../common/constants/point.constants';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
@@ -7,9 +7,11 @@ import type { IPointRepository } from './interfaces/point-repository.interface';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import {
   calculatePointAmount,
+  calculatePointAmountSimple,
   calculatePointAmountWithSnapshot,
   calculateExpiringPoints,
 } from './utils/calculate-point.util';
+import { SlackService } from '../slack/slack.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -25,9 +27,12 @@ export interface PointTotalResult {
 
 @Injectable()
 export class PointService {
+  private readonly logger = new Logger(PointService.name);
+
   constructor(
     @Inject(POINT_REPOSITORY)
     private pointRepository: IPointRepository,
+    private slackService: SlackService,
   ) {}
 
   async getPointTotal(userId: string): Promise<PointTotalResult> {
@@ -98,14 +103,49 @@ export class PointService {
         dayjs(snapshot.updated_at).toISOString(),
       );
 
-      return calculatePointAmountWithSnapshot(
+      const legacyTotal = calculatePointAmountWithSnapshot(
         snapshot.point_balance,
         pointActions,
       );
+      const simpleTotal =
+        snapshot.point_balance + calculatePointAmountSimple(pointActions);
+
+      this.comparePointCalculation(userId, legacyTotal, simpleTotal);
+
+      return legacyTotal;
     }
 
     const pointActions = await this.pointRepository.findAllPointActions(userId);
-    return calculatePointAmount(pointActions);
+    const legacyTotal = calculatePointAmount(pointActions);
+    const simpleTotal = calculatePointAmountSimple(pointActions);
+
+    this.comparePointCalculation(userId, legacyTotal, simpleTotal);
+
+    return legacyTotal;
+  }
+
+  /**
+   * [Phase 5 검증] 기존 status 분기 계산과 단순 SUM 계산을 비교하여
+   * 차이가 발견되면 슬랙으로 알림을 보냅니다. (fire-and-forget)
+   */
+  private comparePointCalculation(
+    userId: string,
+    legacyTotal: number,
+    simpleTotal: number,
+  ): void {
+    if (legacyTotal === simpleTotal) {
+      return;
+    }
+
+    const message = `[PointCalculation] mismatch userId=${userId} ${JSON.stringify(
+      {
+        legacy: legacyTotal,
+        simple: simpleTotal,
+        diff: legacyTotal - simpleTotal,
+      },
+    )}`;
+    this.logger.warn(message);
+    void this.slackService.reportBugToSlack(`🚨 ${message}`);
   }
 
   private async calculateExpiringPoints(userId: string): Promise<number> {

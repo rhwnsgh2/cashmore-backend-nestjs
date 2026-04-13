@@ -55,6 +55,25 @@ export function calculatePointAmountWithSnapshot(
 }
 
 /**
+ * [Phase 5 검증용] 단순 SUM으로 포인트를 계산합니다.
+ *
+ * Phase 3/4 완료 후 모든 EXCHANGE_POINT_TO_CASH 행이 status='done'이고
+ * 취소/거절도 복원 행 패턴으로 기록되므로 status 분기 없이 전체를 합산해도
+ * 기존 로직과 동일한 결과가 나와야 합니다.
+ *
+ * 병행 검증 기간 동안 calculatePointAmount의 결과와 이 함수의 결과를 비교하여
+ * 차이가 발생하면 슬랙으로 리포트합니다.
+ */
+export function calculatePointAmountSimple(
+  pointActions: PointAction[],
+): number {
+  return pointActions.reduce(
+    (sum, action) => sum + (action.point_amount || 0),
+    0,
+  );
+}
+
+/**
  * 소멸 예정 포인트를 계산합니다.
  * 핵심 로직: 소멸기준월 이전까지적립총합 - 전체출금총합 = 소멸포인트
  */

@@ -5,6 +5,11 @@ import { PointService } from './point.service';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import { StubPointRepository } from './repositories/stub-point.repository';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SlackService } from '../slack/slack.service';
+
+const stubSlackService = {
+  reportBugToSlack: async () => {},
+};
 
 describe('PointController', () => {
   let controller: PointController;
@@ -20,6 +25,10 @@ describe('PointController', () => {
         {
           provide: POINT_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: SlackService,
+          useValue: stubSlackService,
         },
       ],
     })
