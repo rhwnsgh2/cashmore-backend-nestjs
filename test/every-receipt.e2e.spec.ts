@@ -1095,9 +1095,9 @@ describe('EveryReceipt API (e2e)', () => {
           (row) => Number(row.point_amount) < 0,
         );
         expect(reversal).toBeDefined();
-        expect(
-          (reversal!.additional_data as { reason: string }).reason,
-        ).toBe('admin_delete');
+        expect((reversal!.additional_data as { reason: string }).reason).toBe(
+          'admin_delete',
+        );
       });
 
       it('pending 상태 영수증 삭제 시 reversal 없이 삭제만 된다', async () => {
@@ -1395,9 +1395,9 @@ describe('EveryReceipt API (e2e)', () => {
         // 마지막 행이 re_review_rejected
         const lastRow = pointActions![2];
         expect(lastRow.point_amount).toBe(20);
-        expect(
-          (lastRow.additional_data as { reason: string }).reason,
-        ).toBe('re_review_rejected');
+        expect((lastRow.additional_data as { reason: string }).reason).toBe(
+          're_review_rejected',
+        );
       });
 
       it('분기 B — afterPoint > beforePoint 이면 새 포인트를 지급하고 every_receipt 업데이트', async () => {
@@ -1485,9 +1485,9 @@ describe('EveryReceipt API (e2e)', () => {
 
         const lastRow = pointActions![2];
         expect(lastRow.point_amount).toBe(30);
-        expect(
-          (lastRow.additional_data as { reason: string }).reason,
-        ).toBe('re_review_approved');
+        expect((lastRow.additional_data as { reason: string }).reason).toBe(
+          're_review_approved',
+        );
       });
 
       it('이미 처리된 재검수 요청이면 400을 반환한다', async () => {

@@ -317,9 +317,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     return !!data;
   }
 
-  async insertPointReversal(
-    params: InsertPointReversalParams,
-  ): Promise<void> {
+  async insertPointReversal(params: InsertPointReversalParams): Promise<void> {
     const additionalData: Record<string, unknown> = {
       every_receipt_id: params.everyReceiptId,
       reason: params.reason,
@@ -373,10 +371,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     if (error) throw error;
   }
 
-  async updateReceiptPoint(
-    receiptId: number,
-    newPoint: number,
-  ): Promise<void> {
+  async updateReceiptPoint(receiptId: number, newPoint: number): Promise<void> {
     const { error } = await this.supabaseService
       .getClient()
       .from('every_receipt')

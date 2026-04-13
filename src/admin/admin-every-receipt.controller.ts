@@ -9,12 +9,7 @@ import {
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiHeader,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { EveryReceiptService } from '../every-receipt/every-receipt.service';
 import { AdminDeleteReceiptResponseDto } from '../every-receipt/dto/admin-delete-receipt.dto';

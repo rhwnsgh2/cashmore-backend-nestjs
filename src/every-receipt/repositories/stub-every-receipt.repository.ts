@@ -344,9 +344,7 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
     return this.receiptStatusCompletedUpdates;
   }
 
-  findReceiptForAdmin(
-    receiptId: number,
-  ): Promise<AdminEveryReceiptRow | null> {
+  findReceiptForAdmin(receiptId: number): Promise<AdminEveryReceiptRow | null> {
     return Promise.resolve(this.adminReceiptData.get(receiptId) ?? null);
   }
 
