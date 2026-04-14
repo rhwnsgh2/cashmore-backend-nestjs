@@ -146,8 +146,7 @@ describe('AffiliateService', () => {
         { id: 2, userId: 'user-b', pointAmount: 1000, merchantId: 'b' },
       ]);
 
-      const originalMarkCompleted =
-        repository.markCompleted.bind(repository);
+      const originalMarkCompleted = repository.markCompleted.bind(repository);
       repository.markCompleted = (id: number, completedAt: string) => {
         if (id === 1) {
           return Promise.reject(new Error('DB 오류'));

@@ -6,9 +6,7 @@ export interface PendingAffiliateApproval {
 }
 
 export interface IAffiliateRepository {
-  findPendingApprovals(
-    beforeDate: string,
-  ): Promise<PendingAffiliateApproval[]>;
+  findPendingApprovals(beforeDate: string): Promise<PendingAffiliateApproval[]>;
   markCompleted(id: number, completedAt: string): Promise<void>;
 }
 
