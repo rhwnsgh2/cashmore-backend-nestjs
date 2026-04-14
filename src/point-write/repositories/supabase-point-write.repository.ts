@@ -33,4 +33,22 @@ export class SupabasePointWriteRepository implements IPointWriteRepository {
 
     return { id: (data as { id: number }).id };
   }
+
+  async upsertBalance(
+    userId: string,
+    delta: number,
+    newPointActionId: number,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .rpc('upsert_user_point_balance', {
+        p_user_id: userId,
+        p_delta: delta,
+        p_new_id: newPointActionId,
+      });
+
+    if (error) {
+      throw error;
+    }
+  }
 }
