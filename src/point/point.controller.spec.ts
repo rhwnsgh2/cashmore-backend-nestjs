@@ -5,6 +5,9 @@ import { PointService } from './point.service';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import { StubPointRepository } from './repositories/stub-point.repository';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 describe('PointController', () => {
   let controller: PointController;
@@ -12,6 +15,7 @@ describe('PointController', () => {
 
   beforeEach(async () => {
     repository = new StubPointRepository();
+    const stubPointWriteRepo = new StubPointWriteRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PointController],
@@ -20,6 +24,10 @@ describe('PointController', () => {
         {
           provide: POINT_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(stubPointWriteRepo),
         },
       ],
     })

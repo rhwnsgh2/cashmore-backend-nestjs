@@ -56,13 +56,6 @@ export interface IPointRepository {
     startDate: string,
     endDate: string,
   ): Promise<EarnedPointAction[]>;
-  insertPointAction(
-    userId: string,
-    pointAmount: number,
-    type: string,
-    status?: string,
-    additionalData?: Record<string, unknown>,
-  ): Promise<{ id: number }>;
 }
 
 // DI 토큰

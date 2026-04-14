@@ -6,6 +6,9 @@ import utc from 'dayjs/plugin/utc';
 import { PointService } from './point.service';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import { StubPointRepository } from './repositories/stub-point.repository';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -16,6 +19,7 @@ describe('PointService', () => {
 
   beforeEach(async () => {
     repository = new StubPointRepository();
+    const stubPointWriteRepo = new StubPointWriteRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -23,6 +27,10 @@ describe('PointService', () => {
         {
           provide: POINT_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(stubPointWriteRepo),
         },
       ],
     }).compile();

@@ -8,6 +8,8 @@ import {
   calculatePointAmount,
   calculateExpiringPoints,
 } from './utils/calculate-point.util';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -26,6 +28,8 @@ export class PointService {
   constructor(
     @Inject(POINT_REPOSITORY)
     private pointRepository: IPointRepository,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {}
 
   async getPointTotal(userId: string): Promise<PointTotalResult> {
@@ -108,13 +112,12 @@ export class PointService {
     type: 'EXCHANGE_POINT_TO_NAVERPAY',
     additionalData: Record<string, unknown> = {},
   ): Promise<{ pointActionId: number }> {
-    const result = await this.pointRepository.insertPointAction(
+    const result = await this.pointWriteService.addPoint({
       userId,
-      -amount,
+      amount: -amount,
       type,
-      'done',
       additionalData,
-    );
+    });
     return { pointActionId: result.id };
   }
 
@@ -125,9 +128,14 @@ export class PointService {
     originalPointActionId: number,
     additionalData: Record<string, unknown> = {},
   ): Promise<void> {
-    await this.pointRepository.insertPointAction(userId, amount, type, 'done', {
-      ...additionalData,
-      original_point_action_id: originalPointActionId,
+    await this.pointWriteService.addPoint({
+      userId,
+      amount,
+      type,
+      additionalData: {
+        ...additionalData,
+        original_point_action_id: originalPointActionId,
+      },
     });
   }
 }
