@@ -36,6 +36,11 @@ export interface PointSnapshot {
   updated_at: string;
 }
 
+export interface PointBalance {
+  totalPoint: number;
+  lastPointActionId: number;
+}
+
 export interface EarnedPointAction {
   point_amount: number;
   created_at: string;
@@ -56,6 +61,7 @@ export interface IPointRepository {
     startDate: string,
     endDate: string,
   ): Promise<EarnedPointAction[]>;
+  findBalance(userId: string): Promise<PointBalance | null>;
 }
 
 // DI 토큰

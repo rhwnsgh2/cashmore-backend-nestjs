@@ -2,6 +2,7 @@ import {
   type IPointRepository,
   type PointAction,
   type PointSnapshot,
+  type PointBalance,
   type EarnedPointAction,
   POINT_ADD_TYPES,
 } from '../interfaces/point-repository.interface';
@@ -13,6 +14,7 @@ import {
 export class StubPointRepository implements IPointRepository {
   private snapshots: Map<string, PointSnapshot> = new Map();
   private pointActions: Map<string, PointAction[]> = new Map();
+  private balances: Map<string, PointBalance> = new Map();
 
   // 데이터 설정 메서드들
   setSnapshot(userId: string, snapshot: PointSnapshot | null): void {
@@ -27,9 +29,18 @@ export class StubPointRepository implements IPointRepository {
     this.pointActions.set(userId, actions);
   }
 
+  setBalance(userId: string, balance: PointBalance | null): void {
+    if (balance) {
+      this.balances.set(userId, balance);
+    } else {
+      this.balances.delete(userId);
+    }
+  }
+
   clear(): void {
     this.snapshots.clear();
     this.pointActions.clear();
+    this.balances.clear();
   }
 
   // IPointRepository 구현
@@ -97,5 +108,9 @@ export class StubPointRepository implements IPointRepository {
         created_at: action.created_at,
       }));
     return Promise.resolve(filtered);
+  }
+
+  findBalance(userId: string): Promise<PointBalance | null> {
+    return Promise.resolve(this.balances.get(userId) ?? null);
   }
 }
