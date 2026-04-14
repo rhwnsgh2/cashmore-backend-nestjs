@@ -9,6 +9,8 @@ import {
   BUZZVIL_REPOSITORY,
   type IBuzzvilRepository,
 } from './interfaces/buzzvil-repository.interface';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 const DEFAULT_IFA = '00000000-0000-0000-0000-000000000000';
 
@@ -22,6 +24,8 @@ export class BuzzvilService {
     private fcmService: FcmService,
     @Inject(BUZZVIL_REPOSITORY)
     private buzzvilRepository: IBuzzvilRepository,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {}
 
   async getAds(authId: string, clientIp: string, query: GetAdsQueryDto) {
@@ -127,12 +131,11 @@ export class BuzzvilService {
     // 3. 포인트 저장 (Buzzvil 포인트 그대로 적립)
     const pointAmount = Number(dto.point);
 
-    await this.buzzvilRepository.insertPointAction({
-      user_id: userId,
+    await this.pointWriteService.addPoint({
+      userId,
+      amount: pointAmount,
       type: 'BUZZVIL_REWARD',
-      point_amount: pointAmount,
-      status: 'done',
-      additional_data: {
+      additionalData: {
         transaction_id: dto.transaction_id,
         campaign_id: dto.campaign_id ? Number(dto.campaign_id) : null,
         action_type: dto.action_type || '',

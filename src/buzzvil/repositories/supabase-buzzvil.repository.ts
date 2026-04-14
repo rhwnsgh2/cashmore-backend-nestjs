@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
 import type {
   IBuzzvilRepository,
-  InsertBuzzvilPointAction,
   BuzzvilReward,
 } from '../interfaces/buzzvil-repository.interface';
 
@@ -24,17 +23,6 @@ export class SupabaseBuzzvilRepository implements IBuzzvilRepository {
     }
 
     return (data?.length ?? 0) > 0;
-  }
-
-  async insertPointAction(data: InsertBuzzvilPointAction): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .insert(data);
-
-    if (error) {
-      throw error;
-    }
   }
 
   async findRewardByCampaignId(

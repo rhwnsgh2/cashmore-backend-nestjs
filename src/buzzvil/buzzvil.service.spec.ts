@@ -8,10 +8,14 @@ import { FcmService } from '../fcm/fcm.service';
 import { BUZZVIL_REPOSITORY } from './interfaces/buzzvil-repository.interface';
 import { StubBuzzvilRepository } from './repositories/stub-buzzvil.repository';
 import { PostbackBodyDto } from './dto/postback.dto';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 describe('BuzzvilService', () => {
   let service: BuzzvilService;
   let stubRepository: StubBuzzvilRepository;
+  let stubPointWriteRepo: StubPointWriteRepository;
   let mockAuthService: { getUserIdByAuthId: ReturnType<typeof vi.fn> };
 
   const buildPostbackDto = (
@@ -30,7 +34,8 @@ describe('BuzzvilService', () => {
   });
 
   beforeEach(async () => {
-    stubRepository = new StubBuzzvilRepository();
+    stubPointWriteRepo = new StubPointWriteRepository();
+    stubRepository = new StubBuzzvilRepository(stubPointWriteRepo);
     mockAuthService = {
       getUserIdByAuthId: vi.fn().mockResolvedValue('user-uuid-123'),
     };
@@ -45,6 +50,10 @@ describe('BuzzvilService', () => {
           useValue: { sendRefreshMessage: vi.fn(), sendDataMessage: vi.fn() },
         },
         { provide: BUZZVIL_REPOSITORY, useValue: stubRepository },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(stubPointWriteRepo),
+        },
       ],
     }).compile();
 
@@ -57,9 +66,9 @@ describe('BuzzvilService', () => {
 
       expect(result).toEqual({ message: 'OK' });
 
-      const saved = stubRepository.getAll();
+      const saved = stubPointWriteRepo.getInsertedActions();
       expect(saved).toHaveLength(1);
-      expect(saved[0].user_id).toBe('user-uuid-123');
+      expect(saved[0].userId).toBe('user-uuid-123');
       expect(saved[0].type).toBe('BUZZVIL_REWARD');
       expect(saved[0].status).toBe('done');
     });
@@ -67,14 +76,14 @@ describe('BuzzvilService', () => {
     it('Buzzvil 포인트를 그대로 적립한다', async () => {
       await service.handlePostback(buildPostbackDto({ point: '100' }));
 
-      const saved = stubRepository.getAll();
-      expect(saved[0].point_amount).toBe(100);
+      const saved = stubPointWriteRepo.getInsertedActions();
+      expect(saved[0].amount).toBe(100);
     });
 
     it('additional_data에 모든 필드가 저장된다', async () => {
       await service.handlePostback(buildPostbackDto());
 
-      const ad = stubRepository.getAll()[0].additional_data;
+      const ad = stubPointWriteRepo.getInsertedActions()[0].additionalData;
       expect(ad.transaction_id).toBe('txn-001');
       expect(ad.campaign_id).toBe(10075328);
       expect(ad.action_type).toBe('l');
@@ -91,9 +100,9 @@ describe('BuzzvilService', () => {
 
       expect(result).toEqual({ message: 'OK' });
 
-      const saved = stubRepository.getAll();
+      const saved = stubPointWriteRepo.getInsertedActions();
       expect(saved).toHaveLength(1);
-      expect(saved[0].additional_data.campaign_id).toBeNull();
+      expect(saved[0].additionalData.campaign_id).toBeNull();
     });
 
     it('중복 transaction_id → ConflictException', async () => {
@@ -110,7 +119,7 @@ describe('BuzzvilService', () => {
       const result = await service.handlePostback(buildPostbackDto());
 
       expect(result).toEqual({ message: 'OK' });
-      expect(stubRepository.getAll()).toHaveLength(0);
+      expect(stubPointWriteRepo.getInsertedActions()).toHaveLength(0);
     });
   });
 
