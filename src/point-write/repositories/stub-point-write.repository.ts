@@ -48,7 +48,10 @@ export class StubPointWriteRepository implements IPointWriteRepository {
       // atomic increment
       this.balances.set(userId, {
         totalPoint: existing.totalPoint + delta,
-        lastPointActionId: Math.max(existing.lastPointActionId, newPointActionId),
+        lastPointActionId: Math.max(
+          existing.lastPointActionId,
+          newPointActionId,
+        ),
       });
       return;
     }
