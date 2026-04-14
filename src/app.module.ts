@@ -47,6 +47,7 @@ import { BannerAdModule } from './banner-ad/banner-ad.module';
 import { AdvertiserAuthModule } from './advertiser-auth/advertiser-auth.module';
 import { AdvertiserModule } from './advertiser/advertiser.module';
 import { PointWriteModule } from './point-write/point-write.module';
+import { AffiliateModule } from './affiliate/affiliate.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -85,6 +86,7 @@ import configuration from './config/configuration';
     DebugModule,
     ExchangePointModule,
     PointBatchModule,
+    AffiliateModule,
     InviteCodeModule,
     NotificationSettingsModule,
     StepRewardsModule,
