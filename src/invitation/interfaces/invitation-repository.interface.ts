@@ -31,12 +31,6 @@ export interface IInvitationRepository {
   countInvitedUsersSince(invitationId: number, since: string): Promise<number>;
   findStepRewards(userId: string): Promise<StepRewardAction[]>;
   hasStepReward(userId: string, stepCount: number): Promise<boolean>;
-  createStepReward(
-    userId: string,
-    amount: number,
-    stepCount: number,
-    stepName: string,
-  ): Promise<void>;
 
   // processInvitationReward 관련
   findUserDeviceId(userId: string): Promise<string | null>;
@@ -60,12 +54,6 @@ export interface IInvitationRepository {
     type?: 'normal' | 'receipt',
     sourceReceiptId?: number,
   ): Promise<number>;
-  createPointAction(
-    userId: string,
-    type: string,
-    pointAmount: number,
-    additionalData: Record<string, unknown>,
-  ): Promise<void>;
 
   // 영수증 초대 통계
   countInvitedUsersByReceiptId(receiptId: number): Promise<number>;

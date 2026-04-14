@@ -7,7 +7,6 @@ import type {
   StepRewardAction,
 } from '../interfaces/invitation-repository.interface';
 import { generateUniqueCode } from '../utils/generate-code';
-import type { Json } from '../../supabase/database.types';
 
 interface InvitationRow {
   id: number;
@@ -176,29 +175,6 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
     return data.length > 0;
   }
 
-  async createStepReward(
-    userId: string,
-    amount: number,
-    stepCount: number,
-    stepName: string,
-  ): Promise<void> {
-    const client = this.supabaseService.getClient();
-
-    const { error } = await client.from('point_actions').insert({
-      type: 'INVITE_STEP_REWARD',
-      user_id: userId,
-      point_amount: amount,
-      additional_data: {
-        step_count: stepCount,
-        step_name: stepName,
-      },
-    });
-
-    if (error) {
-      throw error;
-    }
-  }
-
   // processInvitationReward 관련
 
   async findUserDeviceId(userId: string): Promise<string | null> {
@@ -316,26 +292,6 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
     }
 
     return data.id;
-  }
-
-  async createPointAction(
-    userId: string,
-    type: string,
-    pointAmount: number,
-    additionalData: Record<string, unknown>,
-  ): Promise<void> {
-    const client = this.supabaseService.getClient();
-
-    const { error } = await client.from('point_actions').insert({
-      user_id: userId,
-      type,
-      point_amount: pointAmount,
-      additional_data: additionalData as Json,
-    });
-
-    if (error) {
-      throw error;
-    }
   }
 
   // 영수증 초대 통계

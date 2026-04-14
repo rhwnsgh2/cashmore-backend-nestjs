@@ -6,15 +6,20 @@ import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repos
 import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
 import { FcmService } from '../fcm/fcm.service';
 import { SlackService } from '../slack/slack.service';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 describe('InvitationService - invitation_receipt', () => {
   let service: InvitationService;
   let repository: StubInvitationRepository;
   let modalRepository: StubUserModalRepository;
+  let pointWriteRepo: StubPointWriteRepository;
   const invitedUserId = 'invited-user-id';
 
   beforeEach(async () => {
-    repository = new StubInvitationRepository();
+    pointWriteRepo = new StubPointWriteRepository();
+    repository = new StubInvitationRepository(pointWriteRepo);
     modalRepository = new StubUserModalRepository();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -42,6 +47,10 @@ describe('InvitationService - invitation_receipt', () => {
             reportToInvitationNoti: async () => {},
           },
         },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(pointWriteRepo),
+        },
       ],
     }).compile();
 
@@ -66,12 +75,12 @@ describe('InvitationService - invitation_receipt', () => {
 
     expect(result.receiptPoint).toBe(40);
 
-    const pointActions = repository.getPointActions();
+    const pointActions = pointWriteRepo.getInsertedActions();
     const receiptAction = pointActions.find(
       (p) => p.userId === invitedUserId && p.type === 'INVITATION_RECEIPT',
     );
     expect(receiptAction).toBeDefined();
-    expect(receiptAction!.pointAmount).toBe(40);
+    expect(receiptAction!.amount).toBe(40);
     expect(receiptAction!.additionalData).toEqual({
       source_receipt_id: 99,
       point: 40,
@@ -197,11 +206,11 @@ describe('InvitationService - invitation_receipt', () => {
 
     expect(result.receiptPoint).toBe(0);
 
-    const pointActions = repository.getPointActions();
+    const pointActions = pointWriteRepo.getInsertedActions();
     const receiptAction = pointActions.find(
       (p) => p.userId === invitedUserId && p.type === 'INVITATION_RECEIPT',
     );
     expect(receiptAction).toBeDefined();
-    expect(receiptAction!.pointAmount).toBe(0);
+    expect(receiptAction!.amount).toBe(0);
   });
 });

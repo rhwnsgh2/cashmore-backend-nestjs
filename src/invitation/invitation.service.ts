@@ -26,6 +26,8 @@ import type { StepRewardResponseDto } from './dto/step-reward.dto';
 import type { LottoProcessResponseDto } from './dto/lotto-process.dto';
 import { getRandomRewardPoint } from './utils/random-reward';
 import { addSeparator } from './utils/add-separator';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 const RECEIPT_BONUS_POINT = 20;
 
@@ -46,6 +48,8 @@ export class InvitationService {
     private userModalRepository: IUserModalRepository,
     private fcmService: FcmService,
     private slackService: SlackService,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {}
 
   async getOrCreateInvitation(userId: string): Promise<Invitation> {
@@ -147,12 +151,15 @@ export class InvitationService {
     }
 
     // 보상 지급
-    await this.invitationRepository.createStepReward(
+    await this.pointWriteService.addPoint({
       userId,
-      eligibleStep.amount,
-      eligibleStep.count,
-      eligibleStep.reward,
-    );
+      amount: eligibleStep.amount,
+      type: 'INVITE_STEP_REWARD',
+      additionalData: {
+        step_count: eligibleStep.count,
+        step_name: eligibleStep.reward,
+      },
+    });
 
     return { success: true };
   }
@@ -253,21 +260,21 @@ export class InvitationService {
     // 9. 초대자에게 INVITE_REWARD 300P 지급
     const isReceiptInvite = signupType === 'receipt' && receiptId;
 
-    await this.invitationRepository.createPointAction(
-      invitation.senderId,
-      'INVITE_REWARD',
-      POINTS_PER_INVITATION,
-      { invited_user_id: invitedUserId },
-    );
+    await this.pointWriteService.addPoint({
+      userId: invitation.senderId,
+      amount: POINTS_PER_INVITATION,
+      type: 'INVITE_REWARD',
+      additionalData: { invited_user_id: invitedUserId },
+    });
 
     // 9-1. 영수증 초대 시 추가 보너스 20P (INVITATION_RECEIPT)
     if (isReceiptInvite) {
-      await this.invitationRepository.createPointAction(
-        invitation.senderId,
-        'INVITATION_RECEIPT',
-        RECEIPT_BONUS_POINT,
-        { invited_user_id: invitedUserId, receipt_id: receiptId },
-      );
+      await this.pointWriteService.addPoint({
+        userId: invitation.senderId,
+        amount: RECEIPT_BONUS_POINT,
+        type: 'INVITATION_RECEIPT',
+        additionalData: { invited_user_id: invitedUserId, receipt_id: receiptId },
+      });
     }
 
     // 10. 초대자에게 모달 생성 (영수증 초대 시 별도 모달)
@@ -312,12 +319,12 @@ export class InvitationService {
 
     // 13. 피초대자에게 랜덤 포인트 지급
     const rewardPoint = getRandomRewardPoint();
-    await this.invitationRepository.createPointAction(
-      invitedUserId,
-      'INVITED_USER_REWARD_RANDOM',
-      rewardPoint,
-      { invitation_user_id: invitationUserId },
-    );
+    await this.pointWriteService.addPoint({
+      userId: invitedUserId,
+      amount: rewardPoint,
+      type: 'INVITED_USER_REWARD_RANDOM',
+      additionalData: { invitation_user_id: invitationUserId },
+    });
 
     // Slack: 초대 성공 로깅
     void this.slackService.reportToInvitationNoti(
@@ -370,12 +377,12 @@ export class InvitationService {
       throw new BadRequestException('유효 시간이 초과된 영수증입니다.');
     }
 
-    await this.invitationRepository.createPointAction(
-      invitedUserId,
-      'INVITATION_RECEIPT',
-      receipt.point,
-      { source_receipt_id: receiptId, point: receipt.point },
-    );
+    await this.pointWriteService.addPoint({
+      userId: invitedUserId,
+      amount: receipt.point,
+      type: 'INVITATION_RECEIPT',
+      additionalData: { source_receipt_id: receiptId, point: receipt.point },
+    });
 
     return { receiptPoint: receipt.point };
   }

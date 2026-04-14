@@ -9,14 +9,19 @@ import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repos
 import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
 import { FcmService } from '../fcm/fcm.service';
 import { SlackService } from '../slack/slack.service';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 describe('InvitationService', () => {
   let service: InvitationService;
   let repository: StubInvitationRepository;
   let modalRepository: StubUserModalRepository;
+  let pointWriteRepo: StubPointWriteRepository;
 
   beforeEach(async () => {
-    repository = new StubInvitationRepository();
+    pointWriteRepo = new StubPointWriteRepository();
+    repository = new StubInvitationRepository(pointWriteRepo);
     modalRepository = new StubUserModalRepository();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -43,6 +48,10 @@ describe('InvitationService', () => {
             reportBugToSlack: async () => {},
             reportToInvitationNoti: async () => {},
           },
+        },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(pointWriteRepo),
         },
       ],
     }).compile();
@@ -306,12 +315,12 @@ describe('InvitationService', () => {
         deviceId,
       });
 
-      const pointActions = repository.getPointActions();
+      const pointActions = pointWriteRepo.getInsertedActions();
       const senderReward = pointActions.find(
         (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
       );
       expect(senderReward).toBeDefined();
-      expect(senderReward!.pointAmount).toBe(300);
+      expect(senderReward!.amount).toBe(300);
     });
 
     it('피초대자에게 INVITED_USER_REWARD_RANDOM 랜덤 포인트를 지급한다', async () => {
@@ -321,14 +330,14 @@ describe('InvitationService', () => {
         deviceId,
       });
 
-      const pointActions = repository.getPointActions();
+      const pointActions = pointWriteRepo.getInsertedActions();
       const invitedReward = pointActions.find(
         (p) =>
           p.userId === invitedUserId && p.type === 'INVITED_USER_REWARD_RANDOM',
       );
       expect(invitedReward).toBeDefined();
       expect([300, 500, 1000, 3000, 50000]).toContain(
-        invitedReward!.pointAmount,
+        invitedReward!.amount,
       );
     });
 
@@ -529,7 +538,7 @@ describe('InvitationService', () => {
       expect(result2.success).toBe(true);
 
       // 초대자에게 INVITE_REWARD가 2건 지급되었는지 확인
-      const pointActions = repository.getPointActions();
+      const pointActions = pointWriteRepo.getInsertedActions();
       const senderRewards = pointActions.filter(
         (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
       );
