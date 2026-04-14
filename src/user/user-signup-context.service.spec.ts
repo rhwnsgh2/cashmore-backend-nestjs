@@ -8,6 +8,9 @@ import { StubUserModalRepository } from '../user-modal/repositories/stub-user-mo
 import { InvitationService } from '../invitation/invitation.service';
 import { AmplitudeService } from '../amplitude/amplitude.service';
 import { SignupType } from './dto/create-user.dto';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 const mockInvitationService = {
   processInvitationReward: vi.fn(),
@@ -18,10 +21,12 @@ describe('UserService - signupContext', () => {
   let service: UserService;
   let repository: StubUserRepository;
   let modalRepository: StubUserModalRepository;
+  let pointWriteRepo: StubPointWriteRepository;
 
   beforeEach(async () => {
     repository = new StubUserRepository();
     modalRepository = new StubUserModalRepository();
+    pointWriteRepo = new StubPointWriteRepository();
     mockInvitationService.processInvitationReward.mockReset();
     mockInvitationService.grantReceiptPoint.mockReset();
 
@@ -43,6 +48,10 @@ describe('UserService - signupContext', () => {
         {
           provide: AmplitudeService,
           useValue: { track: vi.fn() },
+        },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(pointWriteRepo),
         },
       ],
     }).compile();
@@ -274,10 +283,10 @@ describe('UserService - signupContext', () => {
       expect(result.success).toBe(true);
 
       // 온보딩 포인트 지급 확인
-      const pointActions = repository.getPointActions();
+      const pointActions = pointWriteRepo.getInsertedActions();
       expect(
         pointActions.some(
-          (p) => p.type === 'ONBOARDING_EVENT' && p.pointAmount === 40,
+          (p) => p.type === 'ONBOARDING_EVENT' && p.amount === 40,
         ),
       ).toBe(true);
 

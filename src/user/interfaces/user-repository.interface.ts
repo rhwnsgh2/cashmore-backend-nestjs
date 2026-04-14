@@ -107,16 +107,6 @@ export interface IUserRepository {
   ): Promise<void>;
 
   /**
-   * 포인트 액션 생성
-   */
-  createPointAction(
-    userId: string,
-    type: string,
-    pointAmount: number,
-    additionalData: Record<string, unknown>,
-  ): Promise<void>;
-
-  /**
    * 초대받은 사용자인지 확인
    */
   findDeviceId(userId: string): Promise<string | null>;

@@ -16,6 +16,8 @@ import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repos
 import { InvitationService } from '../invitation/invitation.service';
 import { AmplitudeService } from '../amplitude/amplitude.service';
 import { SignupType } from './dto/create-user.dto';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 export interface UserInfoResponse {
   id: string;
@@ -246,6 +248,8 @@ export class UserService {
     private userModalRepository: IUserModalRepository,
     private invitationService: InvitationService,
     private amplitudeService: AmplitudeService,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {}
 
   async getLastUsedProvider(
@@ -446,12 +450,11 @@ export class UserService {
       'onboarding_event',
       userId,
     );
-    await this.userRepository.createPointAction(
+    await this.pointWriteService.addPoint({
       userId,
-      'ONBOARDING_EVENT',
-      ONBOARDING_POINT_AMOUNT,
-      {},
-    );
+      amount: ONBOARDING_POINT_AMOUNT,
+      type: 'ONBOARDING_EVENT',
+    });
     this.logger.log(
       `[ONBOARDING] 온보딩 완료 userId=${userId} point=${ONBOARDING_POINT_AMOUNT}`,
     );

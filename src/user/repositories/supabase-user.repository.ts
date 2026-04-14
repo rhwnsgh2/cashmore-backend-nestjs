@@ -7,8 +7,6 @@ import type {
   User,
   UserProvider,
 } from '../interfaces/user-repository.interface';
-import type { Json } from '../../supabase/database.types';
-
 @Injectable()
 export class SupabaseUserRepository implements IUserRepository {
   constructor(private supabaseService: SupabaseService) {}
@@ -227,27 +225,6 @@ export class SupabaseUserRepository implements IUserRepository {
         device_id: deviceId,
         event_name: eventName,
         user_id: userId,
-      });
-
-    if (error) {
-      throw error;
-    }
-  }
-
-  async createPointAction(
-    userId: string,
-    type: string,
-    pointAmount: number,
-    additionalData: Record<string, unknown>,
-  ): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .insert({
-        user_id: userId,
-        type,
-        point_amount: pointAmount,
-        additional_data: additionalData as Json,
       });
 
     if (error) {

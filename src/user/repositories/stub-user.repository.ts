@@ -14,12 +14,6 @@ export class StubUserRepository implements IUserRepository {
   private users: Map<string, User> = new Map();
   private banReasons: Map<string, string> = new Map();
   private deviceEvents: DeviceEvent[] = [];
-  private pointActions: {
-    userId: string;
-    type: string;
-    pointAmount: number;
-    additionalData: Record<string, unknown>;
-  }[] = [];
   private invitedUsers: Set<string> = new Set();
   private authProviders: Map<string, UserProvider> = new Map();
   private deviceIdMap: Map<string, string> = new Map(); // userId → deviceId
@@ -59,10 +53,6 @@ export class StubUserRepository implements IUserRepository {
     this.authProviders.set(authId, provider);
   }
 
-  getPointActions() {
-    return this.pointActions;
-  }
-
   getDeviceEvents() {
     return this.deviceEvents;
   }
@@ -71,7 +61,6 @@ export class StubUserRepository implements IUserRepository {
     this.users.clear();
     this.banReasons.clear();
     this.deviceEvents = [];
-    this.pointActions = [];
     this.invitedUsers.clear();
     this.authProviders.clear();
   }
@@ -171,16 +160,6 @@ export class StubUserRepository implements IUserRepository {
     _userId: string,
   ): Promise<void> {
     this.deviceEvents.push({ device_id: deviceId, event_name: eventName });
-    return Promise.resolve();
-  }
-
-  createPointAction(
-    userId: string,
-    type: string,
-    pointAmount: number,
-    additionalData: Record<string, unknown>,
-  ): Promise<void> {
-    this.pointActions.push({ userId, type, pointAmount, additionalData });
     return Promise.resolve();
   }
 
