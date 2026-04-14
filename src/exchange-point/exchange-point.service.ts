@@ -15,6 +15,8 @@ import type { IExchangePointRepository } from './interfaces/exchange-point-repos
 import { EXCHANGE_POINT_REPOSITORY } from './interfaces/exchange-point-repository.interface';
 import type { ICashExchangeRepository } from './interfaces/cash-exchange-repository.interface';
 import { CASH_EXCHANGE_REPOSITORY } from './interfaces/cash-exchange-repository.interface';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 export interface ExchangePointResponse {
   id: number;
@@ -108,6 +110,8 @@ export class ExchangePointService {
     private userRepository: IUserRepository,
     private accountInfoService: AccountInfoService,
     private fcmService: FcmService,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {}
 
   async getPendingWithAccountInfo(): Promise<GetPendingWithAccountInfoResult> {
@@ -308,11 +312,10 @@ export class ExchangePointService {
     // - 신청 즉시 차감 (잔액 영향 동일)
     // - point_actions는 mutable status 머신이 아닌 append-only 원장
     // - 출금의 진짜 상태(pending/done/cancelled/rejected)는 cash_exchanges에서 관리
-    const result = await this.exchangePointRepository.insertExchangeRequest({
-      user_id: userId,
+    const result = await this.pointWriteService.addPoint({
+      userId,
+      amount: -amount,
       type: 'EXCHANGE_POINT_TO_CASH',
-      point_amount: -amount,
-      status: 'done',
     });
 
     try {
@@ -359,11 +362,14 @@ export class ExchangePointService {
     // - 원본 deduct 행은 그대로 (status='done', -amount)
     // - 새 복원 행 INSERT (status='done', +amount)
     // - net = 0 → 잔액 복원
-    await this.exchangePointRepository.insertRestoreAction({
-      user_id: userId,
+    await this.pointWriteService.addPoint({
+      userId,
       amount: Number(cashExchange.amount),
-      original_point_action_id: id,
-      reason: 'cancelled',
+      type: 'EXCHANGE_POINT_TO_CASH',
+      additionalData: {
+        original_point_action_id: id,
+        reason: 'cancelled',
+      },
     });
 
     // cash_exchanges 상태 업데이트
@@ -436,11 +442,14 @@ export class ExchangePointService {
     }
 
     // Phase 3.4: 복원 행 INSERT (네이버페이 패턴)
-    await this.exchangePointRepository.insertRestoreAction({
-      user_id: cashExchange.user_id,
+    await this.pointWriteService.addPoint({
+      userId: cashExchange.user_id,
       amount: Number(cashExchange.amount),
-      original_point_action_id: id,
-      reason: `rejected_${reason}`,
+      type: 'EXCHANGE_POINT_TO_CASH',
+      additionalData: {
+        original_point_action_id: id,
+        reason: `rejected_${reason}`,
+      },
     });
 
     // cash_exchanges 상태 업데이트

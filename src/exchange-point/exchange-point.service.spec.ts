@@ -12,6 +12,9 @@ import { FcmService } from '../fcm/fcm.service';
 import { USER_REPOSITORY } from '../user/interfaces/user-repository.interface';
 import { StubUserRepository } from '../user/repositories/stub-user.repository';
 import { AccountInfoService } from '../account-info/account-info.service';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 const stubFcmService = {
   pushNotification: async () => {},
@@ -31,7 +34,8 @@ describe('ExchangePointService', () => {
   const userId = 'test-user-id';
 
   beforeEach(async () => {
-    repository = new StubExchangePointRepository();
+    const stubPointWriteRepo = new StubPointWriteRepository();
+    repository = new StubExchangePointRepository(stubPointWriteRepo);
     cashExchangeRepository = new StubCashExchangeRepository();
     userRepository = new StubUserRepository();
 
@@ -61,6 +65,10 @@ describe('ExchangePointService', () => {
         {
           provide: FcmService,
           useValue: stubFcmService,
+        },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(stubPointWriteRepo),
         },
       ],
     }).compile();
