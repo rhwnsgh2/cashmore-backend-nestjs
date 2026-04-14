@@ -4,6 +4,9 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { CoupangService } from './coupang.service';
 import { COUPANG_VISIT_REPOSITORY } from './interfaces/coupang-visit-repository.interface';
 import { StubCoupangVisitRepository } from './repositories/stub-coupang-visit.repository';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 // Redis mock
 const mockRedis = {
@@ -24,10 +27,12 @@ global.fetch = mockFetch;
 describe('CoupangService', () => {
   let service: CoupangService;
   let stubVisitRepo: StubCoupangVisitRepository;
+  let stubPointWriteRepo: StubPointWriteRepository;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    stubVisitRepo = new StubCoupangVisitRepository();
+    stubPointWriteRepo = new StubPointWriteRepository();
+    stubVisitRepo = new StubCoupangVisitRepository(stubPointWriteRepo);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +52,10 @@ describe('CoupangService', () => {
         {
           provide: COUPANG_VISIT_REPOSITORY,
           useValue: stubVisitRepo,
+        },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(stubPointWriteRepo),
         },
       ],
     }).compile();

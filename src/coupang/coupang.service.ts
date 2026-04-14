@@ -5,6 +5,8 @@ import { generateHmac } from './utils/hmac-generator';
 import type { GoldBoxProductDto } from './dto/goldbox-product.dto';
 import type { ICoupangVisitRepository } from './interfaces/coupang-visit-repository.interface';
 import { COUPANG_VISIT_REPOSITORY } from './interfaces/coupang-visit-repository.interface';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 const COUPANG_DOMAIN = 'https://api-gateway.coupang.com';
 const GOLDBOX_PATH =
@@ -47,6 +49,8 @@ export class CoupangService {
     private configService: ConfigService,
     @Inject(COUPANG_VISIT_REPOSITORY)
     private visitRepository: ICoupangVisitRepository,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {
     this.redis = Redis.fromEnv();
     this.accessKey = this.configService.get<string>('coupang.accessKey') ?? '';
@@ -99,7 +103,12 @@ export class CoupangService {
       return { success: false, message: 'Already received' };
     }
 
-    await this.visitRepository.createVisit(userId, 10);
+    await this.pointWriteService.addPoint({
+      userId,
+      amount: 10,
+      type: 'COUPANG_VISIT',
+      additionalData: {},
+    });
 
     return { success: true };
   }

@@ -54,19 +54,4 @@ export class SupabaseCoupangVisitRepository implements ICoupangVisitRepository {
     };
   }
 
-  async createVisit(userId: string, pointAmount: number): Promise<void> {
-    const { error } = await this.supabase
-      .getClient()
-      .from('point_actions')
-      .insert({
-        user_id: userId,
-        type: 'COUPANG_VISIT',
-        additional_data: {},
-        point_amount: pointAmount,
-      });
-
-    if (error) {
-      throw error;
-    }
-  }
 }

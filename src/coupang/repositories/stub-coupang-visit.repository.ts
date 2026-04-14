@@ -5,45 +5,38 @@ import type {
   ICoupangVisitRepository,
   CoupangVisitRecord,
 } from '../interfaces/coupang-visit-repository.interface';
+import type { StubPointWriteRepository } from '../../point-write/repositories/stub-point-write.repository';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export class StubCoupangVisitRepository implements ICoupangVisitRepository {
-  private visits: CoupangVisitRecord[] = [];
-  private nextId = 1;
-
-  setVisits(visits: CoupangVisitRecord[]): void {
-    this.visits = [...visits];
-  }
-
-  clear(): void {
-    this.visits = [];
-    this.nextId = 1;
-  }
+  constructor(private pointWriteRepository: StubPointWriteRepository) {}
 
   async findTodayVisit(userId: string): Promise<CoupangVisitRecord | null> {
     const todayStart = dayjs().tz('Asia/Seoul').startOf('day');
     const todayEnd = dayjs().tz('Asia/Seoul').endOf('day');
+    const now = dayjs();
 
-    const visit = this.visits.find((v) => {
-      const createdAt = dayjs(v.createdAt);
-      return (
-        v.userId === userId &&
-        createdAt.isAfter(todayStart) &&
-        createdAt.isBefore(todayEnd)
+    const action = this.pointWriteRepository
+      .getInsertedActions()
+      .find(
+        (a) =>
+          a.userId === userId &&
+          a.type === 'COUPANG_VISIT' &&
+          now.isAfter(todayStart) &&
+          now.isBefore(todayEnd),
       );
-    });
 
-    return visit ?? null;
-  }
+    if (!action) {
+      return null;
+    }
 
-  async createVisit(userId: string, pointAmount: number): Promise<void> {
-    this.visits.push({
-      id: this.nextId++,
-      userId,
-      pointAmount,
-      createdAt: new Date().toISOString(),
-    });
+    return {
+      id: action.id,
+      userId: action.userId,
+      pointAmount: action.amount,
+      createdAt: now.toISOString(),
+    };
   }
 }
