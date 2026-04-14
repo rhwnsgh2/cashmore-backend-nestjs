@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
@@ -10,7 +10,6 @@ import {
 } from './utils/calculate-point.util';
 import type { IPointWriteService } from '../point-write/point-write.interface';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
-import { SlackService } from '../slack/slack.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -26,23 +25,17 @@ export interface PointTotalResult {
 
 @Injectable()
 export class PointService {
-  private readonly logger = new Logger(PointService.name);
-
   constructor(
     @Inject(POINT_REPOSITORY)
     private pointRepository: IPointRepository,
     @Inject(POINT_WRITE_SERVICE)
     private pointWriteService: IPointWriteService,
-    @Optional() private slackService?: SlackService,
   ) {}
 
   async getPointTotal(userId: string): Promise<PointTotalResult> {
     const now = dayjs().tz('Asia/Seoul');
 
     const totalPoint = await this.calculateTotalPoint(userId);
-
-    // 병행 운영 검증: user_point_balance와 비교해 drift 감지 (비차단)
-    void this.verifyBalance(userId, totalPoint);
     const expiringPoints = calculateExpiringPoints();
     const expiringDate = now.endOf('month').format('YYYY-MM-DD');
 
@@ -111,41 +104,6 @@ export class PointService {
 
     const pointActions = await this.pointRepository.findAllPointActions(userId);
     return calculatePointAmount(pointActions);
-  }
-
-  /**
-   * user_point_balance 테이블 값과 SUM 기반 계산을 비교해 drift를 감지한다.
-   * 병행 운영 단계의 best-effort 검사. 검증 실패나 row 없음(첫 write 전 등)은 조용히 무시.
-   */
-  private async verifyBalance(
-    userId: string,
-    expectedTotal: number,
-  ): Promise<void> {
-    try {
-      const balance = await this.pointRepository.findBalance(userId);
-      if (!balance) return;
-
-      if (balance.totalPoint !== expectedTotal) {
-        const diff = balance.totalPoint - expectedTotal;
-        this.logger.error(
-          `[BALANCE_DRIFT] userId=${userId} expected=${expectedTotal} balance=${balance.totalPoint} diff=${diff}`,
-        );
-        void this.slackService?.reportBugToSlack(
-          `⚠️ user_point_balance drift 감지\n` +
-            `- userId: ${userId}\n` +
-            `- expected (SUM 기반): ${expectedTotal}\n` +
-            `- balance: ${balance.totalPoint}\n` +
-            `- diff: ${diff}\n` +
-            `- last_point_action_id: ${balance.lastPointActionId}`,
-        );
-      }
-    } catch (error) {
-      this.logger.warn(
-        `[BALANCE_VERIFY] 검증 실패 userId=${userId} error=${
-          error instanceof Error ? error.message : 'Unknown'
-        }`,
-      );
-    }
   }
 
   async deductPoint(

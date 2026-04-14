@@ -9,29 +9,16 @@ import { StubPointRepository } from './repositories/stub-point.repository';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 import { PointWriteService } from '../point-write/point-write.service';
 import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
-import { SlackService } from '../slack/slack.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-class StubSlackService {
-  reports: string[] = [];
-  reportBugToSlack(content: string): Promise<void> {
-    this.reports.push(content);
-    return Promise.resolve();
-  }
-}
-
-const flush = () => new Promise((resolve) => setImmediate(resolve));
-
 describe('PointService', () => {
   let service: PointService;
   let repository: StubPointRepository;
-  let slackService: StubSlackService;
 
   beforeEach(async () => {
     repository = new StubPointRepository();
-    slackService = new StubSlackService();
     const stubPointWriteRepo = new StubPointWriteRepository();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -44,10 +31,6 @@ describe('PointService', () => {
         {
           provide: POINT_WRITE_SERVICE,
           useFactory: () => new PointWriteService(stubPointWriteRepo),
-        },
-        {
-          provide: SlackService,
-          useValue: slackService,
         },
       ],
     }).compile();
@@ -193,141 +176,6 @@ describe('PointService', () => {
       const result = await service.getPointTotal(userId);
 
       expect(result.lastWeekPoint).toBe(400);
-    });
-  });
-
-  describe('getPointTotal - balance 병행 검증', () => {
-    const userId = 'verify-user';
-
-    beforeEach(() => {
-      repository.clear();
-    });
-
-    it('balance row가 없으면 Slack 알림을 보내지 않는다 (정상)', async () => {
-      repository.setPointActions(userId, [
-        {
-          id: 1,
-          type: 'EVERY_RECEIPT',
-          created_at: '2024-01-01T00:00:00Z',
-          point_amount: 100,
-          status: 'done',
-        },
-      ]);
-
-      await service.getPointTotal(userId);
-      await flush();
-
-      expect(slackService.reports).toHaveLength(0);
-    });
-
-    it('balance가 SUM과 일치하면 Slack 알림을 보내지 않는다', async () => {
-      repository.setPointActions(userId, [
-        {
-          id: 1,
-          type: 'EVERY_RECEIPT',
-          created_at: '2024-01-01T00:00:00Z',
-          point_amount: 100,
-          status: 'done',
-        },
-        {
-          id: 2,
-          type: 'ATTENDANCE',
-          created_at: '2024-01-02T00:00:00Z',
-          point_amount: 50,
-          status: 'done',
-        },
-      ]);
-      repository.setBalance(userId, { totalPoint: 150, lastPointActionId: 2 });
-
-      await service.getPointTotal(userId);
-      await flush();
-
-      expect(slackService.reports).toHaveLength(0);
-    });
-
-    it('balance가 SUM보다 크면 drift 알림을 보낸다', async () => {
-      repository.setPointActions(userId, [
-        {
-          id: 1,
-          type: 'EVERY_RECEIPT',
-          created_at: '2024-01-01T00:00:00Z',
-          point_amount: 100,
-          status: 'done',
-        },
-      ]);
-      repository.setBalance(userId, {
-        totalPoint: 200, // 100 over
-        lastPointActionId: 1,
-      });
-
-      await service.getPointTotal(userId);
-      await flush();
-
-      expect(slackService.reports).toHaveLength(1);
-      const msg = slackService.reports[0];
-      expect(msg).toContain('drift 감지');
-      expect(msg).toContain(userId);
-      expect(msg).toContain('expected (SUM 기반): 100');
-      expect(msg).toContain('balance: 200');
-      expect(msg).toContain('diff: 100');
-    });
-
-    it('balance가 SUM보다 작으면 drift 알림을 보낸다', async () => {
-      repository.setPointActions(userId, [
-        {
-          id: 1,
-          type: 'EVERY_RECEIPT',
-          created_at: '2024-01-01T00:00:00Z',
-          point_amount: 100,
-          status: 'done',
-        },
-      ]);
-      repository.setBalance(userId, { totalPoint: 50, lastPointActionId: 1 });
-
-      await service.getPointTotal(userId);
-      await flush();
-
-      expect(slackService.reports).toHaveLength(1);
-      expect(slackService.reports[0]).toContain('diff: -50');
-    });
-
-    it('balance 검증이 응답을 차단하지 않는다 (Slack 호출과 무관하게 정상 반환)', async () => {
-      repository.setPointActions(userId, [
-        {
-          id: 1,
-          type: 'EVERY_RECEIPT',
-          created_at: '2024-01-01T00:00:00Z',
-          point_amount: 100,
-          status: 'done',
-        },
-      ]);
-      repository.setBalance(userId, { totalPoint: 999, lastPointActionId: 1 });
-
-      const result = await service.getPointTotal(userId);
-
-      // 검증 fire-and-forget — totalPoint는 SUM 기반 100을 반환
-      expect(result.totalPoint).toBe(100);
-    });
-
-    it('findBalance 자체가 throw해도 응답에 영향 없다', async () => {
-      repository.setPointActions(userId, [
-        {
-          id: 1,
-          type: 'EVERY_RECEIPT',
-          created_at: '2024-01-01T00:00:00Z',
-          point_amount: 100,
-          status: 'done',
-        },
-      ]);
-      repository.findBalance = () =>
-        Promise.reject(new Error('balance read failed'));
-
-      const result = await service.getPointTotal(userId);
-      await flush();
-
-      expect(result.totalPoint).toBe(100);
-      // 검증 자체 실패는 Slack에도 안 보냄
-      expect(slackService.reports).toHaveLength(0);
     });
   });
 });
