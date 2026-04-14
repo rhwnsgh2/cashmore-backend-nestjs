@@ -15,6 +15,8 @@ import type {
 } from './interfaces/lottery-repository.interface';
 import { LOTTERY_REPOSITORY } from './interfaces/lottery-repository.interface';
 import { FcmService } from '../fcm/fcm.service';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -59,6 +61,8 @@ export class LotteryService {
     @Inject(LOTTERY_REPOSITORY)
     private lotteryRepository: ILotteryRepository,
     private fcmService: FcmService,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {}
 
   private static readonly MAX_500_REWARDS = [
@@ -192,15 +196,14 @@ export class LotteryService {
       usedAt,
     );
 
-    await this.lotteryRepository.insertPointAction({
-      user_id: userId,
+    await this.pointWriteService.addPoint({
+      userId,
+      amount: lottery.reward_amount,
       type: 'LOTTERY',
-      point_amount: lottery.reward_amount,
-      additional_data: {
+      additionalData: {
         description: `복권 당첨금 ${lottery.reward_amount}원`,
         reference_id: lottery.id,
       },
-      status: 'done',
     });
 
     // ad_lottery_slots에 광고 시청 기록
@@ -267,15 +270,14 @@ export class LotteryService {
 
     await this.lotteryRepository.updateLotteryStatus(lotteryId, 'USED', usedAt);
 
-    await this.lotteryRepository.insertPointAction({
-      user_id: userId,
+    await this.pointWriteService.addPoint({
+      userId,
+      amount: lottery.reward_amount,
       type: 'LOTTERY',
-      point_amount: lottery.reward_amount,
-      additional_data: {
+      additionalData: {
         description: `복권 당첨금 ${lottery.reward_amount}원`,
         reference_id: lotteryId,
       },
-      status: 'done',
     });
 
     // 클라이언트에게 복권 업데이트 알림

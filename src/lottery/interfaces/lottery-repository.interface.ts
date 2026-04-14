@@ -23,14 +23,6 @@ export interface InsertLotteryData {
   reason?: string | null;
 }
 
-export interface InsertPointActionData {
-  user_id: string;
-  type: string;
-  point_amount: number;
-  additional_data: Record<string, unknown>;
-  status: string;
-}
-
 export type SlotTime = '09:00' | '13:00' | '18:00' | '22:00';
 
 export interface InsertAdLotterySlotData {
@@ -58,7 +50,6 @@ export interface ILotteryRepository {
     status: LotteryStatus,
     usedAt: string,
   ): Promise<void>;
-  insertPointAction(data: InsertPointActionData): Promise<void>;
   insertAdLotterySlot(data: InsertAdLotterySlotData): Promise<void>;
   findMaxRewardLotteries(limit: number): Promise<MaxRewardLottery[]>;
   countByUserIdAndReasonToday(

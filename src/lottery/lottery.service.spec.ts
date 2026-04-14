@@ -5,6 +5,9 @@ import { LotteryService } from './lottery.service';
 import { LOTTERY_REPOSITORY } from './interfaces/lottery-repository.interface';
 import { StubLotteryRepository } from './repositories/stub-lottery.repository';
 import { FcmService } from '../fcm/fcm.service';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 const mockFcmService = {
   sendRefreshMessage: async () => {},
@@ -16,6 +19,7 @@ describe('LotteryService', () => {
 
   beforeEach(async () => {
     repository = new StubLotteryRepository();
+    const stubPointWriteRepo = new StubPointWriteRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,6 +31,10 @@ describe('LotteryService', () => {
         {
           provide: FcmService,
           useValue: mockFcmService,
+        },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(stubPointWriteRepo),
         },
       ],
     }).compile();

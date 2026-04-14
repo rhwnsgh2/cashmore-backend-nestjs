@@ -3,7 +3,6 @@ import { randomUUID } from 'crypto';
 import type {
   ILotteryRepository,
   InsertLotteryData,
-  InsertPointActionData,
   InsertAdLotterySlotData,
   Lottery,
   LotteryStatus,
@@ -103,10 +102,6 @@ export class StubLotteryRepository implements ILotteryRepository {
         break;
       }
     }
-    return Promise.resolve();
-  }
-
-  insertPointAction(_data: InsertPointActionData): Promise<void> {
     return Promise.resolve();
   }
 

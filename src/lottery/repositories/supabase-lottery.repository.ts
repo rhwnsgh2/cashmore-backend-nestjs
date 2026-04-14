@@ -4,7 +4,6 @@ import { SupabaseService } from '../../supabase/supabase.service';
 import type {
   ILotteryRepository,
   InsertLotteryData,
-  InsertPointActionData,
   InsertAdLotterySlotData,
   Lottery,
   LotteryStatus,
@@ -83,17 +82,6 @@ export class SupabaseLotteryRepository implements ILotteryRepository {
       .from('lotteries')
       .update({ status, used_at: usedAt })
       .eq('id', lotteryId);
-
-    if (error) {
-      throw error;
-    }
-  }
-
-  async insertPointAction(data: InsertPointActionData): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .insert({ ...data, additional_data: data.additional_data as Json });
 
     if (error) {
       throw error;
