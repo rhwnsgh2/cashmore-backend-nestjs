@@ -261,27 +261,6 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     return data.id === receiptId;
   }
 
-  async createPointAction(
-    userId: string,
-    receiptId: number,
-    point: number,
-  ): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .insert({
-        user_id: userId,
-        type: 'EVERY_RECEIPT',
-        point_amount: point,
-        status: 'done',
-        additional_data: { every_receipt_id: receiptId },
-      });
-
-    if (error) {
-      throw error;
-    }
-  }
-
   async findEveryReceiptForReReview(
     receiptId: number,
     userId: string,
@@ -315,36 +294,6 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
       .single();
 
     return !!data;
-  }
-
-  async insertPointReversal(params: InsertPointReversalParams): Promise<void> {
-    const additionalData: Record<string, unknown> = {
-      every_receipt_id: params.everyReceiptId,
-      reason: params.reason,
-    };
-
-    if (params.everyReceiptReReviewId !== undefined) {
-      additionalData.every_receipt_re_review_id = params.everyReceiptReReviewId;
-    }
-    if (params.beforePoint !== undefined) {
-      additionalData.before_point = params.beforePoint;
-    }
-    if (params.afterPoint !== undefined) {
-      additionalData.after_point = params.afterPoint;
-    }
-
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .insert({
-        user_id: params.userId,
-        type: 'EVERY_RECEIPT',
-        point_amount: params.pointAmount,
-        status: 'done',
-        additional_data: additionalData as unknown as Json,
-      });
-
-    if (error) throw error;
   }
 
   async findReceiptForAdmin(

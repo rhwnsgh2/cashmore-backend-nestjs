@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EveryReceiptService } from './every-receipt.service';
 import { EVERY_RECEIPT_REPOSITORY } from './interfaces/every-receipt-repository.interface';
-import type { ScoreData } from './interfaces/every-receipt-repository.interface';
+import type {
+  ScoreData,
+  InsertPointReversalParams,
+  PointReversalReason,
+} from './interfaces/every-receipt-repository.interface';
 import { StubEveryReceiptRepository } from './repositories/stub-every-receipt.repository';
 import type { ReceiptQueueMessage } from './receipt-queue.service';
 import { ReceiptQueueService } from './receipt-queue.service';
@@ -13,6 +17,9 @@ import { FcmService } from '../fcm/fcm.service';
 import { UserModalService } from '../user-modal/user-modal.service';
 import type { UserModalType } from '../user-modal/interfaces/user-modal-repository.interface';
 import { SlackService } from '../slack/slack.service';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointWriteService } from '../point-write/point-write.service';
+import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
 
 interface TrackedEvent {
   eventType: string;
@@ -199,6 +206,7 @@ describe('EveryReceiptService', () => {
   let fcmService: StubFcmService;
   let userModalService: StubUserModalService;
   let slackService: StubSlackService;
+  let pointWriteRepository: StubPointWriteRepository;
 
   const userId = 'test-user-id';
 
@@ -211,6 +219,7 @@ describe('EveryReceiptService', () => {
     fcmService = new StubFcmService();
     userModalService = new StubUserModalService();
     slackService = new StubSlackService();
+    pointWriteRepository = new StubPointWriteRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -223,11 +232,43 @@ describe('EveryReceiptService', () => {
         { provide: FcmService, useValue: fcmService },
         { provide: UserModalService, useValue: userModalService },
         { provide: SlackService, useValue: slackService },
+        {
+          provide: POINT_WRITE_SERVICE,
+          useFactory: () => new PointWriteService(pointWriteRepository),
+        },
       ],
     }).compile();
 
     service = module.get<EveryReceiptService>(EveryReceiptService);
   });
+
+  const getInsertedReversals = (): InsertPointReversalParams[] =>
+    pointWriteRepository
+      .getInsertedActions()
+      .filter(
+        (a) =>
+          a.type === 'EVERY_RECEIPT' &&
+          typeof a.additionalData.reason === 'string',
+      )
+      .map((a) => {
+        const result: InsertPointReversalParams = {
+          userId: a.userId,
+          pointAmount: a.amount,
+          everyReceiptId: a.additionalData.every_receipt_id as number,
+          reason: a.additionalData.reason as PointReversalReason,
+        };
+        if (a.additionalData.every_receipt_re_review_id !== undefined) {
+          result.everyReceiptReReviewId = a.additionalData
+            .every_receipt_re_review_id as number;
+        }
+        if (a.additionalData.before_point !== undefined) {
+          result.beforePoint = a.additionalData.before_point as number;
+        }
+        if (a.additionalData.after_point !== undefined) {
+          result.afterPoint = a.additionalData.after_point as number;
+        }
+        return result;
+      });
 
   afterEach(() => {
     repository.clear();
@@ -238,6 +279,7 @@ describe('EveryReceiptService', () => {
     fcmService.clear();
     userModalService.clear();
     slackService.clear();
+    pointWriteRepository.clear();
   });
 
   describe('getEveryReceipts', () => {
@@ -474,7 +516,7 @@ describe('EveryReceiptService', () => {
 
       expect(result.success).toBe(true);
       expect(result.reReview).toBeDefined();
-      expect(repository.getInsertedPointReversals()).toHaveLength(1);
+      expect(getInsertedReversals()).toHaveLength(1);
       expect(repository.getReReviewStatusUpdates()).toEqual([1]);
     });
 
@@ -524,7 +566,7 @@ describe('EveryReceiptService', () => {
       });
 
       // 반대 부호 reversal 행이 INSERT 되어야 함
-      const reversals = repository.getInsertedPointReversals();
+      const reversals = getInsertedReversals();
       expect(reversals).toHaveLength(1);
       expect(reversals[0]).toEqual({
         userId,
@@ -544,7 +586,7 @@ describe('EveryReceiptService', () => {
 
       await service.requestReReview(userId, 1, ['store_name'], '');
 
-      const reversals = repository.getInsertedPointReversals();
+      const reversals = getInsertedReversals();
       expect(reversals).toHaveLength(1);
       expect(reversals[0].pointAmount).toBe(0);
       expect(reversals[0].reason).toBe('user_review');
@@ -903,12 +945,14 @@ describe('EveryReceiptService', () => {
 
       await service.completeReceipt(receiptId);
 
-      const pointActions = repository.getPointActions();
+      const pointActions = pointWriteRepository.getInsertedActions();
       expect(pointActions).toHaveLength(1);
-      expect(pointActions[0]).toEqual({
+      expect(pointActions[0]).toMatchObject({
         userId,
-        receiptId,
-        point: 25,
+        amount: 25,
+        type: 'EVERY_RECEIPT',
+        status: 'done',
+        additionalData: { every_receipt_id: receiptId },
       });
     });
 
@@ -944,7 +988,7 @@ describe('EveryReceiptService', () => {
 
       await service.completeReceipt(receiptId);
 
-      const pointActions = repository.getPointActions();
+      const pointActions = pointWriteRepository.getInsertedActions();
       expect(pointActions).toHaveLength(0);
     });
 
@@ -1079,9 +1123,9 @@ describe('EveryReceiptService', () => {
 
       await service.completeReceipt(receiptId);
 
-      const pointActions = repository.getPointActions();
+      const pointActions = pointWriteRepository.getInsertedActions();
       expect(pointActions).toHaveLength(1);
-      expect(pointActions[0].point).toBe(50);
+      expect(pointActions[0].amount).toBe(50);
     });
 
     it('완료 후 FCM 푸시 알림을 전송한다', async () => {
@@ -1246,7 +1290,7 @@ describe('EveryReceiptService', () => {
       expect(result.success).toBe(true);
       expect(result.message).toBe('영수증이 삭제되었습니다.');
 
-      const reversals = repository.getInsertedPointReversals();
+      const reversals = getInsertedReversals();
       expect(reversals).toHaveLength(1);
       expect(reversals[0]).toEqual({
         userId,
@@ -1270,7 +1314,7 @@ describe('EveryReceiptService', () => {
 
       await service.adminDeleteReceipt(2);
 
-      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+      expect(getInsertedReversals()).toHaveLength(0);
       expect(repository.getDeletedReceiptIds()).toEqual([2]);
     });
 
@@ -1284,7 +1328,7 @@ describe('EveryReceiptService', () => {
 
       await service.adminDeleteReceipt(3);
 
-      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+      expect(getInsertedReversals()).toHaveLength(0);
       expect(repository.getDeletedReceiptIds()).toEqual([3]);
     });
 
@@ -1298,7 +1342,7 @@ describe('EveryReceiptService', () => {
 
       await service.adminDeleteReceipt(4);
 
-      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+      expect(getInsertedReversals()).toHaveLength(0);
       expect(repository.getDeletedReceiptIds()).toEqual([4]);
     });
   });
@@ -1324,7 +1368,7 @@ describe('EveryReceiptService', () => {
         { receiptId: 10, newPoint: 8 },
       ]);
 
-      const reversals = repository.getInsertedPointReversals();
+      const reversals = getInsertedReversals();
       expect(reversals).toHaveLength(1);
       expect(reversals[0]).toEqual({
         userId,
@@ -1346,7 +1390,7 @@ describe('EveryReceiptService', () => {
 
       await service.adminUpdatePoint(11, 4);
 
-      const reversals = repository.getInsertedPointReversals();
+      const reversals = getInsertedReversals();
       expect(reversals).toHaveLength(1);
       expect(reversals[0].pointAmount).toBe(-6);
       expect(reversals[0].beforePoint).toBe(10);
@@ -1366,7 +1410,7 @@ describe('EveryReceiptService', () => {
       expect(repository.getReceiptPointUpdates()).toEqual([
         { receiptId: 12, newPoint: 15 },
       ]);
-      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+      expect(getInsertedReversals()).toHaveLength(0);
     });
 
     it('completed가 아닌 상태에선 point만 업데이트하고 reversal은 생략한다', async () => {
@@ -1382,7 +1426,7 @@ describe('EveryReceiptService', () => {
       expect(repository.getReceiptPointUpdates()).toEqual([
         { receiptId: 13, newPoint: 25 },
       ]);
-      expect(repository.getInsertedPointReversals()).toHaveLength(0);
+      expect(getInsertedReversals()).toHaveLength(0);
     });
   });
 
@@ -1462,7 +1506,7 @@ describe('EveryReceiptService', () => {
         expect(repository.getReReviewRejected()).toEqual([100]);
         expect(repository.getReceiptStatusCompletedUpdates()).toEqual([30]);
 
-        const reversals = repository.getInsertedPointReversals();
+        const reversals = getInsertedReversals();
         expect(reversals).toHaveLength(1);
         expect(reversals[0]).toEqual({
           userId,
@@ -1522,7 +1566,7 @@ describe('EveryReceiptService', () => {
           afterTotalScore: 50,
         });
 
-        expect(repository.getInsertedPointReversals()).toHaveLength(0);
+        expect(getInsertedReversals()).toHaveLength(0);
         expect(repository.getReReviewRejected()).toEqual([102]);
       });
     });
@@ -1563,7 +1607,7 @@ describe('EveryReceiptService', () => {
           afterPoint: 25,
         });
 
-        const reversals = repository.getInsertedPointReversals();
+        const reversals = getInsertedReversals();
         expect(reversals).toHaveLength(1);
         expect(reversals[0]).toEqual({
           userId,

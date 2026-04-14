@@ -25,6 +25,8 @@ import { OnboardingService } from '../onboarding/onboarding.service';
 import { FcmService } from '../fcm/fcm.service';
 import { UserModalService } from '../user-modal/user-modal.service';
 import { SlackService } from '../slack/slack.service';
+import type { IPointWriteService } from '../point-write/point-write.interface';
+import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 
 // 포인트 → 등급 계산 (cash-more-web의 getGradeFromPoint 이관)
 function getGradeFromPoint(point: number): string {
@@ -53,6 +55,8 @@ export class EveryReceiptService {
     private fcmService: FcmService,
     private userModalService: UserModalService,
     private slackService: SlackService,
+    @Inject(POINT_WRITE_SERVICE)
+    private pointWriteService: IPointWriteService,
   ) {}
 
   async getEveryReceipts(userId: string): Promise<EveryReceipt[]> {
@@ -93,12 +97,15 @@ export class EveryReceiptService {
     // 원본 EVERY_RECEIPT 행은 그대로 두고, 반대 부호 행을 추가한다.
     // 0점 영수증인 경우 -0이 아닌 0으로 기록한다.
     const reversalAmount = everyReceipt.point === 0 ? 0 : -everyReceipt.point;
-    await this.everyReceiptRepository.insertPointReversal({
+    await this.pointWriteService.addPoint({
       userId,
-      pointAmount: reversalAmount,
-      everyReceiptId: receiptId,
-      everyReceiptReReviewId: reReview.id,
-      reason: 'user_review',
+      amount: reversalAmount,
+      type: 'EVERY_RECEIPT',
+      additionalData: {
+        every_receipt_id: receiptId,
+        every_receipt_re_review_id: reReview.id,
+        reason: 'user_review',
+      },
     });
 
     // 영수증 상태 업데이트
@@ -248,11 +255,12 @@ export class EveryReceiptService {
 
     // 3. 정상 완료 처리
     await this.everyReceiptRepository.updateToCompleted(everyReceiptId);
-    await this.everyReceiptRepository.createPointAction(
-      receipt.userId,
-      everyReceiptId,
-      finalPoint,
-    );
+    await this.pointWriteService.addPoint({
+      userId: receipt.userId,
+      amount: finalPoint,
+      type: 'EVERY_RECEIPT',
+      additionalData: { every_receipt_id: everyReceiptId },
+    });
 
     // 4. 알림
     await this.fcmService.pushNotification(
@@ -317,13 +325,16 @@ export class EveryReceiptService {
 
     // completed 상태에서만 원장에 기여분이 있으므로 reversal 행 추가
     if (receipt.status === 'completed' && receipt.point > 0) {
-      await this.everyReceiptRepository.insertPointReversal({
+      await this.pointWriteService.addPoint({
         userId: receipt.user_id,
-        pointAmount: -receipt.point,
-        everyReceiptId: receipt.id,
-        reason: 'admin_delete',
-        beforePoint: receipt.point,
-        afterPoint: 0,
+        amount: -receipt.point,
+        type: 'EVERY_RECEIPT',
+        additionalData: {
+          every_receipt_id: receipt.id,
+          reason: 'admin_delete',
+          before_point: receipt.point,
+          after_point: 0,
+        },
       });
     }
 
@@ -351,13 +362,16 @@ export class EveryReceiptService {
     if (receipt.status === 'completed') {
       const delta = newPoint - oldPoint;
       if (delta !== 0) {
-        await this.everyReceiptRepository.insertPointReversal({
+        await this.pointWriteService.addPoint({
           userId: receipt.user_id,
-          pointAmount: delta,
-          everyReceiptId: receipt.id,
-          reason: 'admin_adjust',
-          beforePoint: oldPoint,
-          afterPoint: newPoint,
+          amount: delta,
+          type: 'EVERY_RECEIPT',
+          additionalData: {
+            every_receipt_id: receipt.id,
+            reason: 'admin_adjust',
+            before_point: oldPoint,
+            after_point: newPoint,
+          },
         });
       }
     }
@@ -403,12 +417,15 @@ export class EveryReceiptService {
         );
 
         if (beforePoint > 0) {
-          await this.everyReceiptRepository.insertPointReversal({
+          await this.pointWriteService.addPoint({
             userId: receipt.user_id,
-            pointAmount: beforePoint,
-            everyReceiptId,
-            everyReceiptReReviewId: reReview.id,
-            reason: 're_review_rejected',
+            amount: beforePoint,
+            type: 'EVERY_RECEIPT',
+            additionalData: {
+              every_receipt_id: everyReceiptId,
+              every_receipt_re_review_id: reReview.id,
+              reason: 're_review_rejected',
+            },
           });
         }
 
@@ -450,12 +467,15 @@ export class EveryReceiptService {
         afterPoint,
       );
 
-      await this.everyReceiptRepository.insertPointReversal({
+      await this.pointWriteService.addPoint({
         userId: receipt.user_id,
-        pointAmount: afterPoint,
-        everyReceiptId,
-        everyReceiptReReviewId: reReview.id,
-        reason: 're_review_approved',
+        amount: afterPoint,
+        type: 'EVERY_RECEIPT',
+        additionalData: {
+          every_receipt_id: everyReceiptId,
+          every_receipt_re_review_id: reReview.id,
+          reason: 're_review_approved',
+        },
       });
 
       const afterGrade = getGradeFromPoint(afterPoint);

@@ -111,11 +111,6 @@ export interface IEveryReceiptRepository {
   updateToCompleted(receiptId: number): Promise<void>;
   updateToRejected(receiptId: number, reason: string): Promise<void>;
   updatePoint(receiptId: number, point: number): Promise<void>;
-  createPointAction(
-    userId: string,
-    receiptId: number,
-    point: number,
-  ): Promise<void>;
   isFirstReceipt(userId: string, receiptId: number): Promise<boolean>;
   findReReviewsSince(userId: string, since: string): Promise<ReReviewRecord[]>;
 
@@ -129,8 +124,6 @@ export interface IEveryReceiptRepository {
   } | null>;
 
   hasExistingReReview(receiptId: number): Promise<boolean>;
-
-  insertPointReversal(params: InsertPointReversalParams): Promise<void>;
 
   createReReview(params: {
     everyReceiptId: number;
