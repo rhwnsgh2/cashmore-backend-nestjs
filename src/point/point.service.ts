@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
@@ -10,6 +10,7 @@ import {
 } from './utils/calculate-point.util';
 import type { IPointWriteService } from '../point-write/point-write.interface';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { SlackService } from '../slack/slack.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -25,17 +26,24 @@ export interface PointTotalResult {
 
 @Injectable()
 export class PointService {
+  private readonly logger = new Logger(PointService.name);
+
   constructor(
     @Inject(POINT_REPOSITORY)
     private pointRepository: IPointRepository,
     @Inject(POINT_WRITE_SERVICE)
     private pointWriteService: IPointWriteService,
+    @Optional() private slackService?: SlackService,
   ) {}
 
   async getPointTotal(userId: string): Promise<PointTotalResult> {
     const now = dayjs().tz('Asia/Seoul');
 
     const totalPoint = await this.calculateTotalPoint(userId);
+
+    // 병행 운영 검증: balance와 SUM(up_to_last_id)을 원자적으로 비교
+    void this.verifyBalance(userId);
+
     const expiringPoints = calculateExpiringPoints();
     const expiringDate = now.endOf('month').format('YYYY-MM-DD');
 
@@ -104,6 +112,45 @@ export class PointService {
 
     const pointActions = await this.pointRepository.findAllPointActions(userId);
     return calculatePointAmount(pointActions);
+  }
+
+  /**
+   * user_point_balance와 SUM(point_amount WHERE id <= balance.last_id)을 비교해 drift 감지.
+   * 두 값을 같은 cutoff 기준으로 비교하므로 timing window 영향 없음
+   * (point_actions가 append-only이므로 id <= last_id인 행은 변하지 않음).
+   * 비차단 fire-and-forget. balance row가 없으면(첫 write 전) 무시.
+   */
+  private async verifyBalance(userId: string): Promise<void> {
+    try {
+      const balance = await this.pointRepository.findBalance(userId);
+      if (!balance) return;
+
+      const expectedSum = await this.pointRepository.findSumUpToId(
+        userId,
+        balance.lastPointActionId,
+      );
+
+      if (balance.totalPoint !== expectedSum) {
+        const diff = balance.totalPoint - expectedSum;
+        this.logger.error(
+          `[BALANCE_DRIFT] userId=${userId} balance=${balance.totalPoint} expected=${expectedSum} diff=${diff} last_id=${balance.lastPointActionId}`,
+        );
+        void this.slackService?.reportBugToSlack(
+          `⚠️ user_point_balance drift 감지\n` +
+            `- userId: ${userId}\n` +
+            `- balance: ${balance.totalPoint}\n` +
+            `- expected (SUM up to last_id): ${expectedSum}\n` +
+            `- diff: ${diff}\n` +
+            `- last_point_action_id: ${balance.lastPointActionId}`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `[BALANCE_VERIFY] 검증 실패 userId=${userId} error=${
+          error instanceof Error ? error.message : 'Unknown'
+        }`,
+      );
+    }
   }
 
   async deductPoint(

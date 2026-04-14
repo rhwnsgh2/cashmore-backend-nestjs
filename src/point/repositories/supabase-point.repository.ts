@@ -4,6 +4,7 @@ import {
   IPointRepository,
   PointAction,
   PointSnapshot,
+  PointBalance,
   EarnedPointAction,
   POINT_ADD_TYPES,
 } from '../interfaces/point-repository.interface';
@@ -104,5 +105,43 @@ export class SupabasePointRepository implements IPointRepository {
     }
 
     return (data || []) as EarnedPointAction[];
+  }
+
+  async findBalance(userId: string): Promise<PointBalance | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('user_point_balance')
+      .select('total_point, last_point_action_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    const row = data as { total_point: number; last_point_action_id: number };
+    return {
+      totalPoint: Number(row.total_point),
+      lastPointActionId: Number(row.last_point_action_id),
+    };
+  }
+
+  async findSumUpToId(userId: string, maxId: number): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('point_actions')
+      .select('point_amount')
+      .eq('user_id', userId)
+      .lte('id', maxId);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).reduce(
+      (sum: number, row: { point_amount: number }) =>
+        sum + (row.point_amount ?? 0),
+      0,
+    );
   }
 }
