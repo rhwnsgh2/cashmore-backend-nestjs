@@ -144,9 +144,7 @@ export class StubInvitationRepository implements IInvitationRepository {
   findStepRewards(userId: string): Promise<StepRewardAction[]> {
     const rewards = this.pointWriteRepository
       .getInsertedActions()
-      .filter(
-        (a) => a.type === 'INVITE_STEP_REWARD' && a.userId === userId,
-      )
+      .filter((a) => a.type === 'INVITE_STEP_REWARD' && a.userId === userId)
       .map((a) => ({ stepCount: a.additionalData.step_count as number }))
       .filter((r) => typeof r.stepCount === 'number');
     return Promise.resolve(rewards);

@@ -336,9 +336,7 @@ describe('InvitationService', () => {
           p.userId === invitedUserId && p.type === 'INVITED_USER_REWARD_RANDOM',
       );
       expect(invitedReward).toBeDefined();
-      expect([300, 500, 1000, 3000, 50000]).toContain(
-        invitedReward!.amount,
-      );
+      expect([300, 500, 1000, 3000, 50000]).toContain(invitedReward!.amount);
     });
 
     it('피초대자의 디바이스에 invitation_reward 이벤트를 기록한다', async () => {

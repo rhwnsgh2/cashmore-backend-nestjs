@@ -273,7 +273,10 @@ export class InvitationService {
         userId: invitation.senderId,
         amount: RECEIPT_BONUS_POINT,
         type: 'INVITATION_RECEIPT',
-        additionalData: { invited_user_id: invitedUserId, receipt_id: receiptId },
+        additionalData: {
+          invited_user_id: invitedUserId,
+          receipt_id: receiptId,
+        },
       });
     }
 

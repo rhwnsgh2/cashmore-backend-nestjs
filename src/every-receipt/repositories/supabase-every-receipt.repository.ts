@@ -5,7 +5,6 @@ import type {
   InsertedEveryReceipt,
   PendingEveryReceipt,
   CreatedReReview,
-  InsertPointReversalParams,
   AdminEveryReceiptRow,
   AdminReReviewRow,
 } from '../interfaces/every-receipt-repository.interface';

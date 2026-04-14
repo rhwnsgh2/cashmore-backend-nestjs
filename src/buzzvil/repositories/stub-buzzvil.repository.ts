@@ -26,8 +26,7 @@ export class StubBuzzvilRepository implements IBuzzvilRepository {
     campaignId: number,
   ): Promise<BuzzvilReward | null> {
     const found = this.buzzvilActions().find(
-      (a) =>
-        a.userId === userId && a.additionalData.campaign_id === campaignId,
+      (a) => a.userId === userId && a.additionalData.campaign_id === campaignId,
     );
     if (!found) return Promise.resolve(null);
     return Promise.resolve({

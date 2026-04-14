@@ -22,9 +22,7 @@ export class StubExchangePointRepository implements IExchangePointRepository {
     const seeded = this.seededExchanges.get(userId) ?? [];
     const written = this.pointWriteRepository
       .getInsertedActions()
-      .filter(
-        (a) => a.type === 'EXCHANGE_POINT_TO_CASH' && a.userId === userId,
-      )
+      .filter((a) => a.type === 'EXCHANGE_POINT_TO_CASH' && a.userId === userId)
       .map<ExchangePoint>((a) => ({
         id: a.id,
         user_id: a.userId,

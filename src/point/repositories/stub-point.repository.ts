@@ -98,5 +98,4 @@ export class StubPointRepository implements IPointRepository {
       }));
     return Promise.resolve(filtered);
   }
-
 }

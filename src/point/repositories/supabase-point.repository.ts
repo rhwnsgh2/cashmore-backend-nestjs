@@ -105,5 +105,4 @@ export class SupabasePointRepository implements IPointRepository {
 
     return (data || []) as EarnedPointAction[];
   }
-
 }

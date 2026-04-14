@@ -53,5 +53,4 @@ export class SupabaseCoupangVisitRepository implements ICoupangVisitRepository {
       createdAt: row.created_at,
     };
   }
-
 }
