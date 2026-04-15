@@ -196,7 +196,8 @@ describe('PointService', () => {
     });
   });
 
-  describe('verifyBalance (병행 검증)', () => {
+  // user_point_balance 검증 일시 중단 (정합성 설계 재검토 중)
+  describe.skip('verifyBalance (병행 검증)', () => {
     const userId = 'verify-user';
 
     beforeEach(() => {

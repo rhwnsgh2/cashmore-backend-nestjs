@@ -152,7 +152,8 @@ describe('PointWriteService', () => {
     });
   });
 
-  describe('addPoint - balance 갱신', () => {
+  // user_point_balance 갱신 일시 중단 (정합성 설계 재검토 중)
+  describe.skip('addPoint - balance 갱신', () => {
     it('첫 적립 시 balance row가 생성된다', async () => {
       await service.addPoint({
         userId: 'user-1',

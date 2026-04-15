@@ -35,23 +35,23 @@ export class PointWriteService implements IPointWriteService {
       additionalData,
     );
 
-    // balance 갱신은 best-effort: 실패해도 point_action insert는 유지
-    try {
-      await this.repository.upsertBalance(userId, amount, result.id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `[BALANCE] upsertBalance 실패 userId=${userId} pointActionId=${result.id} delta=${amount} error=${message}`,
-      );
-      void this.slackService?.reportBugToSlack(
-        `⚠️ user_point_balance 갱신 실패\n` +
-          `- userId: ${userId}\n` +
-          `- pointActionId: ${result.id}\n` +
-          `- type: ${type}\n` +
-          `- delta: ${amount}\n` +
-          `- error: ${message}`,
-      );
-    }
+    // user_point_balance 갱신 일시 중단 (정합성 설계 재검토 중)
+    // try {
+    //   await this.repository.upsertBalance(userId, amount, result.id);
+    // } catch (error) {
+    //   const message = error instanceof Error ? error.message : 'Unknown error';
+    //   this.logger.error(
+    //     `[BALANCE] upsertBalance 실패 userId=${userId} pointActionId=${result.id} delta=${amount} error=${message}`,
+    //   );
+    //   void this.slackService?.reportBugToSlack(
+    //     `⚠️ user_point_balance 갱신 실패\n` +
+    //       `- userId: ${userId}\n` +
+    //       `- pointActionId: ${result.id}\n` +
+    //       `- type: ${type}\n` +
+    //       `- delta: ${amount}\n` +
+    //       `- error: ${message}`,
+    //   );
+    // }
 
     return result;
   }
