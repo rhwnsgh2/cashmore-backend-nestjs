@@ -111,7 +111,54 @@ export class PointService {
     }
 
     const pointActions = await this.pointRepository.findAllPointActions(userId);
-    return calculatePointAmount(pointActions);
+    const legacyTotal = calculatePointAmount(pointActions);
+
+    // 병렬 검증: DB SUM(RPC)과 비교 (비차단). cutoff로 race 면역.
+    const cutoff = pointActions.reduce(
+      (max, a) => (a.id > max ? a.id : max),
+      0,
+    );
+    void this.compareWithRpcSum(userId, legacyTotal, cutoff);
+
+    return legacyTotal;
+  }
+
+  /**
+   * 기존 JS reduce SUM과 DB RPC SUM을 같은 cutoff(id <= maxId)로 비교.
+   * point_actions가 append-only라 두 호출 시점이 달라도 같은 행 집합 위에서 동작.
+   * 비차단 fire-and-forget. 불일치 시에만 로그 + 슬랙 리포트.
+   */
+  private async compareWithRpcSum(
+    userId: string,
+    legacyTotal: number,
+    maxId: number,
+  ): Promise<void> {
+    try {
+      const rpcSum = await this.pointRepository.findTotalPointSumViaRpc(
+        userId,
+        maxId,
+      );
+      if (rpcSum !== legacyTotal) {
+        const diff = legacyTotal - rpcSum;
+        this.logger.error(
+          `[POINT_SUM_DRIFT] userId=${userId} legacy=${legacyTotal} rpc=${rpcSum} diff=${diff} maxId=${maxId}`,
+        );
+        void this.slackService?.reportBugToSlack(
+          `⚠️ point sum 병렬 검증 불일치\n` +
+            `- userId: ${userId}\n` +
+            `- legacy(JS reduce): ${legacyTotal}\n` +
+            `- rpc(DB SUM): ${rpcSum}\n` +
+            `- diff: ${diff}\n` +
+            `- maxId: ${maxId}`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `[POINT_SUM_VERIFY] 검증 실패 userId=${userId} error=${
+          error instanceof Error ? error.message : 'Unknown'
+        }`,
+      );
+    }
   }
 
   // user_point_balance 검증 일시 중단 (정합성 설계 재검토 중)

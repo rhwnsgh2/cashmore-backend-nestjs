@@ -196,6 +196,120 @@ describe('PointService', () => {
     });
   });
 
+  describe('compareWithRpcSum (병렬 검증)', () => {
+    const userId = 'rpc-verify-user';
+
+    beforeEach(() => {
+      repository.clear();
+      repository.clearRpcOverride();
+    });
+
+    it('legacy와 rpc가 일치하면 알림 없음', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          type: 'EVERY_RECEIPT',
+          created_at: '2024-01-01T00:00:00Z',
+          point_amount: 100,
+          status: 'done',
+        },
+        {
+          id: 2,
+          type: 'ATTENDANCE',
+          created_at: '2024-01-02T00:00:00Z',
+          point_amount: 50,
+          status: 'done',
+        },
+      ]);
+
+      await service.getPointTotal(userId);
+      await flush();
+
+      expect(slackService.reports).toHaveLength(0);
+    });
+
+    it('legacy와 rpc가 다르면 drift 알림', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          type: 'EVERY_RECEIPT',
+          created_at: '2024-01-01T00:00:00Z',
+          point_amount: 100,
+          status: 'done',
+        },
+        {
+          id: 2,
+          type: 'ATTENDANCE',
+          created_at: '2024-01-02T00:00:00Z',
+          point_amount: 50,
+          status: 'done',
+        },
+      ]);
+      repository.setRpcOverride(() => 140);
+
+      await service.getPointTotal(userId);
+      await flush();
+
+      expect(slackService.reports).toHaveLength(1);
+      const msg = slackService.reports[0];
+      expect(msg).toContain('point sum 병렬 검증 불일치');
+      expect(msg).toContain('legacy(JS reduce): 150');
+      expect(msg).toContain('rpc(DB SUM): 140');
+      expect(msg).toContain('diff: 10');
+      expect(msg).toContain('maxId: 2');
+    });
+
+    it('action이 없으면 maxId=0으로 호출되고 일치하면 알림 없음', async () => {
+      await service.getPointTotal(userId);
+      await flush();
+
+      expect(slackService.reports).toHaveLength(0);
+    });
+
+    it('rpc 호출이 실패해도 응답을 차단하지 않음', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          type: 'EVERY_RECEIPT',
+          created_at: '2024-01-01T00:00:00Z',
+          point_amount: 100,
+          status: 'done',
+        },
+      ]);
+      repository.setRpcOverride(() => {
+        throw new Error('rpc unreachable');
+      });
+
+      const result = await service.getPointTotal(userId);
+      await flush();
+
+      expect(result.totalPoint).toBe(100);
+      expect(slackService.reports).toHaveLength(0);
+    });
+
+    it('snapshot 경로에서는 검증이 동작하지 않음', async () => {
+      repository.setSnapshot(userId, {
+        point_balance: 5000,
+        updated_at: '2024-01-01T00:00:00Z',
+      });
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          type: 'EVERY_RECEIPT',
+          created_at: '2024-01-02T00:00:00Z',
+          point_amount: 100,
+          status: 'done',
+        },
+      ]);
+      repository.setRpcOverride(() => 999999);
+
+      await service.getPointTotal(userId);
+      await flush();
+
+      expect(slackService.reports).toHaveLength(0);
+    });
+  });
+
   // user_point_balance 검증 일시 중단 (정합성 설계 재검토 중)
   describe.skip('verifyBalance (병행 검증)', () => {
     const userId = 'verify-user';

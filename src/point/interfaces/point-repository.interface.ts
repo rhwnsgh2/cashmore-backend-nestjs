@@ -63,6 +63,7 @@ export interface IPointRepository {
   ): Promise<EarnedPointAction[]>;
   findBalance(userId: string): Promise<PointBalance | null>;
   findSumUpToId(userId: string, maxId: number): Promise<number>;
+  findTotalPointSumViaRpc(userId: string, maxId: number): Promise<number>;
 }
 
 // DI 토큰

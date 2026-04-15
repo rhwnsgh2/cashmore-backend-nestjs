@@ -121,4 +121,25 @@ export class StubPointRepository implements IPointRepository {
       .reduce((acc, a) => acc + a.point_amount, 0);
     return Promise.resolve(sum);
   }
+
+  private rpcOverride?: (userId: string, maxId: number) => number;
+
+  setRpcOverride(fn: (userId: string, maxId: number) => number): void {
+    this.rpcOverride = fn;
+  }
+
+  clearRpcOverride(): void {
+    this.rpcOverride = undefined;
+  }
+
+  findTotalPointSumViaRpc(userId: string, maxId: number): Promise<number> {
+    if (this.rpcOverride) {
+      return Promise.resolve(this.rpcOverride(userId, maxId));
+    }
+    const actions = this.pointActions.get(userId) ?? [];
+    const sum = actions
+      .filter((a) => a.id <= maxId)
+      .reduce((acc, a) => acc + a.point_amount, 0);
+    return Promise.resolve(sum);
+  }
 }

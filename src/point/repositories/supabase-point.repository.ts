@@ -144,4 +144,22 @@ export class SupabasePointRepository implements IPointRepository {
       0,
     );
   }
+
+  async findTotalPointSumViaRpc(
+    userId: string,
+    maxId: number,
+  ): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .rpc('sum_user_points_up_to_id', {
+        p_user_id: userId,
+        p_max_id: maxId,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    return Number(data ?? 0);
+  }
 }
