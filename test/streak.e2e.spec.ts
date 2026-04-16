@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
@@ -11,6 +13,26 @@ import { createReceiptSubmissions } from './helpers/streak.helper';
 import { generateTestToken } from './helpers/auth.helper';
 import { SupabaseStreakRepository } from '../src/streak/repositories/supabase-streak.repository';
 import { SupabaseService } from '../src/supabase/supabase.service';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+function kstDate(daysAgo: number, hour = 12): string {
+  return dayjs()
+    .tz('Asia/Seoul')
+    .subtract(daysAgo, 'day')
+    .hour(hour)
+    .minute(0)
+    .second(0)
+    .format('YYYY-MM-DDTHH:mm:ssZ');
+}
+
+function kstDateStr(daysAgo: number): string {
+  return dayjs()
+    .tz('Asia/Seoul')
+    .subtract(daysAgo, 'day')
+    .format('YYYY-MM-DD');
+}
 
 describe('SupabaseStreakRepository (integration)', () => {
   const supabase = getTestSupabaseAdminClient();
@@ -44,74 +66,57 @@ describe('SupabaseStreakRepository (integration)', () => {
       const otherUser = await createTestUser(supabase);
 
       await createReceiptSubmissions(supabase, [
-        { user_id: testUser.id, created_at: '2026-01-15T12:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-16T12:00:00+09:00' },
-        { user_id: otherUser.id, created_at: '2026-01-15T12:00:00+09:00' },
+        { user_id: testUser.id, created_at: kstDate(3) },
+        { user_id: testUser.id, created_at: kstDate(2) },
+        { user_id: otherUser.id, created_at: kstDate(3) },
       ]);
 
       const streaks = await repository.findStreaks(testUser.id);
 
       expect(streaks).toHaveLength(1);
       expect(streaks[0]).toEqual({
-        start_date: '2026-01-15',
-        end_date: '2026-01-16',
+        start_date: kstDateStr(3),
+        end_date: kstDateStr(2),
         continuous_count: 2,
       });
     });
 
     it('status가 completed인 것만 스트릭에 포함한다', async () => {
       await createReceiptSubmissions(supabase, [
-        {
-          user_id: testUser.id,
-          created_at: '2026-01-15T12:00:00+09:00',
-          status: 'completed',
-        },
-        {
-          user_id: testUser.id,
-          created_at: '2026-01-16T12:00:00+09:00',
-          status: 'pending',
-        },
-        {
-          user_id: testUser.id,
-          created_at: '2026-01-17T12:00:00+09:00',
-          status: 'rejected',
-        },
-        {
-          user_id: testUser.id,
-          created_at: '2026-01-18T12:00:00+09:00',
-          status: 'completed',
-        },
+        { user_id: testUser.id, created_at: kstDate(5), status: 'completed' },
+        { user_id: testUser.id, created_at: kstDate(4), status: 'pending' },
+        { user_id: testUser.id, created_at: kstDate(3), status: 'rejected' },
+        { user_id: testUser.id, created_at: kstDate(2), status: 'completed' },
       ]);
 
       const streaks = await repository.findStreaks(testUser.id);
 
-      // 1/15, 1/18만 completed → 연속이 아니므로 스트릭 2개
       expect(streaks).toHaveLength(2);
       expect(streaks.every((s) => s.continuous_count === 1)).toBe(true);
     });
 
     it('연속 3일 제출하면 3일짜리 스트릭을 반환한다', async () => {
       await createReceiptSubmissions(supabase, [
-        { user_id: testUser.id, created_at: '2026-01-15T12:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-16T12:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-17T12:00:00+09:00' },
+        { user_id: testUser.id, created_at: kstDate(5) },
+        { user_id: testUser.id, created_at: kstDate(4) },
+        { user_id: testUser.id, created_at: kstDate(3) },
       ]);
 
       const streaks = await repository.findStreaks(testUser.id);
 
       expect(streaks).toHaveLength(1);
       expect(streaks[0]).toEqual({
-        start_date: '2026-01-15',
-        end_date: '2026-01-17',
+        start_date: kstDateStr(5),
+        end_date: kstDateStr(3),
         continuous_count: 3,
       });
     });
 
     it('하루에 여러 번 제출해도 1일로 계산한다', async () => {
       await createReceiptSubmissions(supabase, [
-        { user_id: testUser.id, created_at: '2026-01-15T09:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-15T12:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-15T18:00:00+09:00' },
+        { user_id: testUser.id, created_at: kstDate(3, 9) },
+        { user_id: testUser.id, created_at: kstDate(3, 12) },
+        { user_id: testUser.id, created_at: kstDate(3, 18) },
       ]);
 
       const streaks = await repository.findStreaks(testUser.id);
@@ -170,9 +175,9 @@ describe('Streak API (e2e)', () => {
       const token = generateTestToken(testUser.auth_id);
 
       await createReceiptSubmissions(supabase, [
-        { user_id: testUser.id, created_at: '2026-01-17T12:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-16T12:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-15T12:00:00+09:00' },
+        { user_id: testUser.id, created_at: kstDate(3) },
+        { user_id: testUser.id, created_at: kstDate(4) },
+        { user_id: testUser.id, created_at: kstDate(5) },
       ]);
 
       const response = await request(app.getHttpServer())
@@ -182,8 +187,8 @@ describe('Streak API (e2e)', () => {
 
       expect(response.body.streaks).toEqual([
         {
-          start_date: '2026-01-15',
-          end_date: '2026-01-17',
+          start_date: kstDateStr(5),
+          end_date: kstDateStr(3),
           continuous_count: 3,
         },
       ]);
@@ -218,11 +223,11 @@ describe('Streak API (e2e)', () => {
       const token = generateTestToken(testUser.auth_id);
 
       await createReceiptSubmissions(supabase, [
-        { user_id: testUser.id, created_at: '2026-01-20T12:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-19T12:00:00+09:00' },
-        // 1월 18일 빠짐
-        { user_id: testUser.id, created_at: '2026-01-17T12:00:00+09:00' },
-        { user_id: testUser.id, created_at: '2026-01-16T12:00:00+09:00' },
+        { user_id: testUser.id, created_at: kstDate(3) },
+        { user_id: testUser.id, created_at: kstDate(4) },
+        // 5일 전 빠짐
+        { user_id: testUser.id, created_at: kstDate(6) },
+        { user_id: testUser.id, created_at: kstDate(7) },
       ]);
 
       const response = await request(app.getHttpServer())
