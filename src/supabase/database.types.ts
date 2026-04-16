@@ -3784,6 +3784,7 @@ export type Database = {
         }
         Returns: Json
       }
+      sum_user_points: { Args: { p_user_id: string }; Returns: number }
       sum_user_points_up_to_id: {
         Args: { p_max_id: number; p_user_id: string }
         Returns: number

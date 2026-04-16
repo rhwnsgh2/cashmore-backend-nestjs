@@ -3,7 +3,6 @@ import { SupabaseService } from '../../supabase/supabase.service';
 import {
   IPointRepository,
   PointAction,
-  PointSnapshot,
   PointBalance,
   EarnedPointAction,
   POINT_ADD_TYPES,
@@ -12,41 +11,6 @@ import {
 @Injectable()
 export class SupabasePointRepository implements IPointRepository {
   constructor(private supabaseService: SupabaseService) {}
-
-  async findLatestSnapshot(userId: string): Promise<PointSnapshot | null> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('user_point_snapshots')
-      .select('point_balance, updated_at')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error || !data) {
-      return null;
-    }
-
-    return data as PointSnapshot;
-  }
-
-  async findPointActionsSince(
-    userId: string,
-    since: string,
-  ): Promise<PointAction[]> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('point_actions')
-      .select('id, type, created_at, point_amount, status')
-      .eq('user_id', userId)
-      .gte('created_at', since);
-
-    if (error) {
-      throw error;
-    }
-
-    return (data as PointAction[]) || [];
-  }
 
   async findAllPointActions(userId: string): Promise<PointAction[]> {
     const { data, error } = await this.supabaseService
@@ -154,6 +118,20 @@ export class SupabasePointRepository implements IPointRepository {
       .rpc('sum_user_points_up_to_id', {
         p_user_id: userId,
         p_max_id: maxId,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    return Number(data ?? 0);
+  }
+
+  async findTotalPointSum(userId: string): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .rpc('sum_user_points', {
+        p_user_id: userId,
       });
 
     if (error) {

@@ -31,11 +31,6 @@ export interface PointAction {
   status: string;
 }
 
-export interface PointSnapshot {
-  point_balance: number;
-  updated_at: string;
-}
-
 export interface PointBalance {
   totalPoint: number;
   lastPointActionId: number;
@@ -48,8 +43,6 @@ export interface EarnedPointAction {
 
 // Repository 인터페이스
 export interface IPointRepository {
-  findLatestSnapshot(userId: string): Promise<PointSnapshot | null>;
-  findPointActionsSince(userId: string, since: string): Promise<PointAction[]>;
   findAllPointActions(userId: string): Promise<PointAction[]>;
   findEarnedPointsBetween(
     userId: string,
@@ -64,6 +57,7 @@ export interface IPointRepository {
   findBalance(userId: string): Promise<PointBalance | null>;
   findSumUpToId(userId: string, maxId: number): Promise<number>;
   findTotalPointSumViaRpc(userId: string, maxId: number): Promise<number>;
+  findTotalPointSum(userId: string): Promise<number>;
 }
 
 // DI 토큰
