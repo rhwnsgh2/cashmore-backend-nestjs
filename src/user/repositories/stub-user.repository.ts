@@ -117,6 +117,19 @@ export class StubUserRepository implements IUserRepository {
     return Promise.resolve();
   }
 
+  updateMarketingInfo(
+    userId: string,
+    marketingAgreement: boolean,
+  ): Promise<{ marketing_info: boolean }> {
+    const user = this.users.get(userId);
+    if (!user) {
+      return Promise.reject(new Error('마케팅 정보 업데이트 실패: not found'));
+    }
+    user.marketing_info = marketingAgreement;
+    this.users.set(userId, user);
+    return Promise.resolve({ marketing_info: marketingAgreement });
+  }
+
   findByNickname(
     nickname: string,
     excludeUserId?: string,

@@ -89,6 +89,30 @@ export class SupabaseUserRepository implements IUserRepository {
     }
   }
 
+  async updateMarketingInfo(
+    userId: string,
+    marketingAgreement: boolean,
+  ): Promise<{ marketing_info: boolean }> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('user')
+      .update({
+        marketing_info: marketingAgreement,
+        marketing_info_updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select('marketing_info')
+      .single<{ marketing_info: boolean }>();
+
+    if (error || !data) {
+      throw new Error(
+        `마케팅 정보 업데이트 실패: ${error?.message ?? 'no data'}`,
+      );
+    }
+
+    return { marketing_info: data.marketing_info };
+  }
+
   async findByNickname(
     nickname: string,
     excludeUserId?: string,

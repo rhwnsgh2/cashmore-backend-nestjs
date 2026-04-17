@@ -657,6 +657,17 @@ export class UserService {
     return { success: true };
   }
 
+  async updateMarketingAgreement(
+    userId: string,
+    marketingAgreement: boolean,
+  ): Promise<{ success: boolean; marketingAgreement: boolean }> {
+    const { marketing_info } = await this.userRepository.updateMarketingInfo(
+      userId,
+      marketingAgreement,
+    );
+    return { success: true, marketingAgreement: marketing_info };
+  }
+
   async checkNicknameDuplicate(
     userId: string,
     nickname: string,

@@ -428,6 +428,141 @@ describe('User API (e2e) - Real DB', () => {
     });
   });
 
+  describe('POST /user/marketing', () => {
+    let testUser: TestUser;
+    let token: string;
+
+    beforeEach(async () => {
+      testUser = await createTestUser(supabase, { marketing_info: false });
+      token = generateTestToken(testUser.auth_id);
+    });
+
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/user/marketing')
+        .send({ marketingAgreement: true })
+        .expect(401);
+    });
+
+    it('true로 업데이트하면 success와 marketingAgreement: true를 반환한다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/user/marketing')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ marketingAgreement: true })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        marketingAgreement: true,
+      });
+
+      const { data: user } = await supabase
+        .from('user')
+        .select('marketing_info, marketing_info_updated_at')
+        .eq('id', testUser.id)
+        .single();
+
+      expect(user?.marketing_info).toBe(true);
+      expect(user?.marketing_info_updated_at).not.toBeNull();
+    });
+
+    it('false로 업데이트하면 success와 marketingAgreement: false를 반환한다', async () => {
+      const marketingUser = await createTestUser(supabase, {
+        marketing_info: true,
+      });
+      const marketingToken = generateTestToken(marketingUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/user/marketing')
+        .set('Authorization', `Bearer ${marketingToken}`)
+        .send({ marketingAgreement: false })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        marketingAgreement: false,
+      });
+
+      const { data: user } = await supabase
+        .from('user')
+        .select('marketing_info')
+        .eq('id', marketingUser.id)
+        .single();
+
+      expect(user?.marketing_info).toBe(false);
+    });
+
+    it('동일한 값으로 업데이트해도 성공한다', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/user/marketing')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ marketingAgreement: false })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.marketingAgreement).toBe(false);
+    });
+
+    it('marketingAgreement가 boolean이 아니면 400을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/user/marketing')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ marketingAgreement: 'yes' })
+        .expect(400);
+    });
+
+    it('marketingAgreement가 누락되면 400을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/user/marketing')
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(400);
+    });
+
+    it('marketingAgreement가 null이면 400을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/user/marketing')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ marketingAgreement: null })
+        .expect(400);
+    });
+
+    it('다른 사용자의 마케팅 정보는 수정되지 않는다', async () => {
+      const otherUser = await createTestUser(supabase, {
+        marketing_info: false,
+      });
+
+      await request(app.getHttpServer())
+        .post('/user/marketing')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ marketingAgreement: true })
+        .expect(200);
+
+      const { data: other } = await supabase
+        .from('user')
+        .select('marketing_info')
+        .eq('id', otherUser.id)
+        .single();
+
+      expect(other?.marketing_info).toBe(false);
+    });
+
+    it('업데이트 후 GET /user/info에도 반영된다', async () => {
+      await request(app.getHttpServer())
+        .post('/user/marketing')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ marketingAgreement: true })
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get('/user/info')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.marketingAgreement).toBe(true);
+    });
+  });
+
   describe('POST /user', () => {
     /**
      * auth.users에만 유저를 생성하고 user 테이블에는 생성하지 않는 헬퍼.

@@ -66,6 +66,14 @@ export interface IUserRepository {
   updateNickname(userId: string, nickname: string): Promise<void>;
 
   /**
+   * 마케팅 정보 수신 동의 업데이트
+   */
+  updateMarketingInfo(
+    userId: string,
+    marketingAgreement: boolean,
+  ): Promise<{ marketing_info: boolean }>;
+
+  /**
    * 닉네임으로 사용자 조회 (중복 체크용). excludeUserId가 주어지면 해당 사용자는 제외
    */
   findByNickname(

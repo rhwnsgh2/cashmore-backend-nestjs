@@ -629,6 +629,57 @@ describe('UserService', () => {
     });
   });
 
+  describe('updateMarketingAgreement', () => {
+    const userId = 'user-1';
+
+    function seedUser(marketing: boolean) {
+      repository.setUser({
+        id: userId,
+        email: 'a@test.com',
+        auth_id: 'auth-1',
+        created_at: '2026-01-01T00:00:00Z',
+        marketing_info: marketing,
+        is_banned: false,
+        nickname: 'nick',
+        provider: 'kakao',
+      });
+    }
+
+    it('true로 업데이트하면 marketing_info가 true가 된다', async () => {
+      seedUser(false);
+
+      const result = await service.updateMarketingAgreement(userId, true);
+
+      expect(result).toEqual({ success: true, marketingAgreement: true });
+      const user = await repository.findById(userId);
+      expect(user?.marketing_info).toBe(true);
+    });
+
+    it('false로 업데이트하면 marketing_info가 false가 된다', async () => {
+      seedUser(true);
+
+      const result = await service.updateMarketingAgreement(userId, false);
+
+      expect(result).toEqual({ success: true, marketingAgreement: false });
+      const user = await repository.findById(userId);
+      expect(user?.marketing_info).toBe(false);
+    });
+
+    it('동일한 값으로 업데이트해도 성공한다', async () => {
+      seedUser(true);
+
+      const result = await service.updateMarketingAgreement(userId, true);
+
+      expect(result).toEqual({ success: true, marketingAgreement: true });
+    });
+
+    it('존재하지 않는 유저는 에러를 던진다', async () => {
+      await expect(
+        service.updateMarketingAgreement('missing', true),
+      ).rejects.toThrow();
+    });
+  });
+
   describe('checkNicknameDuplicate', () => {
     const userId = 'user-1';
 

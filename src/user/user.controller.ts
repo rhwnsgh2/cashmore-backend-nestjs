@@ -38,6 +38,10 @@ import {
   CheckNicknameRequestDto,
   CheckNicknameResponseDto,
 } from './dto/check-nickname.dto';
+import {
+  UpdateMarketingRequestDto,
+  UpdateMarketingResponseDto,
+} from './dto/update-marketing.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtAuthOnlyGuard } from '../auth/guards/jwt-auth-only.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -190,6 +194,31 @@ export class UserController {
     @Body() dto: UpdateNicknameRequestDto,
   ): Promise<UpdateNicknameResponseDto> {
     return this.userService.updateNickname(userId, dto.nickname);
+  }
+
+  @Post('marketing')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '마케팅 정보 수신 동의 변경',
+    description: '현재 사용자의 마케팅 정보 수신 동의 여부를 업데이트합니다.',
+  })
+  @ApiBody({ type: UpdateMarketingRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: '마케팅 동의 업데이트 성공',
+    type: UpdateMarketingResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async updateMarketing(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: UpdateMarketingRequestDto,
+  ): Promise<UpdateMarketingResponseDto> {
+    return this.userService.updateMarketingAgreement(
+      userId,
+      dto.marketingAgreement,
+    );
   }
 
   @Post('nickname/check')
