@@ -9,7 +9,12 @@ import {
 } from 'class-validator';
 
 export class CreateNpsSurveyRequestDto {
-  @ApiProperty({ description: 'NPS 점수 (0~10)', example: 9, minimum: 0, maximum: 10 })
+  @ApiProperty({
+    description: 'NPS 점수 (0~10)',
+    example: 9,
+    minimum: 0,
+    maximum: 10,
+  })
   @IsInt()
   @Min(0)
   @Max(10)
