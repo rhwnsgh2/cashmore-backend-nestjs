@@ -4,6 +4,7 @@ import { NPS_SURVEY_REPOSITORY } from './interfaces/nps-survey-repository.interf
 import type { IUserModalRepository } from '../user-modal/interfaces/user-modal-repository.interface';
 import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 import { NpsSurveyTargetResponseDto } from './dto/nps-survey-target.dto';
+import { CreateNpsSurveyRequestDto } from './dto/create-nps-survey.dto';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -56,5 +57,16 @@ export class NpsSurveyService {
     }
 
     return { need: false, reason: 'not_target' };
+  }
+
+  async createNpsSurvey(
+    userId: string,
+    dto: CreateNpsSurveyRequestDto,
+  ): Promise<void> {
+    await this.npsSurveyRepository.createNpsSurvey({
+      userId,
+      score: dto.score,
+      feedback: dto.feedback,
+    });
   }
 }

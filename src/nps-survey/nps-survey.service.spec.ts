@@ -142,4 +142,32 @@ describe('NpsSurveyService', () => {
 
     expect(result).toEqual({ need: false, reason: 'not_target' });
   });
+
+  describe('createNpsSurvey', () => {
+    it('score와 feedback을 저장한다', async () => {
+      await service.createNpsSurvey(userId, { score: 9, feedback: '좋아요' });
+
+      expect(stubNpsSurveyRepo.getCreatedSurveys()).toEqual([
+        { userId, score: 9, feedback: '좋아요' },
+      ]);
+    });
+
+    it('feedback이 없으면 undefined로 저장한다', async () => {
+      await service.createNpsSurvey(userId, { score: 0 });
+
+      expect(stubNpsSurveyRepo.getCreatedSurveys()).toEqual([
+        { userId, score: 0, feedback: undefined },
+      ]);
+    });
+
+    it('경계값 0과 10 모두 저장 가능하다', async () => {
+      await service.createNpsSurvey(userId, { score: 0 });
+      await service.createNpsSurvey(userId, { score: 10 });
+
+      const surveys = stubNpsSurveyRepo.getCreatedSurveys();
+      expect(surveys).toHaveLength(2);
+      expect(surveys[0].score).toBe(0);
+      expect(surveys[1].score).toBe(10);
+    });
+  });
 });

@@ -1,12 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
 import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 import type {
   IStreakRepository,
   Streak,
 } from './interfaces/streak-repository.interface';
 import { STREAK_REPOSITORY } from './interfaces/streak-repository.interface';
 
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const DEFAULT_DAYS = 90;
+const TIMEZONE = 'Asia/Seoul';
 
 @Injectable()
 export class StreakService {
@@ -31,6 +37,7 @@ export class StreakService {
   private hitsDateBoundary(streaks: Streak[], days: number): boolean {
     const oldest = streaks[streaks.length - 1];
     const boundary = dayjs()
+      .tz(TIMEZONE)
       .subtract(days - 1, 'day')
       .format('YYYY-MM-DD');
     return oldest.start_date <= boundary;

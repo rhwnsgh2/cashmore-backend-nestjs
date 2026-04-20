@@ -28,10 +28,7 @@ function kstDate(daysAgo: number, hour = 12): string {
 }
 
 function kstDateStr(daysAgo: number): string {
-  return dayjs()
-    .tz('Asia/Seoul')
-    .subtract(daysAgo, 'day')
-    .format('YYYY-MM-DD');
+  return dayjs().tz('Asia/Seoul').subtract(daysAgo, 'day').format('YYYY-MM-DD');
 }
 
 describe('SupabaseStreakRepository (integration)', () => {
@@ -216,6 +213,29 @@ describe('Streak API (e2e)', () => {
 
       expect(response.body.streaks).toHaveLength(1);
       expect(response.body.streaks[0].continuous_count).toBe(120);
+    });
+
+    it('90일 경계를 1일만 넘는 연속 스트릭도 정확한 일수로 확장한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      // 정확히 91일 연속 (오늘 포함, 90일 전부터 오늘까지) — RPC 기본 90일 경계에서 잘리는 케이스
+      const submissions = Array.from({ length: 91 }, (_, i) => ({
+        user_id: testUser.id,
+        created_at: kstDate(i),
+      }));
+
+      await createReceiptSubmissions(supabase, submissions);
+
+      const response = await request(app.getHttpServer())
+        .get('/streak/all')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.streaks).toHaveLength(1);
+      expect(response.body.streaks[0].continuous_count).toBe(91);
+      expect(response.body.streaks[0].start_date).toBe(kstDateStr(90));
+      expect(response.body.streaks[0].end_date).toBe(kstDateStr(0));
     });
 
     it('중간에 끊긴 경우 스트릭 2개를 반환한다', async () => {

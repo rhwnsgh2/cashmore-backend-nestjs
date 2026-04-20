@@ -172,5 +172,4 @@ describe('PointService', () => {
       expect(result.lastWeekPoint).toBe(400);
     });
   });
-
 });

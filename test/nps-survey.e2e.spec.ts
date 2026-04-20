@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
@@ -20,6 +20,7 @@ describe('NpsSurvey API (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ transform: true }));
     await app.init();
   });
 
@@ -177,6 +178,124 @@ describe('NpsSurvey API (e2e)', () => {
         .expect(200);
 
       expect(response.body).toEqual({ need: false, reason: 'not_target' });
+    });
+  });
+
+  describe('POST /nps-survey', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/nps-survey')
+        .send({ score: 9 })
+        .expect(401);
+    });
+
+    it('score와 feedback을 정상적으로 저장한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/nps-survey')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ score: 9, feedback: '서비스 좋아요' })
+        .expect(200);
+
+      expect(response.body).toEqual({ success: true });
+
+      const { data } = await supabase
+        .from('nps_surveys')
+        .select('user_id, score, feedback')
+        .eq('user_id', testUser.id)
+        .maybeSingle();
+
+      expect(data).toEqual({
+        user_id: testUser.id,
+        score: 9,
+        feedback: '서비스 좋아요',
+      });
+    });
+
+    it('feedback 없이 score만으로도 저장한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/nps-survey')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ score: 0 })
+        .expect(200);
+
+      const { data } = await supabase
+        .from('nps_surveys')
+        .select('user_id, score, feedback')
+        .eq('user_id', testUser.id)
+        .maybeSingle();
+
+      expect(data).toEqual({
+        user_id: testUser.id,
+        score: 0,
+        feedback: null,
+      });
+    });
+
+    it('score 경계값 10을 허용한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/nps-survey')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ score: 10 })
+        .expect(200);
+    });
+
+    it('score가 누락되면 400을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/nps-survey')
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(400);
+    });
+
+    it('score가 범위 밖이면 400을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/nps-survey')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ score: 11 })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/nps-survey')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ score: -1 })
+        .expect(400);
+    });
+
+    it('score가 정수가 아니면 400을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/nps-survey')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ score: 5.5 })
+        .expect(400);
+    });
+
+    it('score가 문자열이면 400을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/nps-survey')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ score: '9' })
+        .expect(400);
     });
   });
 });

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
 import {
+  CreateNpsSurveyInput,
   ExchangeAction,
   INpsSurveyRepository,
 } from '../interfaces/nps-survey-repository.interface';
@@ -26,5 +27,20 @@ export class SupabaseNpsSurveyRepository implements INpsSurveyRepository {
       pointAmount: -Number(row.amount), // cash_exchanges.amount는 양수, ExchangeAction.pointAmount는 음수 관례 유지
       createdAt: row.created_at,
     }));
+  }
+
+  async createNpsSurvey(input: CreateNpsSurveyInput): Promise<void> {
+    const { error } = await this.supabase
+      .getClient()
+      .from('nps_surveys')
+      .insert({
+        user_id: input.userId,
+        score: input.score,
+        feedback: input.feedback ?? null,
+      });
+
+    if (error) {
+      throw error;
+    }
   }
 }
