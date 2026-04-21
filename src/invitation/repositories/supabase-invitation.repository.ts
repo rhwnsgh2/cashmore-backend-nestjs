@@ -387,70 +387,17 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
   ): Promise<{ userId: string; email: string | null; inviteCount: number }[]> {
     const client = this.supabaseService.getClient();
 
-    // 1) invitation_user를 invitation_id 기준으로 모두 불러와 메모리에서 집계
-    const { data: invUsers, error: iuErr } = await client
-      .from('invitation_user')
-      .select('invitation_id')
-      .returns<{ invitation_id: number | null }[]>();
+    const { data, error } = await client.rpc('admin_top_inviters', {
+      min_invite_count: minInviteCount,
+    });
 
-    if (iuErr || !invUsers) return [];
+    if (error || !data) return [];
 
-    const invitationIdCount = new Map<number, number>();
-    for (const row of invUsers) {
-      if (row.invitation_id == null) continue;
-      invitationIdCount.set(
-        row.invitation_id,
-        (invitationIdCount.get(row.invitation_id) ?? 0) + 1,
-      );
-    }
-
-    if (invitationIdCount.size === 0) return [];
-
-    // 2) invitation_id → sender_id 매핑
-    const invitationIds = Array.from(invitationIdCount.keys());
-    const { data: invs, error: iErr } = await client
-      .from('invitation')
-      .select('id, sender_id')
-      .in('id', invitationIds)
-      .returns<{ id: number; sender_id: string }[]>();
-
-    if (iErr || !invs) return [];
-
-    // sender_id별로 초대 수 합산 (한 유저가 여러 invitation row를 가질 수 있음)
-    const senderCount = new Map<string, number>();
-    for (const inv of invs) {
-      const count = invitationIdCount.get(inv.id) ?? 0;
-      senderCount.set(
-        inv.sender_id,
-        (senderCount.get(inv.sender_id) ?? 0) + count,
-      );
-    }
-
-    const qualifiedSenders = Array.from(senderCount.entries()).filter(
-      ([, count]) => count >= minInviteCount,
-    );
-
-    if (qualifiedSenders.length === 0) return [];
-
-    // 3) email 조회
-    const userIds = qualifiedSenders.map(([id]) => id);
-    const { data: users, error: uErr } = await client
-      .from('user')
-      .select('id, email')
-      .in('id', userIds)
-      .returns<{ id: string; email: string | null }[]>();
-
-    if (uErr || !users) return [];
-
-    const emailMap = new Map(users.map((u) => [u.id, u.email]));
-
-    return qualifiedSenders
-      .map(([userId, inviteCount]) => ({
-        userId,
-        email: emailMap.get(userId) ?? null,
-        inviteCount,
-      }))
-      .sort((a, b) => b.inviteCount - a.inviteCount);
+    return data.map((row) => ({
+      userId: row.user_id,
+      email: row.email,
+      inviteCount: Number(row.invite_count),
+    }));
   }
 
   async countInvitedUsersByReceiptId(receiptId: number): Promise<number> {
