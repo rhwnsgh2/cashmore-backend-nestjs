@@ -99,8 +99,10 @@ export class InvitationService {
     const totalInvitationCount =
       await this.invitationRepository.countTotalInvitedUsers(invitationId);
 
-    const activeProgram =
-      await this.partnerProgramRepository.findActiveProgram(userId, new Date());
+    const activeProgram = await this.partnerProgramRepository.findActiveProgram(
+      userId,
+      new Date(),
+    );
 
     if (activeProgram) {
       const invitationCount =
@@ -176,8 +178,10 @@ export class InvitationService {
       return { success: false, error: 'Invitation not found' };
     }
 
-    const activeProgram =
-      await this.partnerProgramRepository.findActiveProgram(userId, new Date());
+    const activeProgram = await this.partnerProgramRepository.findActiveProgram(
+      userId,
+      new Date(),
+    );
 
     if (activeProgram) {
       const currentCount =

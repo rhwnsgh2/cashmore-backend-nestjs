@@ -14,10 +14,7 @@ export class StubPartnerProgramRepository implements IPartnerProgramRepository {
     this.programs = [];
   }
 
-  findActiveProgram(
-    userId: string,
-    now: Date,
-  ): Promise<PartnerProgram | null> {
+  findActiveProgram(userId: string, now: Date): Promise<PartnerProgram | null> {
     const nowMs = now.getTime();
     const found = this.programs.find(
       (p) =>

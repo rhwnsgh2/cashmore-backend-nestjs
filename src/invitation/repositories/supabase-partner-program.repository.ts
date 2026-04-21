@@ -6,9 +6,7 @@ import type {
 } from '../interfaces/partner-program-repository.interface';
 
 @Injectable()
-export class SupabasePartnerProgramRepository
-  implements IPartnerProgramRepository
-{
+export class SupabasePartnerProgramRepository implements IPartnerProgramRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async findActiveProgram(

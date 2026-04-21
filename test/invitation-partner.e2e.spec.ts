@@ -461,10 +461,12 @@ describe('Invitation Partner Program (e2e)', () => {
 
       expect(data).toHaveLength(1);
       expect(
-        (data![0].additional_data as {
-          partner_program_id?: number;
-          step_count?: number;
-        }).partner_program_id,
+        (
+          data![0].additional_data as {
+            partner_program_id?: number;
+            step_count?: number;
+          }
+        ).partner_program_id,
       ).toBe(programId);
     });
 
