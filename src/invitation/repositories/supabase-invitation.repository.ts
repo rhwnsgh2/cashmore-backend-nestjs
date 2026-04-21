@@ -138,6 +138,44 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
     return new Set(data.map((row) => row.id)).size;
   }
 
+  async countInvitedUsersBetween(
+    invitationId: number,
+    startsAt: string,
+    endsAt: string,
+  ): Promise<number> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('invitation_user')
+      .select('id')
+      .eq('invitation_id', invitationId)
+      .gte('created_at', startsAt)
+      .lte('created_at', endsAt)
+      .returns<{ id: number }[]>();
+
+    if (error || !data) {
+      return 0;
+    }
+
+    return new Set(data.map((row) => row.id)).size;
+  }
+
+  async countTotalInvitedUsers(invitationId: number): Promise<number> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('invitation_user')
+      .select('id')
+      .eq('invitation_id', invitationId)
+      .returns<{ id: number }[]>();
+
+    if (error || !data) {
+      return 0;
+    }
+
+    return new Set(data.map((row) => row.id)).size;
+  }
+
   async findStepRewards(userId: string): Promise<StepRewardAction[]> {
     const client = this.supabaseService.getClient();
 
@@ -146,6 +184,7 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       .select('additional_data')
       .eq('type', 'INVITE_STEP_REWARD')
       .eq('user_id', userId)
+      .is('additional_data->partner_program_id', null)
       .returns<{ additional_data: { step_count?: number } }[]>();
 
     if (error || !data) {
@@ -166,6 +205,53 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
       .eq('type', 'INVITE_STEP_REWARD')
       .eq('user_id', userId)
       .eq('additional_data->>step_count', String(stepCount))
+      .is('additional_data->partner_program_id', null)
+      .returns<{ id: number }[]>();
+
+    if (error || !data) {
+      return false;
+    }
+
+    return data.length > 0;
+  }
+
+  async findStepRewardsByProgram(
+    userId: string,
+    programId: number,
+  ): Promise<StepRewardAction[]> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('point_actions')
+      .select('additional_data')
+      .eq('type', 'INVITE_STEP_REWARD')
+      .eq('user_id', userId)
+      .eq('additional_data->>partner_program_id', String(programId))
+      .returns<{ additional_data: { step_count?: number } }[]>();
+
+    if (error || !data) {
+      return [];
+    }
+
+    return data
+      .filter((row) => row.additional_data?.step_count)
+      .map((row) => ({ stepCount: row.additional_data.step_count! }));
+  }
+
+  async hasStepRewardByProgram(
+    userId: string,
+    stepCount: number,
+    programId: number,
+  ): Promise<boolean> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('point_actions')
+      .select('id')
+      .eq('type', 'INVITE_STEP_REWARD')
+      .eq('user_id', userId)
+      .eq('additional_data->>step_count', String(stepCount))
+      .eq('additional_data->>partner_program_id', String(programId))
       .returns<{ id: number }[]>();
 
     if (error || !data) {

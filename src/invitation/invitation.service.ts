@@ -11,8 +11,14 @@ import {
   type Invitation,
 } from './interfaces/invitation-repository.interface';
 import {
+  PARTNER_PROGRAM_REPOSITORY,
+  type IPartnerProgramRepository,
+} from './interfaces/partner-program-repository.interface';
+import {
   INVITATION_STEPS,
   INVITATION_STEP_START_DATE,
+  PARTNER_INVITATION_STEPS,
+  PARTNER_POINTS_PER_INVITATION,
   POINTS_PER_INVITATION,
 } from './constants/invitation-steps';
 import {
@@ -50,6 +56,8 @@ export class InvitationService {
     private slackService: SlackService,
     @Inject(POINT_WRITE_SERVICE)
     private pointWriteService: IPointWriteService,
+    @Inject(PARTNER_PROGRAM_REPOSITORY)
+    private partnerProgramRepository: IPartnerProgramRepository,
   ) {}
 
   async getOrCreateInvitation(userId: string): Promise<Invitation> {
@@ -88,6 +96,49 @@ export class InvitationService {
       throw new NotFoundException('Invitation not found');
     }
 
+    const totalInvitationCount =
+      await this.invitationRepository.countTotalInvitedUsers(invitationId);
+
+    const activeProgram =
+      await this.partnerProgramRepository.findActiveProgram(userId, new Date());
+
+    if (activeProgram) {
+      const invitationCount =
+        await this.invitationRepository.countInvitedUsersBetween(
+          invitationId,
+          activeProgram.startsAt,
+          activeProgram.endsAt,
+        );
+      const stepRewards =
+        await this.invitationRepository.findStepRewardsByProgram(
+          userId,
+          activeProgram.id,
+        );
+      const receivedRewards = stepRewards.map((r) => r.stepCount);
+
+      const basePoints = invitationCount * PARTNER_POINTS_PER_INVITATION;
+      const stepPoints = receivedRewards.reduce((total, stepCount) => {
+        const step = PARTNER_INVITATION_STEPS.find(
+          (s) => s.count === stepCount,
+        );
+        return total + (step?.amount ?? 0);
+      }, 0);
+
+      return {
+        invitationCount,
+        totalInvitationCount,
+        activeProgram: {
+          id: activeProgram.id,
+          startsAt: activeProgram.startsAt,
+          endsAt: activeProgram.endsAt,
+        },
+        receivedRewards,
+        totalPoints: basePoints + stepPoints,
+        steps: PARTNER_INVITATION_STEPS,
+        success: true,
+      };
+    }
+
     const invitationCount =
       await this.invitationRepository.countInvitedUsersSince(
         invitationId,
@@ -105,6 +156,8 @@ export class InvitationService {
 
     return {
       invitationCount,
+      totalInvitationCount,
+      activeProgram: null,
       receivedRewards,
       totalPoints: basePoints + stepPoints,
       steps: INVITATION_STEPS,
@@ -121,6 +174,54 @@ export class InvitationService {
 
     if (invitationId === null) {
       return { success: false, error: 'Invitation not found' };
+    }
+
+    const activeProgram =
+      await this.partnerProgramRepository.findActiveProgram(userId, new Date());
+
+    if (activeProgram) {
+      const currentCount =
+        await this.invitationRepository.countInvitedUsersBetween(
+          invitationId,
+          activeProgram.startsAt,
+          activeProgram.endsAt,
+        );
+
+      if (currentCount < stepCount) {
+        throw new BadRequestException('Current count is less than step count');
+      }
+
+      const eligibleStep = PARTNER_INVITATION_STEPS.find(
+        (s) => s.count === stepCount,
+      );
+
+      if (!eligibleStep) {
+        throw new BadRequestException('Eligible step not found');
+      }
+
+      const alreadyReceived =
+        await this.invitationRepository.hasStepRewardByProgram(
+          userId,
+          stepCount,
+          activeProgram.id,
+        );
+
+      if (alreadyReceived) {
+        throw new ConflictException('Already received step reward');
+      }
+
+      await this.pointWriteService.addPoint({
+        userId,
+        amount: eligibleStep.amount,
+        type: 'INVITE_STEP_REWARD',
+        additionalData: {
+          step_count: eligibleStep.count,
+          step_name: eligibleStep.reward,
+          partner_program_id: activeProgram.id,
+        },
+      });
+
+      return { success: true };
     }
 
     // 초대 수 확인
@@ -257,14 +358,27 @@ export class InvitationService {
         receiptId,
       );
 
-    // 9. 초대자에게 INVITE_REWARD 300P 지급
+    // 9. 초대자에게 INVITE_REWARD 지급 (파트너 프로그램 기간이면 증액)
     const isReceiptInvite = signupType === 'receipt' && receiptId;
+    const senderActiveProgram =
+      await this.partnerProgramRepository.findActiveProgram(
+        invitation.senderId,
+        new Date(),
+      );
+    const invitePoints = senderActiveProgram
+      ? PARTNER_POINTS_PER_INVITATION
+      : POINTS_PER_INVITATION;
 
     await this.pointWriteService.addPoint({
       userId: invitation.senderId,
-      amount: POINTS_PER_INVITATION,
+      amount: invitePoints,
       type: 'INVITE_REWARD',
-      additionalData: { invited_user_id: invitedUserId },
+      additionalData: senderActiveProgram
+        ? {
+            invited_user_id: invitedUserId,
+            partner_program_id: senderActiveProgram.id,
+          }
+        : { invited_user_id: invitedUserId },
     });
 
     // 9-1. 영수증 초대 시 추가 보너스 20P (INVITATION_RECEIPT)

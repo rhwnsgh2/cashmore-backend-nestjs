@@ -4,7 +4,9 @@ import {
   INVITATION_REPOSITORY,
   Invitation,
 } from './interfaces/invitation-repository.interface';
+import { PARTNER_PROGRAM_REPOSITORY } from './interfaces/partner-program-repository.interface';
 import { StubInvitationRepository } from './repositories/stub-invitation.repository';
+import { StubPartnerProgramRepository } from './repositories/stub-partner-program.repository';
 import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
 import { FcmService } from '../fcm/fcm.service';
@@ -16,12 +18,14 @@ import { StubPointWriteRepository } from '../point-write/repositories/stub-point
 describe('InvitationService', () => {
   let service: InvitationService;
   let repository: StubInvitationRepository;
+  let partnerRepository: StubPartnerProgramRepository;
   let modalRepository: StubUserModalRepository;
   let pointWriteRepo: StubPointWriteRepository;
 
   beforeEach(async () => {
     pointWriteRepo = new StubPointWriteRepository();
     repository = new StubInvitationRepository(pointWriteRepo);
+    partnerRepository = new StubPartnerProgramRepository();
     modalRepository = new StubUserModalRepository();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -30,6 +34,10 @@ describe('InvitationService', () => {
         {
           provide: INVITATION_REPOSITORY,
           useValue: repository,
+        },
+        {
+          provide: PARTNER_PROGRAM_REPOSITORY,
+          useValue: partnerRepository,
         },
         {
           provide: USER_MODAL_REPOSITORY,
@@ -554,6 +562,473 @@ describe('InvitationService', () => {
 
       expect(result.success).toBe(true);
       expect(allowedAmounts).toContain(result.rewardPoint);
+    });
+
+    // === 파트너 프로그램 분기 ===
+
+    describe('파트너 프로그램', () => {
+      const nowMs = Date.now();
+      const activeProgram = {
+        id: 42,
+        userId: senderId,
+        startsAt: new Date(nowMs - 24 * 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(nowMs + 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      it('초대자가 활성 파트너 프로그램을 가지면 INVITE_REWARD가 500P로 지급된다', async () => {
+        partnerRepository.setProgram(activeProgram);
+
+        await service.processInvitationReward({
+          invitedUserId,
+          inviteCode: invitation.identifier,
+          deviceId,
+        });
+
+        const pointActions = pointWriteRepo.getInsertedActions();
+        const senderReward = pointActions.find(
+          (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
+        );
+        expect(senderReward).toBeDefined();
+        expect(senderReward!.amount).toBe(500);
+      });
+
+      it('파트너 지급 시 additional_data에 partner_program_id를 담는다', async () => {
+        partnerRepository.setProgram(activeProgram);
+
+        await service.processInvitationReward({
+          invitedUserId,
+          inviteCode: invitation.identifier,
+          deviceId,
+        });
+
+        const pointActions = pointWriteRepo.getInsertedActions();
+        const senderReward = pointActions.find(
+          (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
+        );
+        expect(senderReward!.additionalData.partner_program_id).toBe(42);
+      });
+
+      it('파트너가 아니면 INVITE_REWARD는 기존 300P로 지급된다', async () => {
+        // 파트너 프로그램 미등록
+
+        await service.processInvitationReward({
+          invitedUserId,
+          inviteCode: invitation.identifier,
+          deviceId,
+        });
+
+        const pointActions = pointWriteRepo.getInsertedActions();
+        const senderReward = pointActions.find(
+          (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
+        );
+        expect(senderReward!.amount).toBe(300);
+      });
+
+      it('프로그램 종료 이후(ends_at 경과)에는 다시 300P로 지급된다', async () => {
+        const expiredProgram = {
+          id: 7,
+          userId: senderId,
+          startsAt: new Date(nowMs - 48 * 60 * 60 * 1000).toISOString(),
+          endsAt: new Date(nowMs - 60 * 60 * 1000).toISOString(),
+        };
+        partnerRepository.setProgram(expiredProgram);
+
+        await service.processInvitationReward({
+          invitedUserId,
+          inviteCode: invitation.identifier,
+          deviceId,
+        });
+
+        const pointActions = pointWriteRepo.getInsertedActions();
+        const senderReward = pointActions.find(
+          (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
+        );
+        expect(senderReward!.amount).toBe(300);
+        expect(senderReward!.additionalData.partner_program_id).toBeUndefined();
+      });
+
+      it('프로그램 시작 이전에는 300P로 지급된다', async () => {
+        const futureProgram = {
+          id: 8,
+          userId: senderId,
+          startsAt: new Date(nowMs + 60 * 60 * 1000).toISOString(),
+          endsAt: new Date(nowMs + 48 * 60 * 60 * 1000).toISOString(),
+        };
+        partnerRepository.setProgram(futureProgram);
+
+        await service.processInvitationReward({
+          invitedUserId,
+          inviteCode: invitation.identifier,
+          deviceId,
+        });
+
+        const pointActions = pointWriteRepo.getInsertedActions();
+        const senderReward = pointActions.find(
+          (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
+        );
+        expect(senderReward!.amount).toBe(300);
+      });
+
+      it('영수증 초대 + 파트너 프로그램이면 500P INVITE_REWARD와 20P 영수증 보너스가 모두 지급된다', async () => {
+        partnerRepository.setProgram(activeProgram);
+        const receiptId = 12345;
+
+        await service.processInvitationReward({
+          invitedUserId,
+          inviteCode: invitation.identifier,
+          deviceId,
+          signupType: 'receipt',
+          receiptId,
+        });
+
+        const actions = pointWriteRepo.getInsertedActions();
+        const inviteReward = actions.find(
+          (p) => p.userId === senderId && p.type === 'INVITE_REWARD',
+        );
+        const receiptBonus = actions.find(
+          (p) => p.userId === senderId && p.type === 'INVITATION_RECEIPT',
+        );
+
+        expect(inviteReward!.amount).toBe(500);
+        expect(inviteReward!.additionalData.partner_program_id).toBe(42);
+        expect(receiptBonus!.amount).toBe(20);
+      });
+    });
+  });
+
+  // === 파트너 프로그램: getStepEvent ===
+
+  describe('getStepEvent (파트너 프로그램)', () => {
+    const userId = 'partner-user';
+    const nowMs = Date.now();
+    const activeProgram = {
+      id: 42,
+      userId,
+      startsAt: new Date(nowMs - 24 * 60 * 60 * 1000).toISOString(),
+      endsAt: new Date(nowMs + 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    it('파트너면 프로그램 기간 내 초대만 카운트한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      // 프로그램 기간 내 5명 초대
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        5,
+      );
+      // 기존 기준(2025-09-11 이후)으로는 30명 — 파트너 분기면 쓰이지 않아야 함
+      repository.setInvitedUserCount(invitation.id, 30);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.invitationCount).toBe(5);
+    });
+
+    it('파트너면 응답 steps가 PARTNER_INVITATION_STEPS다', async () => {
+      await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+
+      const result = await service.getStepEvent(userId);
+
+      // 기획 확정 전 임시값이지만, 파트너 배열이 사용됨을 확인하기 위해
+      // 기존 상수와 동일값일 수 있으므로 count 배열 형태만 assertion
+      expect(result.steps).toHaveLength(4);
+    });
+
+    it('파트너면 파트너 프로그램 수령 이력만 receivedRewards로 반환한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        5,
+      );
+      // 일반 수령 이력 (파트너 이력 아님)
+      repository.setStepRewards(userId, [{ stepCount: 3 }]);
+      // 파트너 프로그램 수령 이력
+      repository.setPartnerStepRewards(userId, activeProgram.id, [
+        { stepCount: 5 },
+      ]);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.receivedRewards).toEqual([5]);
+    });
+
+    it('파트너가 아닐 때는 기존 동작을 유지한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 5);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.invitationCount).toBe(5);
+      expect(result.totalPoints).toBe(5 * 300);
+    });
+
+    it('파트너 basePoints는 count × 500으로 계산된다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        5,
+      );
+
+      const result = await service.getStepEvent(userId);
+
+      // 기본: 5 * 500 = 2500, 스텝 수령 이력 없음
+      expect(result.totalPoints).toBe(2500);
+    });
+
+    it('파트너 스텝 수령 이력도 totalPoints에 합산된다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        5,
+      );
+      repository.setPartnerStepRewards(userId, activeProgram.id, [
+        { stepCount: 3 },
+        { stepCount: 5 },
+      ]);
+
+      const result = await service.getStepEvent(userId);
+
+      // 기본: 5 * 500 = 2500, 스텝: 1000 + 2000 = 3000
+      expect(result.receivedRewards).toEqual([3, 5]);
+      expect(result.totalPoints).toBe(5500);
+    });
+
+    it('파트너가 아닌 경우 파트너 수령 이력은 receivedRewards에 포함되지 않는다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 5);
+      // 과거 파트너 프로그램에서 수령한 이력
+      repository.setPartnerStepRewards(userId, 99, [{ stepCount: 3 }]);
+      // 일반 수령 이력
+      repository.setStepRewards(userId, [{ stepCount: 5 }]);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.receivedRewards).toEqual([5]);
+    });
+
+    // === C방향: totalInvitationCount / activeProgram ===
+
+    it('비파트너는 activeProgram이 null이고 totalInvitationCount는 전체 누적이다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 5);
+      repository.setTotalInvitedUserCount(invitation.id, 20);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.activeProgram).toBeNull();
+      expect(result.totalInvitationCount).toBe(20);
+      expect(result.invitationCount).toBe(5);
+    });
+
+    it('파트너는 activeProgram이 설정되고 totalInvitationCount는 전체 누적이다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        5,
+      );
+      repository.setTotalInvitedUserCount(invitation.id, 30);
+
+      const result = await service.getStepEvent(userId);
+
+      expect(result.activeProgram).toEqual({
+        id: activeProgram.id,
+        startsAt: activeProgram.startsAt,
+        endsAt: activeProgram.endsAt,
+      });
+      expect(result.totalInvitationCount).toBe(30);
+      expect(result.invitationCount).toBe(5);
+    });
+  });
+
+  // === 파트너 프로그램: claimStepReward ===
+
+  describe('claimStepReward (파트너 프로그램)', () => {
+    const userId = 'partner-user';
+    const nowMs = Date.now();
+    const activeProgram = {
+      id: 42,
+      userId,
+      startsAt: new Date(nowMs - 24 * 60 * 60 * 1000).toISOString(),
+      endsAt: new Date(nowMs + 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    it('파트너는 프로그램 기간 내 카운트 기준으로 수령할 수 있다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        3,
+      );
+
+      const result = await service.claimStepReward(userId, 3);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('파트너 수령 시 point_actions에 partner_program_id가 기록된다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        3,
+      );
+
+      await service.claimStepReward(userId, 3);
+
+      const actions = pointWriteRepo.getInsertedActions();
+      const reward = actions.find(
+        (a) => a.type === 'INVITE_STEP_REWARD' && a.userId === userId,
+      );
+      expect(reward).toBeDefined();
+      expect(reward!.additionalData.partner_program_id).toBe(activeProgram.id);
+    });
+
+    it('이전에 일반 수령한 이력이 있어도 파트너 수령은 독립적으로 가능하다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        3,
+      );
+      // 일반 기간(프로그램 전)에 이미 3단계 수령함
+      repository.setStepRewards(userId, [{ stepCount: 3 }]);
+
+      const result = await service.claimStepReward(userId, 3);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('같은 프로그램 내에서 동일 step을 중복 수령하면 ConflictException', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        3,
+      );
+
+      await service.claimStepReward(userId, 3);
+
+      await expect(service.claimStepReward(userId, 3)).rejects.toThrow(
+        'Already received step reward',
+      );
+    });
+
+    it('파트너 카운트가 부족하면 BadRequestException', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      // 프로그램 기간 내 2명만 초대, 3단계 수령 시도
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        2,
+      );
+      // 기존 기준으로는 10명 이상이라도
+      repository.setInvitedUserCount(invitation.id, 100);
+
+      await expect(service.claimStepReward(userId, 3)).rejects.toThrow(
+        'Current count is less than step count',
+      );
+    });
+
+    it('파트너가 아니면 기존 동작을 유지한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 3);
+
+      const result = await service.claimStepReward(userId, 3);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('파트너 수령 이력은 일반 수령 중복 체크에 영향을 주지 않는다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      // 과거 파트너 프로그램에서 3단계 수령한 이력
+      repository.setPartnerStepRewards(userId, 99, [{ stepCount: 3 }]);
+      repository.setInvitedUserCount(invitation.id, 3);
+
+      // 현재는 파트너 아님 → 일반 수령 경로로 3단계 수령 가능해야 함
+      const result = await service.claimStepReward(userId, 3);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('프로그램 시작 전 이력이 많아도, 프로그램 시작 후 카운트로만 수령 판정된다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      // 프로그램 시작 전 10명
+      repository.setInvitedUserCount(invitation.id, 10);
+      // 프로그램 시작 후 3명
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        3,
+      );
+
+      const result = await service.claimStepReward(userId, 3);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('파트너 프로그램에 존재하지 않는 step(99)는 BadRequestException', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        200,
+      );
+
+      await expect(service.claimStepReward(userId, 99)).rejects.toThrow(
+        'Eligible step not found',
+      );
+    });
+
+    it('파트너 수령 후 findStepRewardsByProgram으로 이력이 조회된다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        3,
+      );
+
+      await service.claimStepReward(userId, 3);
+
+      const rewards = await repository.findStepRewardsByProgram(
+        userId,
+        activeProgram.id,
+      );
+      expect(rewards).toEqual([{ stepCount: 3 }]);
+
+      // 같은 이력이 일반 findStepRewards에는 잡히지 않아야 함
+      const normalRewards = await repository.findStepRewards(userId);
+      expect(normalRewards).toEqual([]);
     });
   });
 });

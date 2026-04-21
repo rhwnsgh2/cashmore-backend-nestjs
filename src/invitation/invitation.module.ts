@@ -8,7 +8,9 @@ import { InvitationStepEventController } from './invitation-step-event.controlle
 import { InvitationStepRewardController } from './invitation-step-reward.controller';
 import { InvitationService } from './invitation.service';
 import { INVITATION_REPOSITORY } from './interfaces/invitation-repository.interface';
+import { PARTNER_PROGRAM_REPOSITORY } from './interfaces/partner-program-repository.interface';
 import { SupabaseInvitationRepository } from './repositories/supabase-invitation.repository';
+import { SupabasePartnerProgramRepository } from './repositories/supabase-partner-program.repository';
 
 @Module({
   imports: [AuthModule, FcmModule, SlackModule, UserModalModule],
@@ -22,6 +24,10 @@ import { SupabaseInvitationRepository } from './repositories/supabase-invitation
     {
       provide: INVITATION_REPOSITORY,
       useClass: SupabaseInvitationRepository,
+    },
+    {
+      provide: PARTNER_PROGRAM_REPOSITORY,
+      useClass: SupabasePartnerProgramRepository,
     },
   ],
   exports: [InvitationService],

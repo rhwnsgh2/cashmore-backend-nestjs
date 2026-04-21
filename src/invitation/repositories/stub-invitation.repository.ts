@@ -10,6 +10,8 @@ import type { StubPointWriteRepository } from '../../point-write/repositories/st
 export class StubInvitationRepository implements IInvitationRepository {
   private invitations: Map<string, Invitation> = new Map();
   private invitedUserCounts: Map<number, number> = new Map();
+  private invitedUserCountsInRange: Map<string, number> = new Map();
+  private totalInvitedUserCounts: Map<number, number> = new Map();
   private nextId = 1;
 
   // processInvitationReward 관련 내부 저장소
@@ -44,6 +46,22 @@ export class StubInvitationRepository implements IInvitationRepository {
     this.invitedUserCounts.set(invitationId, count);
   }
 
+  setInvitedUserCountInRange(
+    invitationId: number,
+    startsAt: string,
+    endsAt: string,
+    count: number,
+  ): void {
+    this.invitedUserCountsInRange.set(
+      `${invitationId}:${startsAt}:${endsAt}`,
+      count,
+    );
+  }
+
+  setTotalInvitedUserCount(invitationId: number, count: number): void {
+    this.totalInvitedUserCounts.set(invitationId, count);
+  }
+
   setStepRewards(userId: string, rewards: StepRewardAction[]): void {
     for (const reward of rewards) {
       void this.pointWriteRepository.insertPointAction(
@@ -52,6 +70,22 @@ export class StubInvitationRepository implements IInvitationRepository {
         'INVITE_STEP_REWARD',
         'done',
         { step_count: reward.stepCount },
+      );
+    }
+  }
+
+  setPartnerStepRewards(
+    userId: string,
+    programId: number,
+    rewards: StepRewardAction[],
+  ): void {
+    for (const reward of rewards) {
+      void this.pointWriteRepository.insertPointAction(
+        userId,
+        0,
+        'INVITE_STEP_REWARD',
+        'done',
+        { step_count: reward.stepCount, partner_program_id: programId },
       );
     }
   }
@@ -88,6 +122,8 @@ export class StubInvitationRepository implements IInvitationRepository {
   clear(): void {
     this.invitations.clear();
     this.invitedUserCounts.clear();
+    this.invitedUserCountsInRange.clear();
+    this.totalInvitedUserCounts.clear();
     this.userDeviceIds.clear();
     this.userCreatedAts.clear();
     this.deviceEvents = [];
@@ -141,10 +177,28 @@ export class StubInvitationRepository implements IInvitationRepository {
     return Promise.resolve(this.invitedUserCounts.get(invitationId) ?? 0);
   }
 
+  countInvitedUsersBetween(
+    invitationId: number,
+    startsAt: string,
+    endsAt: string,
+  ): Promise<number> {
+    const key = `${invitationId}:${startsAt}:${endsAt}`;
+    return Promise.resolve(this.invitedUserCountsInRange.get(key) ?? 0);
+  }
+
+  countTotalInvitedUsers(invitationId: number): Promise<number> {
+    return Promise.resolve(this.totalInvitedUserCounts.get(invitationId) ?? 0);
+  }
+
   findStepRewards(userId: string): Promise<StepRewardAction[]> {
     const rewards = this.pointWriteRepository
       .getInsertedActions()
-      .filter((a) => a.type === 'INVITE_STEP_REWARD' && a.userId === userId)
+      .filter(
+        (a) =>
+          a.type === 'INVITE_STEP_REWARD' &&
+          a.userId === userId &&
+          a.additionalData.partner_program_id === undefined,
+      )
       .map((a) => ({ stepCount: a.additionalData.step_count as number }))
       .filter((r) => typeof r.stepCount === 'number');
     return Promise.resolve(rewards);
@@ -157,7 +211,42 @@ export class StubInvitationRepository implements IInvitationRepository {
         (a) =>
           a.type === 'INVITE_STEP_REWARD' &&
           a.userId === userId &&
-          a.additionalData.step_count === stepCount,
+          a.additionalData.step_count === stepCount &&
+          a.additionalData.partner_program_id === undefined,
+      );
+    return Promise.resolve(found);
+  }
+
+  findStepRewardsByProgram(
+    userId: string,
+    programId: number,
+  ): Promise<StepRewardAction[]> {
+    const rewards = this.pointWriteRepository
+      .getInsertedActions()
+      .filter(
+        (a) =>
+          a.type === 'INVITE_STEP_REWARD' &&
+          a.userId === userId &&
+          a.additionalData.partner_program_id === programId,
+      )
+      .map((a) => ({ stepCount: a.additionalData.step_count as number }))
+      .filter((r) => typeof r.stepCount === 'number');
+    return Promise.resolve(rewards);
+  }
+
+  hasStepRewardByProgram(
+    userId: string,
+    stepCount: number,
+    programId: number,
+  ): Promise<boolean> {
+    const found = this.pointWriteRepository
+      .getInsertedActions()
+      .some(
+        (a) =>
+          a.type === 'INVITE_STEP_REWARD' &&
+          a.userId === userId &&
+          a.additionalData.step_count === stepCount &&
+          a.additionalData.partner_program_id === programId,
       );
     return Promise.resolve(found);
   }

@@ -29,8 +29,23 @@ export interface IInvitationRepository {
   getInvitationByCode(code: string): Promise<Invitation | null>;
   findInvitationIdByUserId(userId: string): Promise<number | null>;
   countInvitedUsersSince(invitationId: number, since: string): Promise<number>;
+  countInvitedUsersBetween(
+    invitationId: number,
+    startsAt: string,
+    endsAt: string,
+  ): Promise<number>;
+  countTotalInvitedUsers(invitationId: number): Promise<number>;
   findStepRewards(userId: string): Promise<StepRewardAction[]>;
   hasStepReward(userId: string, stepCount: number): Promise<boolean>;
+  findStepRewardsByProgram(
+    userId: string,
+    programId: number,
+  ): Promise<StepRewardAction[]>;
+  hasStepRewardByProgram(
+    userId: string,
+    stepCount: number,
+    programId: number,
+  ): Promise<boolean>;
 
   // processInvitationReward 관련
   findUserDeviceId(userId: string): Promise<string | null>;

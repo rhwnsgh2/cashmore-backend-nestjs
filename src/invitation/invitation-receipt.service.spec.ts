@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InvitationService } from './invitation.service';
 import { INVITATION_REPOSITORY } from './interfaces/invitation-repository.interface';
+import { PARTNER_PROGRAM_REPOSITORY } from './interfaces/partner-program-repository.interface';
 import { StubInvitationRepository } from './repositories/stub-invitation.repository';
+import { StubPartnerProgramRepository } from './repositories/stub-partner-program.repository';
 import { USER_MODAL_REPOSITORY } from '../user-modal/interfaces/user-modal-repository.interface';
 import { StubUserModalRepository } from '../user-modal/repositories/stub-user-modal.repository';
 import { FcmService } from '../fcm/fcm.service';
@@ -50,6 +52,10 @@ describe('InvitationService - invitation_receipt', () => {
         {
           provide: POINT_WRITE_SERVICE,
           useFactory: () => new PointWriteService(pointWriteRepo),
+        },
+        {
+          provide: PARTNER_PROGRAM_REPOSITORY,
+          useValue: new StubPartnerProgramRepository(),
         },
       ],
     }).compile();
