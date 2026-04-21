@@ -14,9 +14,7 @@ describe('MetricsService (aggregated EMF)', () => {
   let service: MetricsService;
 
   beforeEach(() => {
-    writeSpy = vi
-      .spyOn(process.stdout, 'write')
-      .mockImplementation(() => true);
+    writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     service = createService(true);
   });
 
