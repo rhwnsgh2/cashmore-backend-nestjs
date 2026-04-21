@@ -32,10 +32,7 @@ export class CoupangPartnersController {
         req.body as Record<string, unknown>,
       );
     } catch (error) {
-      this.logger.error(
-        `Postback processing failed: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.logger.error('Postback processing failed', error?.stack);
       return { result: 'E', message: 'Internal server error' };
     }
   }
