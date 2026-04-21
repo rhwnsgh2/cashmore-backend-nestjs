@@ -5,12 +5,7 @@ import {
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
-import {
-  ApiHeader,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { InvitationService } from '../invitation/invitation.service';
 import {
