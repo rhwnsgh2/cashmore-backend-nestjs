@@ -73,6 +73,11 @@ export interface IInvitationRepository {
   // 영수증 초대 통계
   countInvitedUsersByReceiptId(receiptId: number): Promise<number>;
 
+  // 어드민: top inviters 조회
+  findTopInviters(
+    minInviteCount: number,
+  ): Promise<{ userId: string; email: string | null; inviteCount: number }[]>;
+
   // grantReceiptPoint 관련
   findEveryReceiptById(receiptId: number): Promise<EveryReceipt | null>;
 }

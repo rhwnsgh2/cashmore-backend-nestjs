@@ -528,4 +528,44 @@ export class InvitationService {
       totalBonusPoint,
     };
   }
+
+  async findTopInviters(
+    minInviteCount: number,
+  ): Promise<{ userId: string; email: string | null; inviteCount: number }[]> {
+    return this.invitationRepository.findTopInviters(minInviteCount);
+  }
+
+  async registerPartners(params: {
+    userIds: string[];
+    startsAt: string;
+    endsAt: string;
+  }): Promise<{ createdCount: number }> {
+    const { userIds, startsAt, endsAt } = params;
+
+    if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      throw new BadRequestException('endsAt must be after startsAt');
+    }
+
+    const uniqueUserIds = Array.from(new Set(userIds));
+
+    const duplicateUserIds =
+      await this.partnerProgramRepository.findOverlappingUserIds(
+        uniqueUserIds,
+        startsAt,
+        endsAt,
+      );
+
+    if (duplicateUserIds.length > 0) {
+      throw new ConflictException({
+        error: '이미 겹치는 기간에 등록된 유저가 있습니다.',
+        duplicateUserIds,
+      });
+    }
+
+    const createdCount = await this.partnerProgramRepository.createMany(
+      uniqueUserIds.map((userId) => ({ userId, startsAt, endsAt })),
+    );
+
+    return { createdCount };
+  }
 }

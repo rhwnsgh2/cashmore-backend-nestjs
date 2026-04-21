@@ -4,11 +4,14 @@ import { AdminCashExchangeController } from './admin-cash-exchange.controller';
 import { AdminAdvertiserController } from './admin-advertiser.controller';
 import { AdminBannerAdController } from './admin-banner-ad.controller';
 import { AdminEveryReceiptController } from './admin-every-receipt.controller';
+import { AdminInvitationPartnerController } from './admin-invitation-partner.controller';
+import { AdminUserController } from './admin-user.controller';
 import { NaverPayModule } from '../naver-pay/naver-pay.module';
 import { ExchangePointModule } from '../exchange-point/exchange-point.module';
 import { AdvertiserAuthModule } from '../advertiser-auth/advertiser-auth.module';
 import { BannerAdModule } from '../banner-ad/banner-ad.module';
 import { EveryReceiptModule } from '../every-receipt/every-receipt.module';
+import { InvitationModule } from '../invitation/invitation.module';
 
 @Module({
   imports: [
@@ -17,6 +20,7 @@ import { EveryReceiptModule } from '../every-receipt/every-receipt.module';
     AdvertiserAuthModule,
     BannerAdModule,
     EveryReceiptModule,
+    InvitationModule,
   ],
   controllers: [
     AdminNaverPayController,
@@ -24,6 +28,8 @@ import { EveryReceiptModule } from '../every-receipt/every-receipt.module';
     AdminAdvertiserController,
     AdminBannerAdController,
     AdminEveryReceiptController,
+    AdminInvitationPartnerController,
+    AdminUserController,
   ],
 })
 export class AdminModule {}

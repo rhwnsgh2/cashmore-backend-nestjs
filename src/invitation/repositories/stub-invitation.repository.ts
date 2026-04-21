@@ -310,6 +310,13 @@ export class StubInvitationRepository implements IInvitationRepository {
 
   // 영수증 초대 통계
 
+  findTopInviters(
+    _minInviteCount: number,
+  ): Promise<{ userId: string; email: string | null; inviteCount: number }[]> {
+    // 단위 테스트에서는 사용하지 않음 (E2E에서만 검증)
+    return Promise.resolve([]);
+  }
+
   countInvitedUsersByReceiptId(receiptId: number): Promise<number> {
     const count = this.invitationUsers.filter(
       (u) => u.sourceReceiptId === receiptId,
