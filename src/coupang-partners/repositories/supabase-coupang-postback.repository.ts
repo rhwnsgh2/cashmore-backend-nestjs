@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
+import type { Json } from '../../supabase/database.types';
 import type {
   ICoupangPostbackRepository,
   CoupangPostbackRecord,
@@ -24,6 +25,7 @@ export class SupabaseCoupangPostbackRepository implements ICoupangPostbackReposi
         order_time: data.orderTime,
         order_price: data.orderPrice,
         purchase_cancel: data.purchaseCancel,
+        raw_body: data.rawBody as Json | null,
       });
 
     if (error) {

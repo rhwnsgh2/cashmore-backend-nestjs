@@ -26,11 +26,11 @@ export class CoupangPartnersController {
     @Req() req: Request,
     @Body() dto: CoupangPostbackRequestDto,
   ): Promise<CoupangPostbackResponseDto> {
-    this.logger.log(
-      `Postback received: query=${JSON.stringify(req.query)} body=${JSON.stringify(req.body)}`,
-    );
     try {
-      return await this.coupangPartnersService.handlePostback(dto);
+      return await this.coupangPartnersService.handlePostback(
+        dto,
+        req.body as Record<string, unknown>,
+      );
     } catch (error) {
       this.logger.error('Postback processing failed', error?.stack);
       return { result: 'E', message: 'Internal server error' };

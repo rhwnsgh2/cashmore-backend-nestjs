@@ -70,6 +70,28 @@ describe('Coupang Partners API (e2e)', () => {
       expect(data!.order_time).toBe('2026-03-27 12:00:00');
       expect(data!.order_price).toBe(29900);
       expect(data!.purchase_cancel).toBe('purchase');
+      expect(data!.raw_body).toEqual(validPostback);
+    });
+
+    it('DTO에 정의되지 않은 필드도 raw_body에 보존된다', async () => {
+      const extended = {
+        ...validPostback,
+        product_name: '테스트 상품',
+        category: '식품',
+        items: [{ id: 1, qty: 2 }],
+      };
+
+      await request(app.getHttpServer())
+        .post('/coupang/postback')
+        .send(extended)
+        .expect(200);
+
+      const { data } = await supabase
+        .from('coupang_postbacks')
+        .select('*')
+        .single();
+
+      expect(data!.raw_body).toEqual(extended);
     });
 
     it('cancel 포스트백도 정상 저장된다', async () => {

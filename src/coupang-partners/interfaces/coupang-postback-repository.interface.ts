@@ -8,6 +8,7 @@ export interface CoupangPostbackRecord {
   orderTime: string;
   orderPrice: number;
   purchaseCancel: string;
+  rawBody: Record<string, unknown> | null;
   createdAt: string;
 }
 
