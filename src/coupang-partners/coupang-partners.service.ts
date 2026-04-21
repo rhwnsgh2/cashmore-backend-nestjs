@@ -12,7 +12,6 @@ export class CoupangPartnersService {
 
   async handlePostback(
     dto: CoupangPostbackRequestDto,
-    rawBody?: Record<string, unknown>,
   ): Promise<{ result: string; message: string }> {
     await this.postbackRepository.save({
       afcode: dto.afcode,
@@ -23,7 +22,6 @@ export class CoupangPartnersService {
       orderTime: dto.order_time,
       orderPrice: dto.order_price,
       purchaseCancel: dto.purchase_cancel,
-      rawBody: rawBody ?? null,
     });
 
     return { result: 'S', message: 'OK' };

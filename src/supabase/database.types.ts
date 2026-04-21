@@ -771,7 +771,6 @@ export type Database = {
           order_time: string;
           os: string;
           purchase_cancel: string;
-          raw_body: Json | null;
           subid: string;
         };
         Insert: {
@@ -784,7 +783,6 @@ export type Database = {
           order_time: string;
           os: string;
           purchase_cancel: string;
-          raw_body?: Json | null;
           subid: string;
         };
         Update: {
@@ -797,7 +795,6 @@ export type Database = {
           order_time?: string;
           os?: string;
           purchase_cancel?: string;
-          raw_body?: Json | null;
           subid?: string;
         };
         Relationships: [];

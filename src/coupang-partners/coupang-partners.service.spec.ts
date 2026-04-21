@@ -142,27 +142,6 @@ describe('CoupangPartnersService', () => {
       expect(records[0]).toHaveProperty('purchaseCancel');
     });
 
-    it('rawBody가 전달되면 그대로 저장된다', async () => {
-      const raw = {
-        afcode: 'AF000001',
-        subid: 'cashmore',
-        unknown_future_field: 'value',
-        items: [{ id: 1, name: '테스트상품' }],
-      };
-
-      await service.handlePostback(validDto, raw);
-
-      const records = stubRepo.getInsertedRecords();
-      expect(records[0].rawBody).toEqual(raw);
-    });
-
-    it('rawBody가 전달되지 않으면 null로 저장된다', async () => {
-      await service.handlePostback(validDto);
-
-      const records = stubRepo.getInsertedRecords();
-      expect(records[0].rawBody).toBeNull();
-    });
-
     it('repository 에러 시 예외가 전파된다', async () => {
       const failingRepo = new StubCoupangPostbackRepository();
       failingRepo.save = async () => {
