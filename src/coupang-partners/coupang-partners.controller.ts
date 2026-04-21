@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, Logger, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { Request } from 'express';
+import { Request } from 'express';
 import { CoupangPartnersService } from './coupang-partners.service';
 import {
   CoupangPostbackRequestDto,
