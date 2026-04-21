@@ -33,7 +33,7 @@ export class CoupangPartnersController {
       );
     } catch (error) {
       this.logger.error(
-        `Postback processing failed: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
+        `Postback processing failed: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
       return { result: 'E', message: 'Internal server error' };
