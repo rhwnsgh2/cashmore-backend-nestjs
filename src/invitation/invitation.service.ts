@@ -96,51 +96,6 @@ export class InvitationService {
       throw new NotFoundException('Invitation not found');
     }
 
-    const totalInvitationCount =
-      await this.invitationRepository.countTotalInvitedUsers(invitationId);
-
-    const activeProgram = await this.partnerProgramRepository.findActiveProgram(
-      userId,
-      new Date(),
-    );
-
-    if (activeProgram) {
-      const invitationCount =
-        await this.invitationRepository.countInvitedUsersBetween(
-          invitationId,
-          activeProgram.startsAt,
-          activeProgram.endsAt,
-        );
-      const stepRewards =
-        await this.invitationRepository.findStepRewardsByProgram(
-          userId,
-          activeProgram.id,
-        );
-      const receivedRewards = stepRewards.map((r) => r.stepCount);
-
-      const basePoints = invitationCount * PARTNER_POINTS_PER_INVITATION;
-      const stepPoints = receivedRewards.reduce((total, stepCount) => {
-        const step = PARTNER_INVITATION_STEPS.find(
-          (s) => s.count === stepCount,
-        );
-        return total + (step?.amount ?? 0);
-      }, 0);
-
-      return {
-        invitationCount,
-        totalInvitationCount,
-        activeProgram: {
-          id: activeProgram.id,
-          startsAt: activeProgram.startsAt,
-          endsAt: activeProgram.endsAt,
-        },
-        receivedRewards,
-        totalPoints: basePoints + stepPoints,
-        steps: PARTNER_INVITATION_STEPS,
-        success: true,
-      };
-    }
-
     const invitationCount =
       await this.invitationRepository.countInvitedUsersSince(
         invitationId,
@@ -158,8 +113,6 @@ export class InvitationService {
 
     return {
       invitationCount,
-      totalInvitationCount,
-      activeProgram: null,
       receivedRewards,
       totalPoints: basePoints + stepPoints,
       steps: INVITATION_STEPS,
@@ -176,56 +129,6 @@ export class InvitationService {
 
     if (invitationId === null) {
       return { success: false, error: 'Invitation not found' };
-    }
-
-    const activeProgram = await this.partnerProgramRepository.findActiveProgram(
-      userId,
-      new Date(),
-    );
-
-    if (activeProgram) {
-      const currentCount =
-        await this.invitationRepository.countInvitedUsersBetween(
-          invitationId,
-          activeProgram.startsAt,
-          activeProgram.endsAt,
-        );
-
-      if (currentCount < stepCount) {
-        throw new BadRequestException('Current count is less than step count');
-      }
-
-      const eligibleStep = PARTNER_INVITATION_STEPS.find(
-        (s) => s.count === stepCount,
-      );
-
-      if (!eligibleStep) {
-        throw new BadRequestException('Eligible step not found');
-      }
-
-      const alreadyReceived =
-        await this.invitationRepository.hasStepRewardByProgram(
-          userId,
-          stepCount,
-          activeProgram.id,
-        );
-
-      if (alreadyReceived) {
-        throw new ConflictException('Already received step reward');
-      }
-
-      await this.pointWriteService.addPoint({
-        userId,
-        amount: eligibleStep.amount,
-        type: 'INVITE_STEP_REWARD',
-        additionalData: {
-          step_count: eligibleStep.count,
-          step_name: eligibleStep.reward,
-          partner_program_id: activeProgram.id,
-        },
-      });
-
-      return { success: true };
     }
 
     // 초대 수 확인
@@ -533,6 +436,138 @@ export class InvitationService {
     minInviteCount: number,
   ): Promise<{ userId: string; email: string | null; inviteCount: number }[]> {
     return this.invitationRepository.findTopInviters(minInviteCount);
+  }
+
+  async getPartnerStepEvent(
+    userId: string,
+  ): Promise<
+    | { isActive: false }
+    | {
+        isActive: true;
+        programId: number;
+        startsAt: string;
+        endsAt: string;
+        invitationCount: number;
+        pointsPerInvitation: number;
+        receivedRewards: number[];
+        pointsEarned: number;
+        steps: typeof PARTNER_INVITATION_STEPS;
+        totalInvitationCount: number;
+        totalInvitationPoints: number;
+      }
+  > {
+    const program = await this.partnerProgramRepository.findActiveProgram(
+      userId,
+      new Date(),
+    );
+
+    if (!program) {
+      return { isActive: false };
+    }
+
+    const invitationId =
+      await this.invitationRepository.findInvitationIdByUserId(userId);
+
+    const [invitationCount, totalInvitationCount, stepRewards, totalInvitationPoints] =
+      await Promise.all([
+        invitationId === null
+          ? Promise.resolve(0)
+          : this.invitationRepository.countInvitedUsersBetween(
+              invitationId,
+              program.startsAt,
+              program.endsAt,
+            ),
+        invitationId === null
+          ? Promise.resolve(0)
+          : this.invitationRepository.countTotalInvitedUsers(invitationId),
+        this.invitationRepository.findStepRewardsByProgram(userId, program.id),
+        this.invitationRepository.sumInviteEarnedPoints(userId),
+      ]);
+
+    const receivedRewards = stepRewards.map((r) => r.stepCount);
+    const basePoints = invitationCount * PARTNER_POINTS_PER_INVITATION;
+    const stepPoints = receivedRewards.reduce((total, stepCount) => {
+      const step = PARTNER_INVITATION_STEPS.find((s) => s.count === stepCount);
+      return total + (step?.amount ?? 0);
+    }, 0);
+
+    return {
+      isActive: true,
+      programId: program.id,
+      startsAt: program.startsAt,
+      endsAt: program.endsAt,
+      invitationCount,
+      pointsPerInvitation: PARTNER_POINTS_PER_INVITATION,
+      receivedRewards,
+      pointsEarned: basePoints + stepPoints,
+      steps: PARTNER_INVITATION_STEPS,
+      totalInvitationCount,
+      totalInvitationPoints,
+    };
+  }
+
+  async claimPartnerStepReward(
+    userId: string,
+    stepCount: number,
+  ): Promise<StepRewardResponseDto> {
+    const program = await this.partnerProgramRepository.findActiveProgram(
+      userId,
+      new Date(),
+    );
+
+    if (!program) {
+      return { success: false, error: 'No active partner program' };
+    }
+
+    const invitationId =
+      await this.invitationRepository.findInvitationIdByUserId(userId);
+
+    if (invitationId === null) {
+      return { success: false, error: 'Invitation not found' };
+    }
+
+    const currentCount =
+      await this.invitationRepository.countInvitedUsersBetween(
+        invitationId,
+        program.startsAt,
+        program.endsAt,
+      );
+
+    if (currentCount < stepCount) {
+      throw new BadRequestException('Current count is less than step count');
+    }
+
+    const eligibleStep = PARTNER_INVITATION_STEPS.find(
+      (s) => s.count === stepCount,
+    );
+
+    if (!eligibleStep) {
+      throw new BadRequestException('Eligible step not found');
+    }
+
+    const alreadyReceived =
+      await this.invitationRepository.hasStepRewardByProgram(
+        userId,
+        stepCount,
+        program.id,
+      );
+
+    if (alreadyReceived) {
+      throw new ConflictException('Already received step reward');
+    }
+
+    await this.pointWriteService.addPoint({
+      userId,
+      amount: eligibleStep.amount,
+      type: 'INVITE_STEP_REWARD',
+      additionalData: {
+        step_count: eligibleStep.count,
+        step_name: eligibleStep.reward,
+        partner_program_id: program.id,
+      },
+    });
+
+    return { success: true };
   }
 
   async getPartnerStatus(

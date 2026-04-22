@@ -310,6 +310,18 @@ export class StubInvitationRepository implements IInvitationRepository {
 
   // 영수증 초대 통계
 
+  sumInviteEarnedPoints(userId: string): Promise<number> {
+    const sum = this.pointWriteRepository
+      .getInsertedActions()
+      .filter(
+        (a) =>
+          a.userId === userId &&
+          (a.type === 'INVITE_REWARD' || a.type === 'INVITE_STEP_REWARD'),
+      )
+      .reduce((acc, a) => acc + a.amount, 0);
+    return Promise.resolve(sum);
+  }
+
   findTopInviters(
     _minInviteCount: number,
   ): Promise<{ userId: string; email: string | null; inviteCount: number }[]> {

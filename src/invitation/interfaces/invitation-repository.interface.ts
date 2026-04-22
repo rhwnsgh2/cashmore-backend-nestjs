@@ -78,6 +78,9 @@ export interface IInvitationRepository {
     minInviteCount: number,
   ): Promise<{ userId: string; email: string | null; inviteCount: number }[]>;
 
+  // 역대 초대 관련 획득 포인트 합계 (INVITE_REWARD + INVITE_STEP_REWARD)
+  sumInviteEarnedPoints(userId: string): Promise<number>;
+
   // grantReceiptPoint 관련
   findEveryReceiptById(receiptId: number): Promise<EveryReceipt | null>;
 }

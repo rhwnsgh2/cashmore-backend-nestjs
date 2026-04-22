@@ -25,6 +25,11 @@ import {
   LottoProcessResponseDto,
 } from './dto/lotto-process.dto';
 import { PartnerStatusResponseDto } from './dto/partner-status.dto';
+import {
+  PartnerStepEventActiveResponseDto,
+  PartnerStepEventInactiveResponseDto,
+} from './dto/partner-step-event.dto';
+import { StepRewardRequestDto, StepRewardResponseDto } from './dto/step-reward.dto';
 import { ReceiptStatsResponseDto } from './dto/receipt-stats.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -106,6 +111,41 @@ export class InvitationController {
       invitedUserId: userId,
       inviteCode: dto.invitationCode,
     });
+  }
+
+  @Get('partner/step-event')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '파트너 프로그램 진행 상황 조회',
+    description:
+      '활성 파트너 프로그램이 있으면 기간/스텝/수령이력/역대누적을 반환한다. 없으면 isActive: false.',
+  })
+  @ApiResponse({ status: 200, type: PartnerStepEventActiveResponseDto })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async getPartnerStepEvent(
+    @CurrentUser('userId') userId: string,
+  ): Promise<
+    PartnerStepEventActiveResponseDto | PartnerStepEventInactiveResponseDto
+  > {
+    return this.invitationService.getPartnerStepEvent(userId);
+  }
+
+  @Post('partner/step-reward')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '파트너 단계별 보상 수령',
+    description:
+      '활성 파트너 프로그램에서 stepCount 조건을 충족하면 보상을 수령한다. 활성 프로그램이 없으면 success:false.',
+  })
+  @ApiResponse({ status: 201, type: StepRewardResponseDto })
+  @ApiUnauthorizedResponse({ description: '인증 실패' })
+  async claimPartnerStepReward(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: StepRewardRequestDto,
+  ): Promise<StepRewardResponseDto> {
+    return this.invitationService.claimPartnerStepReward(userId, dto.stepCount);
   }
 
   @Get('partner/me')

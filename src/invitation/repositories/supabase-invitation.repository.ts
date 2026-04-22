@@ -400,6 +400,20 @@ export class SupabaseInvitationRepository implements IInvitationRepository {
     }));
   }
 
+  async sumInviteEarnedPoints(userId: string): Promise<number> {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client.rpc('sum_invite_earned_points', {
+      p_user_id: userId,
+    });
+
+    if (error || data == null) {
+      return 0;
+    }
+
+    return Number(data);
+  }
+
   async countInvitedUsersByReceiptId(receiptId: number): Promise<number> {
     const client = this.supabaseService.getClient();
 
