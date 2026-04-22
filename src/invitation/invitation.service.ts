@@ -535,6 +535,28 @@ export class InvitationService {
     return this.invitationRepository.findTopInviters(minInviteCount);
   }
 
+  async getPartnerStatus(
+    userId: string,
+  ): Promise<
+    | { isActive: false }
+    | { isActive: true; startsAt: string; endsAt: string }
+  > {
+    const program = await this.partnerProgramRepository.findActiveProgram(
+      userId,
+      new Date(),
+    );
+
+    if (!program) {
+      return { isActive: false };
+    }
+
+    return {
+      isActive: true,
+      startsAt: program.startsAt,
+      endsAt: program.endsAt,
+    };
+  }
+
   async registerPartners(params: {
     userIds: string[];
     startsAt: string;

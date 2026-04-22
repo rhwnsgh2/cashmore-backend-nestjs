@@ -168,6 +168,61 @@ describe('InvitationService', () => {
     });
   });
 
+  describe('getPartnerStatus', () => {
+    const userId = 'partner-user';
+    const nowMs = Date.now();
+
+    it('활성 파트너 프로그램이 있으면 isActive true와 기간을 반환한다', async () => {
+      const program = {
+        id: 42,
+        userId,
+        startsAt: new Date(nowMs - 24 * 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(nowMs + 24 * 60 * 60 * 1000).toISOString(),
+      };
+      partnerRepository.setProgram(program);
+
+      const result = await service.getPartnerStatus(userId);
+
+      expect(result).toEqual({
+        isActive: true,
+        startsAt: program.startsAt,
+        endsAt: program.endsAt,
+      });
+    });
+
+    it('활성 파트너 프로그램이 없으면 isActive false만 반환한다', async () => {
+      const result = await service.getPartnerStatus(userId);
+
+      expect(result).toEqual({ isActive: false });
+    });
+
+    it('프로그램이 있어도 기간 밖이면 isActive false를 반환한다', async () => {
+      partnerRepository.setProgram({
+        id: 99,
+        userId,
+        startsAt: new Date(nowMs - 48 * 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(nowMs - 60 * 60 * 1000).toISOString(),
+      });
+
+      const result = await service.getPartnerStatus(userId);
+
+      expect(result).toEqual({ isActive: false });
+    });
+
+    it('다른 유저의 활성 프로그램은 영향을 주지 않는다', async () => {
+      partnerRepository.setProgram({
+        id: 100,
+        userId: 'other-user',
+        startsAt: new Date(nowMs - 24 * 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(nowMs + 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      const result = await service.getPartnerStatus(userId);
+
+      expect(result).toEqual({ isActive: false });
+    });
+  });
+
   describe('getStepEvent', () => {
     const userId = 'test-user';
 

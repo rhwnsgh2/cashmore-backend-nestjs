@@ -24,6 +24,7 @@ import {
   LottoProcessRequestDto,
   LottoProcessResponseDto,
 } from './dto/lotto-process.dto';
+import { PartnerStatusResponseDto } from './dto/partner-status.dto';
 import { ReceiptStatsResponseDto } from './dto/receipt-stats.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -105,6 +106,28 @@ export class InvitationController {
       invitedUserId: userId,
       inviteCode: dto.invitationCode,
     });
+  }
+
+  @Get('partner/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '본인의 파트너 프로그램 활성 여부 조회',
+    description:
+      '현재 시각 기준 활성 파트너 프로그램이 있으면 기간을 포함해 반환한다. 없으면 isActive: false.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '파트너 상태 조회 성공',
+    type: PartnerStatusResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 실패',
+  })
+  async getPartnerStatus(
+    @CurrentUser('userId') userId: string,
+  ): Promise<PartnerStatusResponseDto> {
+    return this.invitationService.getPartnerStatus(userId);
   }
 
   @Get('receipt-stats/:receiptId')

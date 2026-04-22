@@ -673,4 +673,81 @@ describe('Invitation Partner Program (e2e)', () => {
         .expect(409);
     });
   });
+
+  describe('GET /invitation/partner/me', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .get('/invitation/partner/me')
+        .expect(401);
+    });
+
+    it('활성 파트너 프로그램이 있으면 isActive true와 기간을 반환한다', async () => {
+      const user = await createTestUser(supabase);
+      const token = generateTestToken(user.auth_id);
+      const startsAt = isoHoursFromNow(-24);
+      const endsAt = isoHoursFromNow(24);
+      await createPartnerProgram(supabase, {
+        userId: user.id,
+        startsAt,
+        endsAt,
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/invitation/partner/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.isActive).toBe(true);
+      expect(response.body.startsAt).toBeDefined();
+      expect(response.body.endsAt).toBeDefined();
+      expect(new Date(response.body.startsAt).getTime()).toBe(
+        new Date(startsAt).getTime(),
+      );
+      expect(new Date(response.body.endsAt).getTime()).toBe(
+        new Date(endsAt).getTime(),
+      );
+    });
+
+    it('파트너 프로그램이 없으면 isActive false만 반환한다', async () => {
+      const user = await createTestUser(supabase);
+      const token = generateTestToken(user.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .get('/invitation/partner/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ isActive: false });
+    });
+
+    it('프로그램이 종료된 유저는 isActive false를 반환한다', async () => {
+      const user = await createTestUser(supabase);
+      const token = generateTestToken(user.auth_id);
+      await createPartnerProgram(supabase, {
+        userId: user.id,
+        startsAt: isoHoursFromNow(-48),
+        endsAt: isoHoursFromNow(-1),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/invitation/partner/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ isActive: false });
+    });
+
+    it('초대장이 없는 유저도 정상 응답한다', async () => {
+      // 파트너 프로그램 API는 초대장 유무와 무관해야 함
+      const user = await createTestUser(supabase);
+      const token = generateTestToken(user.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .get('/invitation/partner/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ isActive: false });
+    });
+  });
 });
