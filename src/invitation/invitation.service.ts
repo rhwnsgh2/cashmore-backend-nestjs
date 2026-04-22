@@ -538,8 +538,7 @@ export class InvitationService {
   async getPartnerStatus(
     userId: string,
   ): Promise<
-    | { isActive: false }
-    | { isActive: true; startsAt: string; endsAt: string }
+    { isActive: false } | { isActive: true; startsAt: string; endsAt: string }
   > {
     const program = await this.partnerProgramRepository.findActiveProgram(
       userId,
