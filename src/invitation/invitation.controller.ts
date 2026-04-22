@@ -29,7 +29,10 @@ import {
   PartnerStepEventActiveResponseDto,
   PartnerStepEventInactiveResponseDto,
 } from './dto/partner-step-event.dto';
-import { StepRewardRequestDto, StepRewardResponseDto } from './dto/step-reward.dto';
+import {
+  StepRewardRequestDto,
+  StepRewardResponseDto,
+} from './dto/step-reward.dto';
 import { ReceiptStatsResponseDto } from './dto/receipt-stats.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';

@@ -438,9 +438,7 @@ export class InvitationService {
     return this.invitationRepository.findTopInviters(minInviteCount);
   }
 
-  async getPartnerStepEvent(
-    userId: string,
-  ): Promise<
+  async getPartnerStepEvent(userId: string): Promise<
     | { isActive: false }
     | {
         isActive: true;
@@ -468,21 +466,25 @@ export class InvitationService {
     const invitationId =
       await this.invitationRepository.findInvitationIdByUserId(userId);
 
-    const [invitationCount, totalInvitationCount, stepRewards, totalInvitationPoints] =
-      await Promise.all([
-        invitationId === null
-          ? Promise.resolve(0)
-          : this.invitationRepository.countInvitedUsersBetween(
-              invitationId,
-              program.startsAt,
-              program.endsAt,
-            ),
-        invitationId === null
-          ? Promise.resolve(0)
-          : this.invitationRepository.countTotalInvitedUsers(invitationId),
-        this.invitationRepository.findStepRewardsByProgram(userId, program.id),
-        this.invitationRepository.sumInviteEarnedPoints(userId),
-      ]);
+    const [
+      invitationCount,
+      totalInvitationCount,
+      stepRewards,
+      totalInvitationPoints,
+    ] = await Promise.all([
+      invitationId === null
+        ? Promise.resolve(0)
+        : this.invitationRepository.countInvitedUsersBetween(
+            invitationId,
+            program.startsAt,
+            program.endsAt,
+          ),
+      invitationId === null
+        ? Promise.resolve(0)
+        : this.invitationRepository.countTotalInvitedUsers(invitationId),
+      this.invitationRepository.findStepRewardsByProgram(userId, program.id),
+      this.invitationRepository.sumInviteEarnedPoints(userId),
+    ]);
 
     const receivedRewards = stepRewards.map((r) => r.stepCount);
     const basePoints = invitationCount * PARTNER_POINTS_PER_INVITATION;
