@@ -107,6 +107,60 @@ describe('Admin Invitation Partner API (e2e)', () => {
       expect(userIds).toEqual([u1.id, u2.id, u3.id].sort());
     });
 
+    it('등록 성공 시 대상 유저들에게 partner_selected 모달을 생성한다', async () => {
+      const u1 = await createTestUser(supabase);
+      const u2 = await createTestUser(supabase);
+
+      await request(app.getHttpServer())
+        .post('/admin/invitation-partner')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({
+          userIds: [u1.id, u2.id],
+          startsAt: isoHoursFromNow(0),
+          endsAt: isoHoursFromNow(24 * 7),
+        })
+        .expect(201);
+
+      const { data } = await supabase
+        .from('modal_shown')
+        .select('user_id, name, status')
+        .eq('name', 'partner_selected');
+
+      expect(data).toHaveLength(2);
+      const users = data!.map((r) => r.user_id).sort();
+      expect(users).toEqual([u1.id, u2.id].sort());
+      expect(data!.every((r) => r.status === 'pending')).toBe(true);
+    });
+
+    it('409 응답 시 모달도 생성되지 않는다 (전체 롤백)', async () => {
+      const u1 = await createTestUser(supabase);
+      const u2 = await createTestUser(supabase);
+
+      // u2는 이미 기존 프로그램 있음
+      await supabase.from('invitation_partner_program').insert({
+        user_id: u2.id,
+        starts_at: isoHoursFromNow(-24),
+        ends_at: isoHoursFromNow(48),
+      });
+
+      await request(app.getHttpServer())
+        .post('/admin/invitation-partner')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({
+          userIds: [u1.id, u2.id],
+          startsAt: isoHoursFromNow(0),
+          endsAt: isoHoursFromNow(24 * 7),
+        })
+        .expect(409);
+
+      const { data } = await supabase
+        .from('modal_shown')
+        .select('id')
+        .eq('name', 'partner_selected');
+
+      expect(data).toHaveLength(0);
+    });
+
     it('동일 유저가 기간 겹치는 기존 프로그램을 가지면 409를 반환하고 전체 롤백한다', async () => {
       const u1 = await createTestUser(supabase);
       const u2 = await createTestUser(supabase);

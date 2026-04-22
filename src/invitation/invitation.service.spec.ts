@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { InvitationService } from './invitation.service';
 import {
@@ -937,6 +938,70 @@ describe('InvitationService', () => {
       await expect(service.claimPartnerStepReward(userId, 3)).rejects.toThrow(
         'Already received step reward',
       );
+    });
+  });
+
+  describe('registerPartners', () => {
+    const nowMs = Date.now();
+    const startsAt = new Date(nowMs + 60 * 60 * 1000).toISOString();
+    const endsAt = new Date(nowMs + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    it('등록 성공 시 대상 유저들에게 partner_selected 모달을 생성한다', async () => {
+      await service.registerPartners({
+        userIds: ['user-a', 'user-b', 'user-c'],
+        startsAt,
+        endsAt,
+      });
+
+      expect(
+        await modalRepository.hasModalByName('user-a', 'partner_selected'),
+      ).toBe(true);
+      expect(
+        await modalRepository.hasModalByName('user-b', 'partner_selected'),
+      ).toBe(true);
+      expect(
+        await modalRepository.hasModalByName('user-c', 'partner_selected'),
+      ).toBe(true);
+    });
+
+    it('중복으로 인한 409일 때는 모달을 생성하지 않는다', async () => {
+      partnerRepository.setProgram({
+        id: 1,
+        userId: 'user-b',
+        startsAt: new Date(nowMs - 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(nowMs + 48 * 60 * 60 * 1000).toISOString(),
+      });
+
+      await expect(
+        service.registerPartners({
+          userIds: ['user-a', 'user-b'],
+          startsAt,
+          endsAt,
+        }),
+      ).rejects.toThrow();
+
+      expect(
+        await modalRepository.hasModalByName('user-a', 'partner_selected'),
+      ).toBe(false);
+      expect(
+        await modalRepository.hasModalByName('user-b', 'partner_selected'),
+      ).toBe(false);
+    });
+
+    it('중복된 userIds는 모달도 한 번만 생성한다', async () => {
+      const createModalSpy = vi.spyOn(modalRepository, 'createModal');
+
+      await service.registerPartners({
+        userIds: ['user-a', 'user-a'],
+        startsAt,
+        endsAt,
+      });
+
+      const calls = createModalSpy.mock.calls.filter(
+        ([, name]) => name === 'partner_selected',
+      );
+      expect(calls).toHaveLength(1);
+      expect(calls[0][0]).toBe('user-a');
     });
   });
 });

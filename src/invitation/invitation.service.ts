@@ -624,6 +624,12 @@ export class InvitationService {
       uniqueUserIds.map((userId) => ({ userId, startsAt, endsAt })),
     );
 
+    await Promise.all(
+      uniqueUserIds.map((userId) =>
+        this.userModalRepository.createModal(userId, 'partner_selected'),
+      ),
+    );
+
     return { createdCount };
   }
 }
