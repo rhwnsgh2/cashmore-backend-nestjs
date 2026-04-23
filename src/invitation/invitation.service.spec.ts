@@ -433,6 +433,21 @@ describe('InvitationService', () => {
       expect(hasModal).toBe(true);
     });
 
+    it('비파트너의 invite_reward_received 모달 rewardAmount가 300P이다', async () => {
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      const modals = await modalRepository.findPendingByUserId(senderId);
+      const modal = modals.find((m) => m.name === 'invite_reward_received');
+      expect(modal).toBeDefined();
+      expect(
+        (modal!.additionalData as { rewardAmount: number }).rewardAmount,
+      ).toBe(300);
+    });
+
     // === 실패 케이스: 초대코드 검증 ===
 
     it('존재하지 않는 초대코드이면 실패한다', async () => {
@@ -748,6 +763,44 @@ describe('InvitationService', () => {
         expect(inviteReward!.amount).toBe(500);
         expect(inviteReward!.additionalData.partner_program_id).toBe(42);
         expect(receiptBonus!.amount).toBe(20);
+      });
+
+      it('파트너의 invite_reward_received 모달 rewardAmount가 500P이다', async () => {
+        partnerRepository.setProgram(activeProgram);
+
+        await service.processInvitationReward({
+          invitedUserId,
+          inviteCode: invitation.identifier,
+          deviceId,
+        });
+
+        const modals = await modalRepository.findPendingByUserId(senderId);
+        const modal = modals.find((m) => m.name === 'invite_reward_received');
+        expect(modal).toBeDefined();
+        expect(
+          (modal!.additionalData as { rewardAmount: number }).rewardAmount,
+        ).toBe(500);
+      });
+
+      it('파트너의 영수증 초대 모달 rewardAmount가 500P이다', async () => {
+        partnerRepository.setProgram(activeProgram);
+
+        await service.processInvitationReward({
+          invitedUserId,
+          inviteCode: invitation.identifier,
+          deviceId,
+          signupType: 'receipt',
+          receiptId: 999,
+        });
+
+        const modals = await modalRepository.findPendingByUserId(senderId);
+        const modal = modals.find(
+          (m) => m.name === 'invite_receipt_reward_received',
+        );
+        expect(modal).toBeDefined();
+        expect(
+          (modal!.additionalData as { rewardAmount: number }).rewardAmount,
+        ).toBe(500);
       });
     });
   });

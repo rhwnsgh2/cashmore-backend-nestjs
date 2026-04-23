@@ -307,7 +307,7 @@ export class InvitationService {
         invitation.senderId,
         'invite_receipt_reward_received',
         {
-          rewardAmount: POINTS_PER_INVITATION,
+          rewardAmount: invitePoints,
           receiptBonusAmount: RECEIPT_BONUS_POINT,
           receiptId,
         },
@@ -316,14 +316,14 @@ export class InvitationService {
       await this.userModalRepository.createModal(
         invitation.senderId,
         'invite_reward_received',
-        { rewardAmount: POINTS_PER_INVITATION },
+        { rewardAmount: invitePoints },
       );
     }
 
     // 11. 초대자에게 FCM 리프레시 + 푸시 알림
     const totalReward = isReceiptInvite
-      ? POINTS_PER_INVITATION + RECEIPT_BONUS_POINT
-      : POINTS_PER_INVITATION;
+      ? invitePoints + RECEIPT_BONUS_POINT
+      : invitePoints;
     void this.fcmService.sendRefreshMessage(
       invitation.senderId,
       'point_update',
