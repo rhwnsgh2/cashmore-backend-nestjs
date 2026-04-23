@@ -58,7 +58,13 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  await app.listen(port);
+  app.enableShutdownHooks();
+
+  const server = await app.listen(port);
+  // ALB idle timeout(60s)보다 크게 설정해 keep-alive race condition으로 인한 502 방지
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
+
   console.log(`Server is running on http://localhost:${port}`);
   console.log(`Swagger docs available at http://localhost:${port}/api-docs`);
 }

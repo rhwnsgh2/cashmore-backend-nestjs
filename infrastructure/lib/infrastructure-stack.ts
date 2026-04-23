@@ -183,6 +183,8 @@ export class InfrastructureStack extends cdk.Stack {
     // Container
     const container = taskDefinition.addContainer('CashmoreContainer', {
       image: ecs.ContainerImage.fromEcrRepository(repository),
+      // SIGTERM 후 in-flight 요청이 graceful shutdown 될 시간 확보 (기본 30s → 60s)
+      stopTimeout: cdk.Duration.seconds(60),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'cashmore',
         logGroup: logGroup,
