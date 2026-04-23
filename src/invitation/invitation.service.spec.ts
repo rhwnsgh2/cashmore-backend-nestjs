@@ -873,8 +873,8 @@ describe('InvitationService', () => {
 
       if (!result.isActive) throw new Error('expected active');
       expect(result.receivedRewards).toEqual([3]);
-      // 5 * 500 + 1000 = 3500
-      expect(result.pointsEarned).toBe(3500);
+      // 5 * 500 + 300 = 2800
+      expect(result.pointsEarned).toBe(2800);
     });
 
     it('다른 프로그램의 수령 이력은 receivedRewards에 포함되지 않는다', async () => {
@@ -945,7 +945,7 @@ describe('InvitationService', () => {
       expect(reward!.additionalData.partner_program_id).toBe(activeProgram.id);
     });
 
-    it('30명 스텝은 만원을 지급한다', async () => {
+    it('30명 스텝은 6,000P를 지급한다', async () => {
       const invitation = await service.getOrCreateInvitation(userId);
       partnerRepository.setProgram(activeProgram);
       repository.setInvitedUserCountInRange(
@@ -966,7 +966,7 @@ describe('InvitationService', () => {
           a.additionalData.step_count === 30,
       );
       expect(reward).toBeDefined();
-      expect(reward!.amount).toBe(10000);
+      expect(reward!.amount).toBe(6000);
     });
 
     it('카운트 부족이면 BadRequestException', async () => {
