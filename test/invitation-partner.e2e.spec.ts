@@ -356,7 +356,7 @@ describe('Invitation Partner Program (e2e)', () => {
       expect(response.body.pointsPerInvitation).toBe(500);
       expect(response.body.receivedRewards).toEqual([]);
       expect(response.body.pointsEarned).toBe(1500);
-      expect(response.body.steps).toHaveLength(4);
+      expect(response.body.steps).toHaveLength(12);
       expect(response.body.totalInvitationCount).toBe(5);
       expect(response.body.totalInvitationPoints).toBe(1500);
     });

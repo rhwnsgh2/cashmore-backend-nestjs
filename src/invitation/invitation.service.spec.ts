@@ -851,7 +851,7 @@ describe('InvitationService', () => {
       expect(result.pointsPerInvitation).toBe(500);
       expect(result.receivedRewards).toEqual([]);
       expect(result.pointsEarned).toBe(5 * 500);
-      expect(result.steps).toHaveLength(4);
+      expect(result.steps).toHaveLength(12);
       expect(result.totalInvitationCount).toBe(20);
       expect(result.totalInvitationPoints).toBe(12000);
     });
@@ -943,6 +943,30 @@ describe('InvitationService', () => {
       );
       expect(reward).toBeDefined();
       expect(reward!.additionalData.partner_program_id).toBe(activeProgram.id);
+    });
+
+    it('30명 스텝은 만원을 지급한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        30,
+      );
+
+      const result = await service.claimPartnerStepReward(userId, 30);
+
+      expect(result.success).toBe(true);
+      const actions = pointWriteRepo.getInsertedActions();
+      const reward = actions.find(
+        (a) =>
+          a.type === 'INVITE_STEP_REWARD' &&
+          a.userId === userId &&
+          a.additionalData.step_count === 30,
+      );
+      expect(reward).toBeDefined();
+      expect(reward!.amount).toBe(10000);
     });
 
     it('카운트 부족이면 BadRequestException', async () => {
