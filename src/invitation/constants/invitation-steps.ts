@@ -21,16 +21,16 @@ export const PARTNER_POINTS_PER_INVITATION = 500;
 
 // 파트너 프로그램 전용 스텝
 export const PARTNER_INVITATION_STEPS: InvitationStep[] = [
-  { count: 3, reward: '300P 받기', amount: 300 },
-  { count: 5, reward: '400P 받기', amount: 400 },
-  { count: 7, reward: '600P 받기', amount: 600 },
-  { count: 10, reward: '2,000P 받기', amount: 2000 },
-  { count: 13, reward: '500P 받기', amount: 500 },
-  { count: 15, reward: '700P 받기', amount: 700 },
-  { count: 17, reward: '1,000P 받기', amount: 1000 },
-  { count: 20, reward: '4,000P 받기', amount: 4000 },
-  { count: 23, reward: '800P 받기', amount: 800 },
-  { count: 25, reward: '1,200P 받기', amount: 1200 },
-  { count: 27, reward: '1,600P 받기', amount: 1600 },
-  { count: 30, reward: '6,000P 받기', amount: 6000 },
+  { count: 3, reward: '300원 받기', amount: 300 },
+  { count: 5, reward: '400원 받기', amount: 400 },
+  { count: 7, reward: '600원 받기', amount: 600 },
+  { count: 10, reward: '2천원 받기', amount: 2000 },
+  { count: 13, reward: '500원 받기', amount: 500 },
+  { count: 15, reward: '700원 받기', amount: 700 },
+  { count: 17, reward: '천원 받기', amount: 1000 },
+  { count: 20, reward: '4천원 받기', amount: 4000 },
+  { count: 23, reward: '800원 받기', amount: 800 },
+  { count: 25, reward: '1,200원 받기', amount: 1200 },
+  { count: 27, reward: '1,600원 받기', amount: 1600 },
+  { count: 30, reward: '6천원 받기', amount: 6000 },
 ];
