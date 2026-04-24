@@ -60,6 +60,25 @@ describe('CoupangPartnersService', () => {
       });
     });
 
+    it('rawData를 함께 전달하면 repository에 그대로 저장된다', async () => {
+      const rawData = {
+        ...validDto,
+        extra_unknown_field: 'keep-me',
+      };
+
+      await service.handlePostback(validDto, rawData);
+
+      const records = stubRepo.getInsertedRecords();
+      expect(records[0].rawData).toEqual(rawData);
+    });
+
+    it('rawData를 생략하면 null로 저장된다', async () => {
+      await service.handlePostback(validDto);
+
+      const records = stubRepo.getInsertedRecords();
+      expect(records[0].rawData).toBeNull();
+    });
+
     it('cancel 포스트백도 정상 저장된다', async () => {
       const cancelDto: CoupangPostbackRequestDto = {
         ...validDto,

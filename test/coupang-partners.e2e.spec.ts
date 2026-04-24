@@ -70,6 +70,27 @@ describe('Coupang Partners API (e2e)', () => {
       expect(data!.order_time).toBe('2026-03-27 12:00:00');
       expect(data!.order_price).toBe(29900);
       expect(data!.purchase_cancel).toBe('purchase');
+      expect(data!.raw_data).toEqual(validPostback);
+    });
+
+    it('스펙 외 필드가 포함된 body도 raw_data에 그대로 보존된다', async () => {
+      const bodyWithExtras = {
+        ...validPostback,
+        unknown_extra: 'something-coupang-might-send',
+        nested: { a: 1, b: [1, 2, 3] },
+      };
+
+      await request(app.getHttpServer())
+        .post('/coupang/postback')
+        .send(bodyWithExtras)
+        .expect(200);
+
+      const { data } = await supabase
+        .from('coupang_postbacks')
+        .select('*')
+        .single();
+
+      expect(data!.raw_data).toEqual(bodyWithExtras);
     });
 
     it('cancel 포스트백도 정상 저장된다', async () => {
