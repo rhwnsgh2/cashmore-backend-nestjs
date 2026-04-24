@@ -945,17 +945,30 @@ describe('InvitationService', () => {
       expect(reward!.additionalData.partner_program_id).toBe(activeProgram.id);
     });
 
-    it('30명 스텝은 6,000P를 지급한다', async () => {
+    it.each([
+      [3, 300],
+      [5, 400],
+      [7, 600],
+      [10, 2000],
+      [13, 500],
+      [15, 700],
+      [17, 1000],
+      [20, 4000],
+      [23, 800],
+      [25, 1200],
+      [27, 1600],
+      [30, 6000],
+    ])('%d명 스텝은 %d원을 지급한다', async (stepCount, expectedAmount) => {
       const invitation = await service.getOrCreateInvitation(userId);
       partnerRepository.setProgram(activeProgram);
       repository.setInvitedUserCountInRange(
         invitation.id,
         activeProgram.startsAt,
         activeProgram.endsAt,
-        30,
+        stepCount,
       );
 
-      const result = await service.claimPartnerStepReward(userId, 30);
+      const result = await service.claimPartnerStepReward(userId, stepCount);
 
       expect(result.success).toBe(true);
       const actions = pointWriteRepo.getInsertedActions();
@@ -963,10 +976,11 @@ describe('InvitationService', () => {
         (a) =>
           a.type === 'INVITE_STEP_REWARD' &&
           a.userId === userId &&
-          a.additionalData.step_count === 30,
+          a.additionalData.step_count === stepCount,
       );
       expect(reward).toBeDefined();
-      expect(reward!.amount).toBe(6000);
+      expect(reward!.amount).toBe(expectedAmount);
+      expect(reward!.additionalData.partner_program_id).toBe(activeProgram.id);
     });
 
     it('카운트 부족이면 BadRequestException', async () => {
