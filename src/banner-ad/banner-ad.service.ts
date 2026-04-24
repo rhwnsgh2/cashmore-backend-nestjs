@@ -17,7 +17,11 @@ const AD_TIME_POLICIES: Record<number, { startHour: number; endHour: number }> =
   {
     // 렌트리 배너: 12시~18시만 노출
     1: { startHour: 12, endHour: 18 },
+    // 미래피엠피 배너: 12시~18시만 노출
+    2: { startHour: 12, endHour: 18 },
   };
+
+const DEV_PREVIEW_AD_ID = 2;
 
 @Injectable()
 export class BannerAdService {
@@ -49,6 +53,21 @@ export class BannerAdService {
   }
 
   async getActiveBanners(placement: string): Promise<BannerAdDto[]> {
+    if (process.env.NODE_ENV !== 'production') {
+      const all = await this.bannerAdRepository.findAll();
+      const preview = all.find((ad) => ad.id === DEV_PREVIEW_AD_ID);
+      if (preview) {
+        return [
+          {
+            id: preview.id,
+            imageUrl: preview.image_url,
+            clickUrl: preview.click_url,
+            placement: preview.placement,
+          },
+        ];
+      }
+    }
+
     const ads = await this.bannerAdRepository.findActive(placement);
     return ads
       .filter((ad) => this.isWithinAdPolicy(ad))
