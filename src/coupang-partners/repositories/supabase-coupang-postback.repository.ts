@@ -25,6 +25,7 @@ export class SupabaseCoupangPostbackRepository implements ICoupangPostbackReposi
         order_time: data.orderTime,
         order_price: data.orderPrice,
         purchase_cancel: data.purchaseCancel,
+        order_id: data.orderId,
         raw_data: (data.rawData ?? null) as Json | null,
       });
 

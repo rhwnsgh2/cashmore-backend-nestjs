@@ -18,6 +18,7 @@ describe('CoupangPartnersService', () => {
     order_time: '2026-03-27 12:00:00',
     order_price: 29900,
     purchase_cancel: 'purchase',
+    order_id: 1234567890,
   };
 
   beforeEach(async () => {
@@ -57,6 +58,7 @@ describe('CoupangPartnersService', () => {
         orderTime: '2026-03-27 12:00:00',
         orderPrice: 29900,
         purchaseCancel: 'purchase',
+        orderId: 1234567890,
       });
     });
 

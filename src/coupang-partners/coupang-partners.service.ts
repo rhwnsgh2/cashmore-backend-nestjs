@@ -23,6 +23,7 @@ export class CoupangPartnersService {
       orderTime: dto.order_time,
       orderPrice: dto.order_price,
       purchaseCancel: dto.purchase_cancel,
+      orderId: dto.order_id,
       rawData,
     });
 

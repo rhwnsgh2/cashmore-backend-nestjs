@@ -37,6 +37,10 @@ export class CoupangPostbackRequestDto {
   })
   @IsIn(['purchase', 'cancel'])
   purchase_cancel: string;
+
+  @ApiProperty({ description: '주문 ID', example: 1234567890 })
+  @IsNumber()
+  order_id: number;
 }
 
 export class CoupangPostbackResponseDto {

@@ -19,6 +19,7 @@ describe('Coupang Partners API (e2e)', () => {
     order_time: '2026-03-27 12:00:00',
     order_price: 29900,
     purchase_cancel: 'purchase',
+    order_id: 1234567890,
   };
 
   beforeAll(async () => {
@@ -70,6 +71,7 @@ describe('Coupang Partners API (e2e)', () => {
       expect(data!.order_time).toBe('2026-03-27 12:00:00');
       expect(data!.order_price).toBe(29900);
       expect(data!.purchase_cancel).toBe('purchase');
+      expect(data!.order_id).toBe(1234567890);
       expect(data!.raw_data).toEqual(validPostback);
     });
 
@@ -261,6 +263,22 @@ describe('Coupang Partners API (e2e)', () => {
       await request(app.getHttpServer())
         .post('/coupang/postback')
         .send(dto)
+        .expect(400);
+    });
+
+    it('order_id가 누락되면 400을 반환한다', async () => {
+      const { order_id: _orderId, ...dto } = validPostback;
+
+      await request(app.getHttpServer())
+        .post('/coupang/postback')
+        .send(dto)
+        .expect(400);
+    });
+
+    it('order_id가 문자열이면 400을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .post('/coupang/postback')
+        .send({ ...validPostback, order_id: 'not-a-number' })
         .expect(400);
     });
 

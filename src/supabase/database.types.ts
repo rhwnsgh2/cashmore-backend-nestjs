@@ -767,6 +767,7 @@ export type Database = {
           click_id: string;
           created_at: string;
           id: number;
+          order_id: number;
           order_price: number;
           order_time: string;
           os: string;
@@ -780,6 +781,7 @@ export type Database = {
           click_id?: string;
           created_at?: string;
           id?: never;
+          order_id: number;
           order_price: number;
           order_time: string;
           os: string;
@@ -793,6 +795,7 @@ export type Database = {
           click_id?: string;
           created_at?: string;
           id?: never;
+          order_id?: number;
           order_price?: number;
           order_time?: string;
           os?: string;
