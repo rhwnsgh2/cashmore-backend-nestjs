@@ -1187,6 +1187,44 @@ exports.handler = async (event) => {
       targets: [new events_targets.LambdaFunction(scalingEventLambda)],
     });
 
+    // Daily memory recycle: 매일 KST 04:00 ECS rolling restart로 메모리 leak 우회
+    const dailyRestartFn = new lambda.Function(this, 'DailyRestartLambda', {
+      functionName: 'cashmore-daily-restart',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      timeout: cdk.Duration.seconds(30),
+      code: lambda.Code.fromInline(`
+const { ECSClient, UpdateServiceCommand } = require('@aws-sdk/client-ecs');
+const ecs = new ECSClient({ region: process.env.AWS_REGION });
+exports.handler = async () => {
+  await ecs.send(new UpdateServiceCommand({
+    cluster: process.env.CLUSTER_NAME,
+    service: process.env.SERVICE_NAME,
+    forceNewDeployment: true,
+  }));
+  return { ok: true, ts: new Date().toISOString() };
+};
+      `),
+      environment: {
+        CLUSTER_NAME: cluster.clusterName,
+        SERVICE_NAME: service.serviceName,
+      },
+    });
+
+    dailyRestartFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ecs:UpdateService'],
+        resources: [service.serviceArn],
+      }),
+    );
+
+    new events.Rule(this, 'DailyMemoryRecycleRule', {
+      ruleName: 'cashmore-daily-memory-recycle',
+      description: '매일 KST 04:00 ECS rolling restart (메모리 leak 우회)',
+      schedule: events.Schedule.cron({ hour: '19', minute: '0' }), // UTC 19:00 = KST 04:00
+      targets: [new events_targets.LambdaFunction(dailyRestartFn)],
+    });
+
     // Outputs
     new cdk.CfnOutput(this, 'AlbDnsName', {
       value: alb.loadBalancerDnsName,
