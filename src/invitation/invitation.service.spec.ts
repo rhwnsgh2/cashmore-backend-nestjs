@@ -15,6 +15,7 @@ import { SlackService } from '../slack/slack.service';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 import { PointWriteService } from '../point-write/point-write.service';
 import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
+import { AmplitudeService } from '../amplitude/amplitude.service';
 
 describe('InvitationService', () => {
   let service: InvitationService;
@@ -22,12 +23,18 @@ describe('InvitationService', () => {
   let partnerRepository: StubPartnerProgramRepository;
   let modalRepository: StubUserModalRepository;
   let pointWriteRepo: StubPointWriteRepository;
+  let amplitudeIdentify: ReturnType<typeof vi.fn>;
+  let amplitudeTrack: ReturnType<typeof vi.fn>;
+  let fcmPushNotification: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     pointWriteRepo = new StubPointWriteRepository();
     repository = new StubInvitationRepository(pointWriteRepo);
     partnerRepository = new StubPartnerProgramRepository();
     modalRepository = new StubUserModalRepository();
+    amplitudeIdentify = vi.fn();
+    amplitudeTrack = vi.fn();
+    fcmPushNotification = vi.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,7 +55,7 @@ describe('InvitationService', () => {
           provide: FcmService,
           useValue: {
             sendRefreshMessage: async () => {},
-            pushNotification: async () => {},
+            pushNotification: fcmPushNotification,
           },
         },
         {
@@ -61,6 +68,10 @@ describe('InvitationService', () => {
         {
           provide: POINT_WRITE_SERVICE,
           useFactory: () => new PointWriteService(pointWriteRepo),
+        },
+        {
+          provide: AmplitudeService,
+          useValue: { identify: amplitudeIdentify, track: amplitudeTrack },
         },
       ],
     }).compile();
@@ -401,6 +412,33 @@ describe('InvitationService', () => {
       );
       expect(invitedReward).toBeDefined();
       expect([300, 500, 1000, 3000, 50000]).toContain(invitedReward!.amount);
+    });
+
+    it('Amplitude에 초대자/피초대자 이벤트를 발사한다', async () => {
+      await service.processInvitationReward({
+        invitedUserId,
+        inviteCode: invitation.identifier,
+        deviceId,
+      });
+
+      expect(amplitudeTrack).toHaveBeenCalledWith(
+        'invitation_reward_granted',
+        senderId,
+        expect.objectContaining({
+          amount: 300,
+          is_partner_bonus: false,
+          signup_type: 'normal',
+          receipt_bonus: 0,
+        }),
+      );
+      expect(amplitudeTrack).toHaveBeenCalledWith(
+        'invited_user_reward_received',
+        invitedUserId,
+        expect.objectContaining({
+          sender_was_partner: false,
+          signup_type: 'normal',
+        }),
+      );
     });
 
     it('피초대자의 디바이스에 invitation_reward 이벤트를 기록한다', async () => {
@@ -1077,6 +1115,59 @@ describe('InvitationService', () => {
       expect(
         await modalRepository.hasModalByName('user-b', 'partner_selected'),
       ).toBe(false);
+    });
+
+    it('등록 성공 시 대상 유저들에게 파트너 선정 푸시를 보낸다', async () => {
+      await service.registerPartners({
+        userIds: ['user-a', 'user-b'],
+        startsAt,
+        endsAt,
+      });
+
+      expect(fcmPushNotification).toHaveBeenCalledWith(
+        'user-a',
+        '캐시모어 파트너에 선정됐어요 🏅',
+        '훨씬 좋아진 친구 초대 보상을 확인해보세요',
+      );
+      expect(fcmPushNotification).toHaveBeenCalledWith(
+        'user-b',
+        '캐시모어 파트너에 선정됐어요 🏅',
+        '훨씬 좋아진 친구 초대 보상을 확인해보세요',
+      );
+    });
+
+    it('등록 성공 시 대상 유저들에게 partner_program_v1=true 유저 프로퍼티를 세팅한다', async () => {
+      await service.registerPartners({
+        userIds: ['user-a', 'user-b'],
+        startsAt,
+        endsAt,
+      });
+
+      expect(amplitudeIdentify).toHaveBeenCalledWith('user-a', {
+        partner_program_v1: true,
+      });
+      expect(amplitudeIdentify).toHaveBeenCalledWith('user-b', {
+        partner_program_v1: true,
+      });
+    });
+
+    it('중복으로 인한 409일 때는 amplitude identify를 호출하지 않는다', async () => {
+      partnerRepository.setProgram({
+        id: 1,
+        userId: 'user-b',
+        startsAt: new Date(nowMs - 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(nowMs + 48 * 60 * 60 * 1000).toISOString(),
+      });
+
+      await expect(
+        service.registerPartners({
+          userIds: ['user-a', 'user-b'],
+          startsAt,
+          endsAt,
+        }),
+      ).rejects.toThrow();
+
+      expect(amplitudeIdentify).not.toHaveBeenCalled();
     });
 
     it('중복된 userIds는 모달도 한 번만 생성한다', async () => {

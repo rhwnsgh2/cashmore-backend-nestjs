@@ -27,6 +27,7 @@ import {
 } from '../user-modal/interfaces/user-modal-repository.interface';
 import { FcmService } from '../fcm/fcm.service';
 import { SlackService } from '../slack/slack.service';
+import { AmplitudeService } from '../amplitude/amplitude.service';
 import type { StepEventResponseDto } from './dto/step-event-response.dto';
 import type { StepRewardResponseDto } from './dto/step-reward.dto';
 import type { LottoProcessResponseDto } from './dto/lotto-process.dto';
@@ -58,6 +59,7 @@ export class InvitationService {
     private pointWriteService: IPointWriteService,
     @Inject(PARTNER_PROGRAM_REPOSITORY)
     private partnerProgramRepository: IPartnerProgramRepository,
+    private amplitudeService: AmplitudeService,
   ) {}
 
   async getOrCreateInvitation(userId: string): Promise<Invitation> {
@@ -320,6 +322,18 @@ export class InvitationService {
       );
     }
 
+    // 10-1. Amplitude: 초대자 보상 수령
+    this.amplitudeService.track(
+      'invitation_reward_granted',
+      invitation.senderId,
+      {
+        amount: invitePoints,
+        is_partner_bonus: !!senderActiveProgram,
+        signup_type: signupType ?? 'normal',
+        receipt_bonus: isReceiptInvite ? RECEIPT_BONUS_POINT : 0,
+      },
+    );
+
     // 11. 초대자에게 FCM 리프레시 + 푸시 알림
     const totalReward = isReceiptInvite
       ? invitePoints + RECEIPT_BONUS_POINT
@@ -349,6 +363,17 @@ export class InvitationService {
       type: 'INVITED_USER_REWARD_RANDOM',
       additionalData: { invitation_user_id: invitationUserId },
     });
+
+    // 13-1. Amplitude: 피초대자 랜덤 보상 수령
+    this.amplitudeService.track(
+      'invited_user_reward_received',
+      invitedUserId,
+      {
+        amount: rewardPoint,
+        sender_was_partner: !!senderActiveProgram,
+        signup_type: signupType ?? 'normal',
+      },
+    );
 
     // Slack: 초대 성공 로깅
     void this.slackService.reportToInvitationNoti(
@@ -629,6 +654,15 @@ export class InvitationService {
         this.userModalRepository.createModal(userId, 'partner_selected'),
       ),
     );
+
+    for (const userId of uniqueUserIds) {
+      this.amplitudeService.identify(userId, { partner_program_v1: true });
+      void this.fcmService.pushNotification(
+        userId,
+        '캐시모어 파트너에 선정됐어요 🏅',
+        '훨씬 좋아진 친구 초대 보상을 확인해보세요',
+      );
+    }
 
     return { createdCount };
   }

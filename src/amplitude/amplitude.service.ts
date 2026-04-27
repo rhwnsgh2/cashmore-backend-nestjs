@@ -40,6 +40,23 @@ export class AmplitudeService implements OnModuleDestroy {
     amplitude.track(eventType, eventProperties, { user_id: userId });
   }
 
+  identify(userId: string, properties: AmplitudeEventProperties): void {
+    if (!this.initialized) {
+      return;
+    }
+
+    const identify = new amplitude.Identify();
+    for (const [key, value] of Object.entries(properties)) {
+      if (value === null) {
+        identify.unset(key);
+      } else {
+        identify.set(key, value);
+      }
+    }
+
+    amplitude.identify(identify, { user_id: userId });
+  }
+
   onModuleDestroy(): void {
     if (this.initialized) {
       amplitude.flush();
