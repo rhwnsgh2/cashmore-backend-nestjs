@@ -365,15 +365,11 @@ export class InvitationService {
     });
 
     // 13-1. Amplitude: 피초대자 랜덤 보상 수령
-    this.amplitudeService.track(
-      'invited_user_reward_received',
-      invitedUserId,
-      {
-        amount: rewardPoint,
-        sender_was_partner: !!senderActiveProgram,
-        signup_type: signupType ?? 'normal',
-      },
-    );
+    this.amplitudeService.track('invited_user_reward_received', invitedUserId, {
+      amount: rewardPoint,
+      sender_was_partner: !!senderActiveProgram,
+      signup_type: signupType ?? 'normal',
+    });
 
     // Slack: 초대 성공 로깅
     void this.slackService.reportToInvitationNoti(
