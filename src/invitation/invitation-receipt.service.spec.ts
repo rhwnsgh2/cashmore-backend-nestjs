@@ -11,6 +11,7 @@ import { SlackService } from '../slack/slack.service';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 import { PointWriteService } from '../point-write/point-write.service';
 import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
+import { AmplitudeService } from '../amplitude/amplitude.service';
 
 describe('InvitationService - invitation_receipt', () => {
   let service: InvitationService;
@@ -56,6 +57,10 @@ describe('InvitationService - invitation_receipt', () => {
         {
           provide: PARTNER_PROGRAM_REPOSITORY,
           useValue: new StubPartnerProgramRepository(),
+        },
+        {
+          provide: AmplitudeService,
+          useValue: { identify: () => {}, track: () => {} },
         },
       ],
     }).compile();
