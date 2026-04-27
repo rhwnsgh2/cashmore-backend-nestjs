@@ -171,6 +171,12 @@ export class InvitationService {
       },
     });
 
+    this.amplitudeService.track('invitation_step_reward_claimed', userId, {
+      amount: eligibleStep.amount,
+      step_count: eligibleStep.count,
+      is_partner_step: false,
+    });
+
     return { success: true };
   }
 
@@ -588,6 +594,12 @@ export class InvitationService {
         step_name: eligibleStep.reward,
         partner_program_id: program.id,
       },
+    });
+
+    this.amplitudeService.track('invitation_step_reward_claimed', userId, {
+      amount: eligibleStep.amount,
+      step_count: eligibleStep.count,
+      is_partner_step: true,
     });
 
     return { success: true };

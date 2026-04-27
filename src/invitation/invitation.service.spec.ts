@@ -327,6 +327,22 @@ describe('InvitationService', () => {
       expect(result.error).toBeUndefined();
     });
 
+    it('수령 성공 시 invitation_step_reward_claimed Amplitude 이벤트를 발사한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      repository.setInvitedUserCount(invitation.id, 3);
+
+      await service.claimStepReward(userId, 3);
+
+      expect(amplitudeTrack).toHaveBeenCalledWith(
+        'invitation_step_reward_claimed',
+        userId,
+        expect.objectContaining({
+          step_count: 3,
+          is_partner_step: false,
+        }),
+      );
+    });
+
     it('보상 지급 후 중복 수령이 불가능하다', async () => {
       const invitation = await service.getOrCreateInvitation(userId);
       repository.setInvitedUserCount(invitation.id, 3);
@@ -981,6 +997,28 @@ describe('InvitationService', () => {
       );
       expect(reward).toBeDefined();
       expect(reward!.additionalData.partner_program_id).toBe(activeProgram.id);
+    });
+
+    it('수령 성공 시 is_partner_step:true Amplitude 이벤트를 발사한다', async () => {
+      const invitation = await service.getOrCreateInvitation(userId);
+      partnerRepository.setProgram(activeProgram);
+      repository.setInvitedUserCountInRange(
+        invitation.id,
+        activeProgram.startsAt,
+        activeProgram.endsAt,
+        3,
+      );
+
+      await service.claimPartnerStepReward(userId, 3);
+
+      expect(amplitudeTrack).toHaveBeenCalledWith(
+        'invitation_step_reward_claimed',
+        userId,
+        expect.objectContaining({
+          step_count: 3,
+          is_partner_step: true,
+        }),
+      );
     });
 
     it.each([
