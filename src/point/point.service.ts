@@ -2,7 +2,10 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-import type { IPointRepository } from './interfaces/point-repository.interface';
+import type {
+  IPointRepository,
+  PointBalance,
+} from './interfaces/point-repository.interface';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import { calculateExpiringPoints } from './utils/calculate-point.util';
 import type { IPointWriteService } from '../point-write/point-write.interface';
@@ -36,9 +39,13 @@ export class PointService {
   async getPointTotal(userId: string): Promise<PointTotalResult> {
     const now = dayjs().tz('Asia/Seoul');
 
-    const totalPoint = await this.calculateTotalPoint(userId);
+    // SUM과 cached balance를 병렬 조회 — race window 최소화 (1~5ms)
+    const [totalPoint, balance] = await Promise.all([
+      this.calculateTotalPoint(userId),
+      this.pointRepository.findBalance(userId),
+    ]);
 
-    void this.syncBalance(userId, totalPoint);
+    void this.syncBalance(userId, totalPoint, balance);
 
     const expiringPoints = calculateExpiringPoints();
     const expiringDate = now.endOf('month').format('YYYY-MM-DD');
@@ -99,9 +106,12 @@ export class PointService {
     return this.pointRepository.findTotalPointSum(userId);
   }
 
-  private async syncBalance(userId: string, expected: number): Promise<void> {
+  private async syncBalance(
+    userId: string,
+    expected: number,
+    balance: PointBalance | null,
+  ): Promise<void> {
     try {
-      const balance = await this.pointRepository.findBalance(userId);
       const cached = balance?.totalPoint ?? 0;
       if (cached === expected) {
         return;
