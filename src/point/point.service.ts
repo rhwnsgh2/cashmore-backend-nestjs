@@ -2,10 +2,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-import type {
-  IPointRepository,
-  PointBalance,
-} from './interfaces/point-repository.interface';
+import type { IPointRepository } from './interfaces/point-repository.interface';
 import { POINT_REPOSITORY } from './interfaces/point-repository.interface';
 import { calculateExpiringPoints } from './utils/calculate-point.util';
 import type { IPointWriteService } from '../point-write/point-write.interface';
@@ -39,14 +36,26 @@ export class PointService {
   async getPointTotal(userId: string): Promise<PointTotalResult> {
     const now = dayjs().tz('Asia/Seoul');
 
-    // SUM과 cached balance를 병렬 조회 — race window 최소화 (1~5ms)
-    // findBalance 실패는 응답에 영향 없도록 swallow (drift 검증만 스킵)
-    const [totalPoint, balance] = await Promise.all([
-      this.calculateTotalPoint(userId),
-      this.pointRepository.findBalance(userId).catch(() => null),
-    ]);
-
-    void this.syncBalance(userId, totalPoint, balance);
+    // user_point_balance에서 직접 totalPoint 조회 (sum_user_points RPC 대체)
+    // row가 없거나 조회 실패 시 sum_user_points로 폴백 (안전망)
+    let totalPoint: number;
+    try {
+      const balance = await this.pointRepository.findBalance(userId);
+      if (balance) {
+        totalPoint = balance.totalPoint;
+      } else {
+        // row 없음 (신규 유저이거나 누락 케이스) → SUM으로 폴백
+        totalPoint = await this.calculateTotalPoint(userId);
+      }
+    } catch (error) {
+      // DB 에러 → SUM으로 폴백
+      this.logger.warn(
+        `[POINT_TOTAL] findBalance failed, fallback to SUM userId=${userId} error=${
+          error instanceof Error ? error.message : 'Unknown'
+        }`,
+      );
+      totalPoint = await this.calculateTotalPoint(userId);
+    }
 
     const expiringPoints = calculateExpiringPoints();
     const expiringDate = now.endOf('month').format('YYYY-MM-DD');
@@ -105,34 +114,6 @@ export class PointService {
 
   private async calculateTotalPoint(userId: string): Promise<number> {
     return this.pointRepository.findTotalPointSum(userId);
-  }
-
-  private async syncBalance(
-    userId: string,
-    expected: number,
-    balance: PointBalance | null,
-  ): Promise<void> {
-    try {
-      const cached = balance?.totalPoint ?? 0;
-      if (cached === expected) {
-        return;
-      }
-
-      const diff = expected - cached;
-      void this.slackService?.reportBugToSlack(
-        `⚠️ user_point_balance drift\n` +
-          `- userId: ${userId}\n` +
-          `- cached: ${balance ? balance.totalPoint : '(no row)'}\n` +
-          `- expected: ${expected}\n` +
-          `- diff: ${diff}`,
-      );
-    } catch (error) {
-      this.logger.warn(
-        `[BALANCE_SYNC] failed userId=${userId} error=${
-          error instanceof Error ? error.message : 'Unknown'
-        }`,
-      );
-    }
   }
 
   async deductPoint(

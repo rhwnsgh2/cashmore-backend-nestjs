@@ -83,25 +83,7 @@ describe('PointService', () => {
       expect(result.totalPoint).toBe(1050);
     });
 
-    it('balance가 일치하면 Slack 알림을 보내지 않는다', async () => {
-      repository.setPointActions(userId, [
-        {
-          id: 1,
-          type: 'EVERY_RECEIPT',
-          created_at: '2024-01-01',
-          point_amount: 500,
-          status: 'done',
-        },
-      ]);
-      await repository.saveBalance(userId, 500);
-
-      await service.getPointTotal(userId);
-      await new Promise((resolve) => setImmediate(resolve));
-
-      expect(slackService.reports).toHaveLength(0);
-    });
-
-    it('balance가 다르면 Slack에 drift 알림을 보낸다', async () => {
+    it('user_point_balance row가 있으면 그 값을 totalPoint로 사용한다', async () => {
       repository.setPointActions(userId, [
         {
           id: 1,
@@ -111,29 +93,15 @@ describe('PointService', () => {
           status: 'done',
         },
       ]);
-      // cached는 800인데 실제 SUM은 1000 → 200 drift
+      // balance row의 값이 SUM과 다르더라도 우선 사용
       await repository.saveBalance(userId, 800);
 
-      await service.getPointTotal(userId);
-      await new Promise((resolve) => setImmediate(resolve));
+      const result = await service.getPointTotal(userId);
 
-      expect(slackService.reports).toHaveLength(1);
-      expect(slackService.reports[0]).toContain('drift');
-      expect(slackService.reports[0]).toContain(userId);
-      expect(slackService.reports[0]).toContain('cached: 800');
-      expect(slackService.reports[0]).toContain('expected: 1000');
-      expect(slackService.reports[0]).toContain('diff: 200');
+      expect(result.totalPoint).toBe(800);
     });
 
-    it('expected=0이고 balance row가 없으면 알림 없이 종료한다', async () => {
-      // point_actions 없음, balance row 없음 → expected=0=cached, 일치
-      await service.getPointTotal(userId);
-      await new Promise((resolve) => setImmediate(resolve));
-
-      expect(slackService.reports).toHaveLength(0);
-    });
-
-    it('balance row가 없는데 expected > 0이면 의심 신호로 Slack 알림을 보낸다', async () => {
+    it('user_point_balance row가 없으면 SUM으로 폴백한다', async () => {
       repository.setPointActions(userId, [
         {
           id: 1,
@@ -143,19 +111,14 @@ describe('PointService', () => {
           status: 'done',
         },
       ]);
-      // balance row 없음, expected=700
+      // balance row 미설정
 
-      await service.getPointTotal(userId);
-      await new Promise((resolve) => setImmediate(resolve));
+      const result = await service.getPointTotal(userId);
 
-      expect(slackService.reports).toHaveLength(1);
-      expect(slackService.reports[0]).toContain('drift');
-      expect(slackService.reports[0]).toContain('cached: (no row)');
-      expect(slackService.reports[0]).toContain('expected: 700');
-      expect(slackService.reports[0]).toContain('diff: 700');
+      expect(result.totalPoint).toBe(700);
     });
 
-    it('findBalance가 실패해도 응답은 정상 반환된다', async () => {
+    it('findBalance가 실패하면 SUM으로 폴백하여 응답한다', async () => {
       repository.setPointActions(userId, [
         {
           id: 1,
