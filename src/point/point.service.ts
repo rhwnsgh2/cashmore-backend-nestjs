@@ -40,9 +40,10 @@ export class PointService {
     const now = dayjs().tz('Asia/Seoul');
 
     // SUM과 cached balance를 병렬 조회 — race window 최소화 (1~5ms)
+    // findBalance 실패는 응답에 영향 없도록 swallow (drift 검증만 스킵)
     const [totalPoint, balance] = await Promise.all([
       this.calculateTotalPoint(userId),
-      this.pointRepository.findBalance(userId),
+      this.pointRepository.findBalance(userId).catch(() => null),
     ]);
 
     void this.syncBalance(userId, totalPoint, balance);
@@ -125,8 +126,6 @@ export class PointService {
           `- expected: ${expected}\n` +
           `- diff: ${diff}`,
       );
-
-      await this.pointRepository.saveBalance(userId, expected);
     } catch (error) {
       this.logger.warn(
         `[BALANCE_SYNC] failed userId=${userId} error=${

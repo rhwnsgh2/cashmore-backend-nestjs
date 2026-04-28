@@ -83,26 +83,7 @@ describe('PointService', () => {
       expect(result.totalPoint).toBe(1050);
     });
 
-    it('getPointTotal 후 user_point_balance를 SUM 값으로 동기화한다', async () => {
-      repository.setPointActions(userId, [
-        {
-          id: 1,
-          type: 'EVERY_RECEIPT',
-          created_at: '2024-01-01',
-          point_amount: 700,
-          status: 'done',
-        },
-      ]);
-
-      await service.getPointTotal(userId);
-      // syncBalance는 fire-and-forget이라 한 틱 양보
-      await new Promise((resolve) => setImmediate(resolve));
-
-      const balance = await repository.findBalance(userId);
-      expect(balance?.totalPoint).toBe(700);
-    });
-
-    it('balance가 이미 같으면 saveBalance를 호출하지 않는다', async () => {
+    it('balance가 일치하면 Slack 알림을 보내지 않는다', async () => {
       repository.setPointActions(userId, [
         {
           id: 1,
@@ -112,20 +93,12 @@ describe('PointService', () => {
           status: 'done',
         },
       ]);
-      // 이미 정확한 balance 세팅
       await repository.saveBalance(userId, 500);
-
-      let saveCalls = 0;
-      const originalSave = repository.saveBalance.bind(repository);
-      repository.saveBalance = async (uid: string, total: number) => {
-        saveCalls += 1;
-        return originalSave(uid, total);
-      };
 
       await service.getPointTotal(userId);
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(saveCalls).toBe(0);
+      expect(slackService.reports).toHaveLength(0);
     });
 
     it('balance가 다르면 Slack에 drift 알림을 보낸다', async () => {
@@ -182,7 +155,7 @@ describe('PointService', () => {
       expect(slackService.reports[0]).toContain('diff: 700');
     });
 
-    it('saveBalance가 실패해도 응답은 정상 반환된다', async () => {
+    it('findBalance가 실패해도 응답은 정상 반환된다', async () => {
       repository.setPointActions(userId, [
         {
           id: 1,
@@ -192,8 +165,8 @@ describe('PointService', () => {
           status: 'done',
         },
       ]);
-      repository.saveBalance = () =>
-        Promise.reject(new Error('balance write failed'));
+      repository.findBalance = () =>
+        Promise.reject(new Error('balance read failed'));
 
       const result = await service.getPointTotal(userId);
 
