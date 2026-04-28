@@ -152,7 +152,15 @@ describe('PointService', () => {
       expect(slackService.reports[0]).toContain('diff: 200');
     });
 
-    it('balance row가 없는 첫 호출(lazy-fill)에는 Slack 알림을 보내지 않는다', async () => {
+    it('expected=0이고 balance row가 없으면 알림 없이 종료한다', async () => {
+      // point_actions 없음, balance row 없음 → expected=0=cached, 일치
+      await service.getPointTotal(userId);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(slackService.reports).toHaveLength(0);
+    });
+
+    it('balance row가 없는데 expected > 0이면 의심 신호로 Slack 알림을 보낸다', async () => {
       repository.setPointActions(userId, [
         {
           id: 1,
@@ -162,12 +170,16 @@ describe('PointService', () => {
           status: 'done',
         },
       ]);
-      // balance row 없음
+      // balance row 없음, expected=700
 
       await service.getPointTotal(userId);
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(slackService.reports).toHaveLength(0);
+      expect(slackService.reports).toHaveLength(1);
+      expect(slackService.reports[0]).toContain('drift');
+      expect(slackService.reports[0]).toContain('cached: (no row)');
+      expect(slackService.reports[0]).toContain('expected: 700');
+      expect(slackService.reports[0]).toContain('diff: 700');
     });
 
     it('saveBalance가 실패해도 응답은 정상 반환된다', async () => {

@@ -102,20 +102,19 @@ export class PointService {
   private async syncBalance(userId: string, expected: number): Promise<void> {
     try {
       const balance = await this.pointRepository.findBalance(userId);
-      if (balance?.totalPoint === expected) {
+      const cached = balance?.totalPoint ?? 0;
+      if (cached === expected) {
         return;
       }
 
-      if (balance && balance.totalPoint !== expected) {
-        const diff = expected - balance.totalPoint;
-        void this.slackService?.reportBugToSlack(
-          `⚠️ user_point_balance drift\n` +
-            `- userId: ${userId}\n` +
-            `- cached: ${balance.totalPoint}\n` +
-            `- expected: ${expected}\n` +
-            `- diff: ${diff}`,
-        );
-      }
+      const diff = expected - cached;
+      void this.slackService?.reportBugToSlack(
+        `⚠️ user_point_balance drift\n` +
+          `- userId: ${userId}\n` +
+          `- cached: ${balance ? balance.totalPoint : '(no row)'}\n` +
+          `- expected: ${expected}\n` +
+          `- diff: ${diff}`,
+      );
 
       await this.pointRepository.saveBalance(userId, expected);
     } catch (error) {
