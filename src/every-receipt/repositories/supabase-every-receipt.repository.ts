@@ -47,6 +47,7 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
       .from('every_receipt')
       .select('id, created_at, point, status, image_url')
       .eq('user_id', userId)
+      .neq('status', 'rejected')
       .order('created_at', { ascending: false })
       .limit(limit ?? DEFAULT_LIMIT)
       .returns<EveryReceiptRow[]>();
