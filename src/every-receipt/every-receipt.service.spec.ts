@@ -356,7 +356,7 @@ describe('EveryReceiptService', () => {
       expect(result[0].pointAmount).toBeNull();
     });
 
-    it('rejected 상태의 영수증은 제외한다', async () => {
+    it('rejected 상태의 영수증도 포함한다', async () => {
       repository.setReceipts(userId, [
         {
           id: 'receipt-rejected',
@@ -365,19 +365,12 @@ describe('EveryReceiptService', () => {
           status: 'rejected',
           imageUrl: 'https://example.com/image.jpg',
         },
-        {
-          id: 'receipt-completed',
-          createdAt: '2026-01-15T11:00:00+09:00',
-          pointAmount: 100,
-          status: 'completed',
-          imageUrl: 'https://example.com/image2.jpg',
-        },
       ]);
 
       const result = await service.getEveryReceipts(userId);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('receipt-completed');
+      expect(result[0].status).toBe('rejected');
     });
 
     it('다른 사용자의 영수증은 포함하지 않는다', async () => {

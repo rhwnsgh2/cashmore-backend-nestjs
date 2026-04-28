@@ -129,7 +129,7 @@ describe('EveryReceipt API (e2e)', () => {
       expect(response.body[1].pointAmount).toBe(200);
     });
 
-    it('rejected 상태는 제외하고 나머지를 반환한다', async () => {
+    it('모든 상태의 영수증을 반환한다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
@@ -159,12 +159,12 @@ describe('EveryReceipt API (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body).toHaveLength(2);
+      expect(response.body).toHaveLength(3);
 
       const statuses = response.body.map((r: { status: string }) => r.status);
       expect(statuses).toContain('completed');
       expect(statuses).toContain('pending');
-      expect(statuses).not.toContain('rejected');
+      expect(statuses).toContain('rejected');
     });
 
     it('다른 사용자의 영수증은 포함하지 않는다', async () => {

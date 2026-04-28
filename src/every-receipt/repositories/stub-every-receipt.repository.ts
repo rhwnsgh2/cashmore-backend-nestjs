@@ -100,12 +100,10 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
 
   findByUserId(userId: string, limit?: number): Promise<EveryReceipt[]> {
     const userReceipts = this.receipts.get(userId) || [];
-    const sortedReceipts = [...userReceipts]
-      .filter((r) => r.status !== 'rejected')
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    const sortedReceipts = [...userReceipts].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
 
     if (limit) {
       return Promise.resolve(sortedReceipts.slice(0, limit));

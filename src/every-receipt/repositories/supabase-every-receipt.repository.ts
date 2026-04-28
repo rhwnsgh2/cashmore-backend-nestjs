@@ -35,7 +35,7 @@ interface EveryReceiptDetailRow {
   score_data: ScoreData | null;
 }
 
-const DEFAULT_LIMIT = 10;
+const DEFAULT_LIMIT = 20;
 
 @Injectable()
 export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
@@ -47,7 +47,6 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
       .from('every_receipt')
       .select('id, created_at, point, status, image_url')
       .eq('user_id', userId)
-      .neq('status', 'rejected')
       .order('created_at', { ascending: false })
       .limit(limit ?? DEFAULT_LIMIT)
       .returns<EveryReceiptRow[]>();
