@@ -90,11 +90,6 @@ export class StubPointRepository implements IPointRepository {
     return Promise.resolve(this.balances.get(userId) ?? null);
   }
 
-  saveBalance(userId: string, total: number): Promise<void> {
-    this.balances.set(userId, { totalPoint: total });
-    return Promise.resolve();
-  }
-
   findSumUpToId(userId: string, maxId: number): Promise<number> {
     const actions = this.pointActions.get(userId) ?? [];
     const sum = actions

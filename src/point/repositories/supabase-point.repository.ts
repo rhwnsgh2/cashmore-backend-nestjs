@@ -89,24 +89,6 @@ export class SupabasePointRepository implements IPointRepository {
     };
   }
 
-  async saveBalance(userId: string, total: number): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('user_point_balance')
-      .upsert(
-        {
-          user_id: userId,
-          total_point: total,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' },
-      );
-
-    if (error) {
-      throw error;
-    }
-  }
-
   async findSumUpToId(userId: string, maxId: number): Promise<number> {
     const { data, error } = await this.supabaseService
       .getClient()

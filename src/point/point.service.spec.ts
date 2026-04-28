@@ -94,7 +94,7 @@ describe('PointService', () => {
         },
       ]);
       // balance row의 값이 SUM과 다르더라도 우선 사용
-      await repository.saveBalance(userId, 800);
+      repository.setBalance(userId, { totalPoint: 800 });
 
       const result = await service.getPointTotal(userId);
 
