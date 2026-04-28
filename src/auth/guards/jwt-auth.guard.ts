@@ -39,7 +39,6 @@ export class JwtAuthGuard implements CanActivate {
     //   return true;
     // }
     if (!token) {
-      this.logger.warn('No token provided in request');
       throw new UnauthorizedException('No token provided');
     }
 
@@ -71,7 +70,6 @@ export class JwtAuthGuard implements CanActivate {
       );
 
       if (!userId) {
-        this.logger.warn(`User not found for authId: ${payload.sub}`);
         throw new UnauthorizedException('User not found');
       }
 
@@ -82,8 +80,10 @@ export class JwtAuthGuard implements CanActivate {
 
       return true;
     } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       if (error instanceof jwt.JsonWebTokenError) {
-        this.logger.warn(`Invalid token: ${error.message}`);
         throw new UnauthorizedException('Invalid token');
       }
       this.logger.error(`Unexpected auth error: ${error}`);
