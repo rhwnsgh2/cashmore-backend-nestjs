@@ -105,6 +105,18 @@ export class PointService {
       if (balance?.totalPoint === expected) {
         return;
       }
+
+      if (balance && balance.totalPoint !== expected) {
+        const diff = expected - balance.totalPoint;
+        void this.slackService?.reportBugToSlack(
+          `⚠️ user_point_balance drift\n` +
+            `- userId: ${userId}\n` +
+            `- cached: ${balance.totalPoint}\n` +
+            `- expected: ${expected}\n` +
+            `- diff: ${diff}`,
+        );
+      }
+
       await this.pointRepository.saveBalance(userId, expected);
     } catch (error) {
       this.logger.warn(

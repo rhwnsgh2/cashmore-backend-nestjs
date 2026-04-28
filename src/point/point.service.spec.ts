@@ -128,6 +128,48 @@ describe('PointService', () => {
       expect(saveCalls).toBe(0);
     });
 
+    it('balance가 다르면 Slack에 drift 알림을 보낸다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          type: 'EVERY_RECEIPT',
+          created_at: '2024-01-01',
+          point_amount: 1000,
+          status: 'done',
+        },
+      ]);
+      // cached는 800인데 실제 SUM은 1000 → 200 drift
+      await repository.saveBalance(userId, 800);
+
+      await service.getPointTotal(userId);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(slackService.reports).toHaveLength(1);
+      expect(slackService.reports[0]).toContain('drift');
+      expect(slackService.reports[0]).toContain(userId);
+      expect(slackService.reports[0]).toContain('cached: 800');
+      expect(slackService.reports[0]).toContain('expected: 1000');
+      expect(slackService.reports[0]).toContain('diff: 200');
+    });
+
+    it('balance row가 없는 첫 호출(lazy-fill)에는 Slack 알림을 보내지 않는다', async () => {
+      repository.setPointActions(userId, [
+        {
+          id: 1,
+          type: 'EVERY_RECEIPT',
+          created_at: '2024-01-01',
+          point_amount: 700,
+          status: 'done',
+        },
+      ]);
+      // balance row 없음
+
+      await service.getPointTotal(userId);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(slackService.reports).toHaveLength(0);
+    });
+
     it('saveBalance가 실패해도 응답은 정상 반환된다', async () => {
       repository.setPointActions(userId, [
         {
