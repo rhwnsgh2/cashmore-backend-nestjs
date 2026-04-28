@@ -75,7 +75,7 @@ export class SupabasePointRepository implements IPointRepository {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('user_point_balance')
-      .select('total_point, last_point_action_id')
+      .select('total_point')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -83,11 +83,28 @@ export class SupabasePointRepository implements IPointRepository {
       return null;
     }
 
-    const row = data as { total_point: number; last_point_action_id: number };
+    const row = data as { total_point: number };
     return {
       totalPoint: Number(row.total_point),
-      lastPointActionId: Number(row.last_point_action_id),
     };
+  }
+
+  async saveBalance(userId: string, total: number): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('user_point_balance')
+      .upsert(
+        {
+          user_id: userId,
+          total_point: total,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' },
+      );
+
+    if (error) {
+      throw error;
+    }
   }
 
   async findSumUpToId(userId: string, maxId: number): Promise<number> {
