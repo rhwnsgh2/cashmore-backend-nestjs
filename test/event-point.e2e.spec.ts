@@ -78,9 +78,9 @@ describe('EventPoint API (e2e)', () => {
         .expect(200);
 
       expect(response.body).toHaveLength(2);
-      expect(
-        new Date(response.body[0].createdAt).getTime(),
-      ).toBeGreaterThan(new Date(response.body[1].createdAt).getTime());
+      expect(new Date(response.body[0].createdAt).getTime()).toBeGreaterThan(
+        new Date(response.body[1].createdAt).getTime(),
+      );
     });
 
     it('24시간보다 오래된 COUPANG_VISIT은 포함하지 않는다', async () => {
