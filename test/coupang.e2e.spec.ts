@@ -280,6 +280,82 @@ describe('Coupang API (e2e)', () => {
       expect(data!.point_amount).toBe(10);
       expect(data!.user_id).toBe(testUser.id);
     });
+
+    it('성공 시 coupang_visits 테이블에도 행이 생성된다 (dual-write)', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/coupang/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(200);
+
+      const { data } = await supabase
+        .from('coupang_visits')
+        .select('*')
+        .eq('user_id', testUser.id);
+
+      expect(data).toHaveLength(1);
+      expect(data![0].point_amount).toBe(10);
+      expect(data![0].created_at_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('point_actions의 additional_data에 coupang_visit_id가 들어간다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/coupang/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(200);
+
+      const { data: visits } = await supabase
+        .from('coupang_visits')
+        .select('id')
+        .eq('user_id', testUser.id)
+        .single();
+
+      const { data: action } = await supabase
+        .from('point_actions')
+        .select('additional_data')
+        .eq('user_id', testUser.id)
+        .eq('type', 'COUPANG_VISIT')
+        .single();
+
+      expect(action!.additional_data).toEqual({ coupang_visit_id: visits!.id });
+    });
+
+    it('레거시 데이터(point_actions에만 있음)도 중복 차단한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const now = dayjs().tz('Asia/Seoul');
+      await createPointAction(supabase, {
+        user_id: testUser.id,
+        type: 'COUPANG_VISIT',
+        point_amount: 10,
+        created_at: now.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/coupang/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Already received',
+      });
+
+      const { data } = await supabase
+        .from('coupang_visits')
+        .select('*')
+        .eq('user_id', testUser.id);
+      expect(data).toHaveLength(0);
+    });
   });
 
   describe('GET /coupang/visit/today', () => {

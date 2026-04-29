@@ -1,12 +1,18 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Redis } from '@upstash/redis';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import { generateHmac } from './utils/hmac-generator';
 import type { GoldBoxProductDto } from './dto/goldbox-product.dto';
 import type { ICoupangVisitRepository } from './interfaces/coupang-visit-repository.interface';
 import { COUPANG_VISIT_REPOSITORY } from './interfaces/coupang-visit-repository.interface';
 import type { IPointWriteService } from '../point-write/point-write.interface';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const COUPANG_DOMAIN = 'https://api-gateway.coupang.com';
 const GOLDBOX_PATH =
@@ -97,9 +103,25 @@ export class CoupangService {
   async recordVisit(
     userId: string,
   ): Promise<{ success: boolean; message?: string }> {
-    const existing = await this.visitRepository.findTodayVisit(userId);
+    const today = this.getTodayKST();
 
-    if (existing) {
+    const existingDomain = await this.visitRepository.findByUserIdAndDate(
+      userId,
+      today,
+    );
+    if (existingDomain) {
+      return { success: false, message: 'Already received' };
+    }
+
+    const existingLegacy = await this.visitRepository.findTodayVisit(userId);
+    if (existingLegacy) {
+      return { success: false, message: 'Already received' };
+    }
+
+    let visit;
+    try {
+      visit = await this.visitRepository.insertVisit(userId, today, 10);
+    } catch {
       return { success: false, message: 'Already received' };
     }
 
@@ -107,7 +129,7 @@ export class CoupangService {
       userId,
       amount: 10,
       type: 'COUPANG_VISIT',
-      additionalData: {},
+      additionalData: { coupang_visit_id: visit.id },
     });
 
     return { success: true };
@@ -118,6 +140,10 @@ export class CoupangService {
   ): Promise<{ hasVisitedToday: boolean }> {
     const existing = await this.visitRepository.findTodayVisit(userId);
     return { hasVisitedToday: existing !== null };
+  }
+
+  private getTodayKST(): string {
+    return dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
   }
 
   private async fetchGoldBox(): Promise<GoldBoxItem[]> {

@@ -286,6 +286,50 @@ describe('CoupangService', () => {
       const visit = await stubVisitRepo.findTodayVisit('user-B');
       expect(visit!.pointAmount).toBe(10);
     });
+
+    it('성공 시 coupang_visits에도 행이 생성된다 (dual-write)', async () => {
+      await service.recordVisit(userId);
+
+      const visits = stubVisitRepo.getInsertedVisits();
+      expect(visits).toHaveLength(1);
+      expect(visits[0].userId).toBe(userId);
+      expect(visits[0].pointAmount).toBe(10);
+    });
+
+    it('point_actions의 additional_data에 coupang_visit_id가 들어간다', async () => {
+      await service.recordVisit(userId);
+
+      const actions = stubPointWriteRepo.getInsertedActions();
+      const visitAction = actions.find((a) => a.type === 'COUPANG_VISIT');
+      const visits = stubVisitRepo.getInsertedVisits();
+
+      expect(visitAction?.additionalData).toEqual({
+        coupang_visit_id: visits[0].id,
+      });
+    });
+
+    it('이미 받은 경우 coupang_visits에 추가 행이 생기지 않는다', async () => {
+      await service.recordVisit(userId);
+      await service.recordVisit(userId);
+
+      const visits = stubVisitRepo.getInsertedVisits();
+      expect(visits).toHaveLength(1);
+    });
+
+    it('레거시 데이터(point_actions에만 있음)도 중복 차단한다', async () => {
+      await stubPointWriteRepo.insertPointAction(
+        userId,
+        10,
+        'COUPANG_VISIT',
+        'done',
+        {},
+      );
+
+      const result = await service.recordVisit(userId);
+
+      expect(result).toEqual({ success: false, message: 'Already received' });
+      expect(stubVisitRepo.getInsertedVisits()).toHaveLength(0);
+    });
   });
 
   describe('getTodayVisitStatus', () => {
