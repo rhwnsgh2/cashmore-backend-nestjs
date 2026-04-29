@@ -113,6 +113,13 @@ export class CoupangService {
     return { success: true };
   }
 
+  async getTodayVisitStatus(
+    userId: string,
+  ): Promise<{ hasVisitedToday: boolean }> {
+    const existing = await this.visitRepository.findTodayVisit(userId);
+    return { hasVisitedToday: existing !== null };
+  }
+
   private async fetchGoldBox(): Promise<GoldBoxItem[]> {
     const method = 'GET';
     const url = `${GOLDBOX_PATH}?${GOLDBOX_QUERY}`;

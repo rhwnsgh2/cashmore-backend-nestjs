@@ -287,4 +287,30 @@ describe('CoupangService', () => {
       expect(visit!.pointAmount).toBe(10);
     });
   });
+
+  describe('getTodayVisitStatus', () => {
+    const userId = 'user-1';
+
+    it('오늘 방문 기록이 없으면 hasVisitedToday: false를 반환한다', async () => {
+      const result = await service.getTodayVisitStatus(userId);
+
+      expect(result).toEqual({ hasVisitedToday: false });
+    });
+
+    it('오늘 방문 기록이 있으면 hasVisitedToday: true를 반환한다', async () => {
+      await service.recordVisit(userId);
+
+      const result = await service.getTodayVisitStatus(userId);
+
+      expect(result).toEqual({ hasVisitedToday: true });
+    });
+
+    it('다른 유저의 방문 기록은 영향을 주지 않는다', async () => {
+      await service.recordVisit('user-A');
+
+      const result = await service.getTodayVisitStatus('user-B');
+
+      expect(result).toEqual({ hasVisitedToday: false });
+    });
+  });
 });

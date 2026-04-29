@@ -281,4 +281,112 @@ describe('Coupang API (e2e)', () => {
       expect(data!.user_id).toBe(testUser.id);
     });
   });
+
+  describe('GET /coupang/visit/today', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/coupang/visit/today')
+        .expect(401);
+
+      expect(response.body.message).toBe('No token provided');
+    });
+
+    it('오늘 방문 기록이 없으면 hasVisitedToday: false를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/visit/today')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ hasVisitedToday: false });
+    });
+
+    it('오늘 방문 기록이 있으면 hasVisitedToday: true를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const now = dayjs().tz('Asia/Seoul');
+      await createPointAction(supabase, {
+        user_id: testUser.id,
+        type: 'COUPANG_VISIT',
+        point_amount: 10,
+        created_at: now.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/visit/today')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ hasVisitedToday: true });
+    });
+
+    it('어제 방문 기록만 있으면 hasVisitedToday: false를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const yesterday = dayjs()
+        .tz('Asia/Seoul')
+        .subtract(1, 'day')
+        .hour(15)
+        .minute(0)
+        .second(0);
+      await createPointAction(supabase, {
+        user_id: testUser.id,
+        type: 'COUPANG_VISIT',
+        point_amount: 10,
+        created_at: yesterday.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/visit/today')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ hasVisitedToday: false });
+    });
+
+    it('다른 유저의 오늘 방문 기록은 영향을 주지 않는다', async () => {
+      const userA = await createTestUser(supabase);
+      const userB = await createTestUser(supabase);
+      const tokenB = generateTestToken(userB.auth_id);
+
+      const now = dayjs().tz('Asia/Seoul');
+      await createPointAction(supabase, {
+        user_id: userA.id,
+        type: 'COUPANG_VISIT',
+        point_amount: 10,
+        created_at: now.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/visit/today')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ hasVisitedToday: false });
+    });
+
+    it('다른 타입의 오늘 포인트만 있으면 hasVisitedToday: false를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const now = dayjs().tz('Asia/Seoul');
+      await createPointAction(supabase, {
+        user_id: testUser.id,
+        type: 'ATTENDANCE',
+        point_amount: 10,
+        created_at: now.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/visit/today')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ hasVisitedToday: false });
+    });
+  });
 });
