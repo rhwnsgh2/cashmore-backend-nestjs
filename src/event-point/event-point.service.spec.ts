@@ -33,113 +33,27 @@ describe('EventPointService', () => {
       expect(result).toEqual([]);
     });
 
-    it('이벤트 포인트 목록을 반환한다', async () => {
+    it('COUPANG_VISIT 이벤트 포인트를 최신순으로 반환한다', async () => {
       repository.setEventPoints(userId, [
         {
           id: 1,
           type: 'COUPANG_VISIT',
-          createdAt: '2026-01-15T10:00:00+09:00',
-          point: 100,
+          createdAt: '2026-04-28T10:00:00+09:00',
+          point: 10,
         },
         {
           id: 2,
-          type: 'LOTTERY',
-          createdAt: '2026-01-14T10:00:00+09:00',
-          point: 50,
+          type: 'COUPANG_VISIT',
+          createdAt: '2026-04-29T09:00:00+09:00',
+          point: 10,
         },
       ]);
 
       const result = await service.getEventPoints(userId);
 
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe(1);
-      expect(result[1].id).toBe(2);
-    });
-
-    it('이벤트 포인트를 최신순으로 정렬하여 반환한다', async () => {
-      repository.setEventPoints(userId, [
-        {
-          id: 1,
-          type: 'COUPANG_VISIT',
-          createdAt: '2026-01-10T10:00:00+09:00',
-          point: 100,
-        },
-        {
-          id: 2,
-          type: 'LOTTERY',
-          createdAt: '2026-01-15T10:00:00+09:00',
-          point: 50,
-        },
-      ]);
-
-      const result = await service.getEventPoints(userId);
-
       expect(result[0].id).toBe(2);
       expect(result[1].id).toBe(1);
-    });
-
-    it('COUPANG_VISIT 타입을 포함한다', async () => {
-      repository.setEventPoints(userId, [
-        {
-          id: 1,
-          type: 'COUPANG_VISIT',
-          createdAt: '2026-01-15T10:00:00+09:00',
-          point: 100,
-        },
-      ]);
-
-      const result = await service.getEventPoints(userId);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('COUPANG_VISIT');
-    });
-
-    it('ONBOARDING_EVENT 타입을 포함한다', async () => {
-      repository.setEventPoints(userId, [
-        {
-          id: 1,
-          type: 'ONBOARDING_EVENT',
-          createdAt: '2026-01-15T10:00:00+09:00',
-          point: 200,
-        },
-      ]);
-
-      const result = await service.getEventPoints(userId);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('ONBOARDING_EVENT');
-    });
-
-    it('AFFILIATE 타입을 포함한다', async () => {
-      repository.setEventPoints(userId, [
-        {
-          id: 1,
-          type: 'AFFILIATE',
-          createdAt: '2026-01-15T10:00:00+09:00',
-          point: 150,
-        },
-      ]);
-
-      const result = await service.getEventPoints(userId);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('AFFILIATE');
-    });
-
-    it('LOTTERY 타입을 포함한다', async () => {
-      repository.setEventPoints(userId, [
-        {
-          id: 1,
-          type: 'LOTTERY',
-          createdAt: '2026-01-15T10:00:00+09:00',
-          point: 500,
-        },
-      ]);
-
-      const result = await service.getEventPoints(userId);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('LOTTERY');
     });
 
     it('다른 사용자의 이벤트 포인트는 포함하지 않는다', async () => {
@@ -149,17 +63,17 @@ describe('EventPointService', () => {
         {
           id: 1,
           type: 'COUPANG_VISIT',
-          createdAt: '2026-01-15T10:00:00+09:00',
-          point: 100,
+          createdAt: '2026-04-29T09:00:00+09:00',
+          point: 10,
         },
       ]);
 
       repository.setEventPoints(otherUserId, [
         {
           id: 2,
-          type: 'LOTTERY',
-          createdAt: '2026-01-15T10:00:00+09:00',
-          point: 500,
+          type: 'COUPANG_VISIT',
+          createdAt: '2026-04-29T09:00:00+09:00',
+          point: 10,
         },
       ]);
 

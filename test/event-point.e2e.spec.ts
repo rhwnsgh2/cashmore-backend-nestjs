@@ -52,22 +52,23 @@ describe('EventPoint API (e2e)', () => {
       expect(response.body).toEqual([]);
     });
 
-    it('이벤트 포인트 목록을 최신순으로 반환한다', async () => {
+    it('최근 24시간 내 COUPANG_VISIT 액션을 최신순으로 반환한다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
+      const now = Date.now();
       await createPointActions(supabase, [
         {
           user_id: testUser.id,
           type: 'COUPANG_VISIT',
-          point_amount: 100,
-          created_at: '2026-01-10T10:00:00+09:00',
+          point_amount: 10,
+          created_at: new Date(now - 60 * 60 * 1000).toISOString(),
         },
         {
           user_id: testUser.id,
-          type: 'LOTTERY',
-          point_amount: 500,
-          created_at: '2026-01-15T10:00:00+09:00',
+          type: 'COUPANG_VISIT',
+          point_amount: 10,
+          created_at: new Date(now - 30 * 60 * 1000).toISOString(),
         },
       ]);
 
@@ -77,38 +78,28 @@ describe('EventPoint API (e2e)', () => {
         .expect(200);
 
       expect(response.body).toHaveLength(2);
-      expect(response.body[0].point).toBe(500);
-      expect(response.body[1].point).toBe(100);
+      expect(
+        new Date(response.body[0].createdAt).getTime(),
+      ).toBeGreaterThan(new Date(response.body[1].createdAt).getTime());
     });
 
-    it('모든 이벤트 타입을 포함한다', async () => {
+    it('24시간보다 오래된 COUPANG_VISIT은 포함하지 않는다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
+      const now = Date.now();
       await createPointActions(supabase, [
         {
           user_id: testUser.id,
           type: 'COUPANG_VISIT',
-          point_amount: 100,
-          created_at: '2026-01-15T10:00:00+09:00',
+          point_amount: 10,
+          created_at: new Date(now - 25 * 60 * 60 * 1000).toISOString(),
         },
         {
           user_id: testUser.id,
-          type: 'ONBOARDING_EVENT',
-          point_amount: 200,
-          created_at: '2026-01-15T11:00:00+09:00',
-        },
-        {
-          user_id: testUser.id,
-          type: 'AFFILIATE',
-          point_amount: 150,
-          created_at: '2026-01-15T12:00:00+09:00',
-        },
-        {
-          user_id: testUser.id,
-          type: 'LOTTERY',
-          point_amount: 500,
-          created_at: '2026-01-15T13:00:00+09:00',
+          type: 'COUPANG_VISIT',
+          point_amount: 10,
+          created_at: new Date(now - 60 * 60 * 1000).toISOString(),
         },
       ]);
 
@@ -117,37 +108,44 @@ describe('EventPoint API (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body).toHaveLength(4);
-
-      const types = response.body.map((p: { type: string }) => p.type);
-      expect(types).toContain('COUPANG_VISIT');
-      expect(types).toContain('ONBOARDING_EVENT');
-      expect(types).toContain('AFFILIATE');
-      expect(types).toContain('LOTTERY');
+      expect(response.body).toHaveLength(1);
     });
 
-    it('다른 타입의 포인트 액션은 포함하지 않는다', async () => {
+    it('COUPANG_VISIT이 아닌 타입은 포함하지 않는다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
+      const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       await createPointActions(supabase, [
         {
           user_id: testUser.id,
           type: 'COUPANG_VISIT',
-          point_amount: 100,
-          created_at: '2026-01-15T10:00:00+09:00',
+          point_amount: 10,
+          created_at: recent,
+        },
+        {
+          user_id: testUser.id,
+          type: 'LOTTERY',
+          point_amount: 500,
+          created_at: recent,
+        },
+        {
+          user_id: testUser.id,
+          type: 'ONBOARDING_EVENT',
+          point_amount: 200,
+          created_at: recent,
+        },
+        {
+          user_id: testUser.id,
+          type: 'AFFILIATE',
+          point_amount: 150,
+          created_at: recent,
         },
         {
           user_id: testUser.id,
           type: 'EVERY_RECEIPT',
           point_amount: 250,
-          created_at: '2026-01-15T11:00:00+09:00',
-        },
-        {
-          user_id: testUser.id,
-          type: 'ATTENDANCE',
-          point_amount: 50,
-          created_at: '2026-01-15T12:00:00+09:00',
+          created_at: recent,
         },
       ]);
 
@@ -160,23 +158,24 @@ describe('EventPoint API (e2e)', () => {
       expect(response.body[0].type).toBe('COUPANG_VISIT');
     });
 
-    it('다른 사용자의 이벤트 포인트는 포함하지 않는다', async () => {
+    it('다른 사용자의 COUPANG_VISIT은 포함하지 않는다', async () => {
       const testUser = await createTestUser(supabase);
       const otherUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
+      const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       await createPointActions(supabase, [
         {
           user_id: testUser.id,
           type: 'COUPANG_VISIT',
-          point_amount: 100,
-          created_at: '2026-01-15T10:00:00+09:00',
+          point_amount: 10,
+          created_at: recent,
         },
         {
           user_id: otherUser.id,
-          type: 'LOTTERY',
-          point_amount: 500,
-          created_at: '2026-01-15T10:00:00+09:00',
+          type: 'COUPANG_VISIT',
+          point_amount: 10,
+          created_at: recent,
         },
       ]);
 
@@ -186,7 +185,7 @@ describe('EventPoint API (e2e)', () => {
         .expect(200);
 
       expect(response.body).toHaveLength(1);
-      expect(response.body[0].point).toBe(100);
+      expect(response.body[0].point).toBe(10);
     });
 
     it('응답에 모든 필드가 포함된다', async () => {
@@ -196,8 +195,8 @@ describe('EventPoint API (e2e)', () => {
       await createPointAction(supabase, {
         user_id: testUser.id,
         type: 'COUPANG_VISIT',
-        point_amount: 100,
-        created_at: '2026-01-15T10:30:00+09:00',
+        point_amount: 10,
+        created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
       });
 
       const response = await request(app.getHttpServer())
@@ -209,7 +208,7 @@ describe('EventPoint API (e2e)', () => {
       expect(eventPoint).toHaveProperty('id');
       expect(eventPoint).toHaveProperty('type', 'COUPANG_VISIT');
       expect(eventPoint).toHaveProperty('createdAt');
-      expect(eventPoint).toHaveProperty('point', 100);
+      expect(eventPoint).toHaveProperty('point', 10);
     });
   });
 });

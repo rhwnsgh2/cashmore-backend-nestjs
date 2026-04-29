@@ -9,7 +9,7 @@ export class EventPointDto {
 
   @ApiProperty({
     description: '이벤트 타입',
-    enum: ['COUPANG_VISIT', 'ONBOARDING_EVENT', 'AFFILIATE', 'LOTTERY'],
+    enum: ['COUPANG_VISIT'],
     example: 'COUPANG_VISIT',
   })
   type: string;

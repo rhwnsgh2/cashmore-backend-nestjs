@@ -17,13 +17,18 @@ import { EventPoint } from './interfaces/event-point-repository.interface';
 export class EventPointController {
   constructor(private eventPointService: EventPointService) {}
 
+  /**
+   * @deprecated 쿠팡 오늘 방문 여부 확인용으로만 쓰이며, 신규 전용 엔드포인트로 대체 예정.
+   * 현재는 최근 24시간 내 COUPANG_VISIT 액션만 반환한다.
+   */
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '이벤트 포인트 목록 조회',
+    summary: '[Deprecated] 이벤트 포인트 목록 조회',
     description:
-      '사용자의 이벤트 포인트 내역 (쿠팡 방문, 온보딩 이벤트, 제휴, 복권)을 최신순으로 조회합니다.',
+      '@deprecated 쿠팡 오늘 방문 여부 확인용. 최근 24시간 내 COUPANG_VISIT 액션만 최신순으로 반환합니다. 신규 전용 엔드포인트로 대체 예정.',
+    deprecated: true,
   })
   @ApiResponse({
     status: 200,
