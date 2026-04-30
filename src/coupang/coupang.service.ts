@@ -105,16 +105,11 @@ export class CoupangService {
   ): Promise<{ success: boolean; message?: string }> {
     const today = this.getTodayKST();
 
-    const existingDomain = await this.visitRepository.findByUserIdAndDate(
+    const existing = await this.visitRepository.findByUserIdAndDate(
       userId,
       today,
     );
-    if (existingDomain) {
-      return { success: false, message: 'Already received' };
-    }
-
-    const existingLegacy = await this.visitRepository.findTodayVisit(userId);
-    if (existingLegacy) {
+    if (existing) {
       return { success: false, message: 'Already received' };
     }
 
@@ -138,7 +133,11 @@ export class CoupangService {
   async getTodayVisitStatus(
     userId: string,
   ): Promise<{ hasVisitedToday: boolean }> {
-    const existing = await this.visitRepository.findTodayVisit(userId);
+    const today = this.getTodayKST();
+    const existing = await this.visitRepository.findByUserIdAndDate(
+      userId,
+      today,
+    );
     return { hasVisitedToday: existing !== null };
   }
 

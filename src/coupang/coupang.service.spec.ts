@@ -32,7 +32,7 @@ describe('CoupangService', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     stubPointWriteRepo = new StubPointWriteRepository();
-    stubVisitRepo = new StubCoupangVisitRepository(stubPointWriteRepo);
+    stubVisitRepo = new StubCoupangVisitRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -256,9 +256,9 @@ describe('CoupangService', () => {
     it('10P를 지급한다', async () => {
       await service.recordVisit(userId);
 
-      const visit = await stubVisitRepo.findTodayVisit(userId);
-      expect(visit).not.toBeNull();
-      expect(visit!.pointAmount).toBe(10);
+      const visits = stubVisitRepo.getInsertedVisits();
+      expect(visits).toHaveLength(1);
+      expect(visits[0].pointAmount).toBe(10);
     });
 
     it('오늘 이미 받았으면 success: false와 Already received 메시지를 반환한다', async () => {
@@ -283,11 +283,14 @@ describe('CoupangService', () => {
       const result = await service.recordVisit('user-B');
       expect(result).toEqual({ success: true });
 
-      const visit = await stubVisitRepo.findTodayVisit('user-B');
-      expect(visit!.pointAmount).toBe(10);
+      const userBVisits = stubVisitRepo
+        .getInsertedVisits()
+        .filter((v) => v.userId === 'user-B');
+      expect(userBVisits).toHaveLength(1);
+      expect(userBVisits[0].pointAmount).toBe(10);
     });
 
-    it('성공 시 coupang_visits에도 행이 생성된다 (dual-write)', async () => {
+    it('성공 시 coupang_visits에 행이 생성된다', async () => {
       await service.recordVisit(userId);
 
       const visits = stubVisitRepo.getInsertedVisits();
@@ -315,21 +318,6 @@ describe('CoupangService', () => {
       const visits = stubVisitRepo.getInsertedVisits();
       expect(visits).toHaveLength(1);
     });
-
-    it('레거시 데이터(point_actions에만 있음)도 중복 차단한다', async () => {
-      await stubPointWriteRepo.insertPointAction(
-        userId,
-        10,
-        'COUPANG_VISIT',
-        'done',
-        {},
-      );
-
-      const result = await service.recordVisit(userId);
-
-      expect(result).toEqual({ success: false, message: 'Already received' });
-      expect(stubVisitRepo.getInsertedVisits()).toHaveLength(0);
-    });
   });
 
   describe('getTodayVisitStatus', () => {
@@ -353,6 +341,20 @@ describe('CoupangService', () => {
       await service.recordVisit('user-A');
 
       const result = await service.getTodayVisitStatus('user-B');
+
+      expect(result).toEqual({ hasVisitedToday: false });
+    });
+
+    it('point_actions만 있고 coupang_visits에 없으면 false (백필 누락 케이스)', async () => {
+      await stubPointWriteRepo.insertPointAction(
+        userId,
+        10,
+        'COUPANG_VISIT',
+        'done',
+        {},
+      );
+
+      const result = await service.getTodayVisitStatus(userId);
 
       expect(result).toEqual({ hasVisitedToday: false });
     });

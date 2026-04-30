@@ -105,12 +105,11 @@ describe('Coupang API (e2e)', () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      const now = dayjs().tz('Asia/Seoul');
-      await createPointAction(supabase, {
+      const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
         user_id: testUser.id,
-        type: 'COUPANG_VISIT',
+        created_at_date: today,
         point_amount: 10,
-        created_at: now.toISOString(),
       });
 
       const response = await request(app.getHttpServer())
@@ -125,16 +124,15 @@ describe('Coupang API (e2e)', () => {
       });
     });
 
-    it('오늘 이미 받았으면 추가 포인트가 생성되지 않는다', async () => {
+    it('오늘 이미 받았으면 coupang_visits에 추가 행이 생기지 않는다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      const now = dayjs().tz('Asia/Seoul');
-      await createPointAction(supabase, {
+      const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
         user_id: testUser.id,
-        type: 'COUPANG_VISIT',
+        created_at_date: today,
         point_amount: 10,
-        created_at: now.toISOString(),
       });
 
       await request(app.getHttpServer())
@@ -144,10 +142,9 @@ describe('Coupang API (e2e)', () => {
         .expect(200);
 
       const { data } = await supabase
-        .from('point_actions')
+        .from('coupang_visits')
         .select('*')
-        .eq('user_id', testUser.id)
-        .eq('type', 'COUPANG_VISIT');
+        .eq('user_id', testUser.id);
 
       expect(data).toHaveLength(1);
     });
@@ -159,14 +156,11 @@ describe('Coupang API (e2e)', () => {
       const yesterday = dayjs()
         .tz('Asia/Seoul')
         .subtract(1, 'day')
-        .hour(15)
-        .minute(0)
-        .second(0);
-      await createPointAction(supabase, {
+        .format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
         user_id: testUser.id,
-        type: 'COUPANG_VISIT',
+        created_at_date: yesterday,
         point_amount: 10,
-        created_at: yesterday.toISOString(),
       });
 
       const response = await request(app.getHttpServer())
@@ -178,10 +172,9 @@ describe('Coupang API (e2e)', () => {
       expect(response.body).toEqual({ success: true });
 
       const { data } = await supabase
-        .from('point_actions')
+        .from('coupang_visits')
         .select('*')
-        .eq('user_id', testUser.id)
-        .eq('type', 'COUPANG_VISIT');
+        .eq('user_id', testUser.id);
 
       expect(data).toHaveLength(2);
     });
@@ -191,12 +184,11 @@ describe('Coupang API (e2e)', () => {
       const userB = await createTestUser(supabase);
       const tokenB = generateTestToken(userB.auth_id);
 
-      const now = dayjs().tz('Asia/Seoul');
-      await createPointAction(supabase, {
+      const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
         user_id: userA.id,
-        type: 'COUPANG_VISIT',
+        created_at_date: today,
         point_amount: 10,
-        created_at: now.toISOString(),
       });
 
       const response = await request(app.getHttpServer())
@@ -326,36 +318,6 @@ describe('Coupang API (e2e)', () => {
 
       expect(action!.additional_data).toEqual({ coupang_visit_id: visits!.id });
     });
-
-    it('레거시 데이터(point_actions에만 있음)도 중복 차단한다', async () => {
-      const testUser = await createTestUser(supabase);
-      const token = generateTestToken(testUser.auth_id);
-
-      const now = dayjs().tz('Asia/Seoul');
-      await createPointAction(supabase, {
-        user_id: testUser.id,
-        type: 'COUPANG_VISIT',
-        point_amount: 10,
-        created_at: now.toISOString(),
-      });
-
-      const response = await request(app.getHttpServer())
-        .post('/coupang/visit')
-        .set('Authorization', `Bearer ${token}`)
-        .send({})
-        .expect(200);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: 'Already received',
-      });
-
-      const { data } = await supabase
-        .from('coupang_visits')
-        .select('*')
-        .eq('user_id', testUser.id);
-      expect(data).toHaveLength(0);
-    });
   });
 
   describe('GET /coupang/visit/today', () => {
@@ -383,12 +345,11 @@ describe('Coupang API (e2e)', () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      const now = dayjs().tz('Asia/Seoul');
-      await createPointAction(supabase, {
+      const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
         user_id: testUser.id,
-        type: 'COUPANG_VISIT',
+        created_at_date: today,
         point_amount: 10,
-        created_at: now.toISOString(),
       });
 
       const response = await request(app.getHttpServer())
@@ -406,14 +367,11 @@ describe('Coupang API (e2e)', () => {
       const yesterday = dayjs()
         .tz('Asia/Seoul')
         .subtract(1, 'day')
-        .hour(15)
-        .minute(0)
-        .second(0);
-      await createPointAction(supabase, {
+        .format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
         user_id: testUser.id,
-        type: 'COUPANG_VISIT',
+        created_at_date: yesterday,
         point_amount: 10,
-        created_at: yesterday.toISOString(),
       });
 
       const response = await request(app.getHttpServer())
@@ -429,12 +387,11 @@ describe('Coupang API (e2e)', () => {
       const userB = await createTestUser(supabase);
       const tokenB = generateTestToken(userB.auth_id);
 
-      const now = dayjs().tz('Asia/Seoul');
-      await createPointAction(supabase, {
+      const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
         user_id: userA.id,
-        type: 'COUPANG_VISIT',
+        created_at_date: today,
         point_amount: 10,
-        created_at: now.toISOString(),
       });
 
       const response = await request(app.getHttpServer())
@@ -445,14 +402,14 @@ describe('Coupang API (e2e)', () => {
       expect(response.body).toEqual({ hasVisitedToday: false });
     });
 
-    it('다른 타입의 오늘 포인트만 있으면 hasVisitedToday: false를 반환한다', async () => {
+    it('point_actions만 있고 coupang_visits에 없으면 hasVisitedToday: false', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
       const now = dayjs().tz('Asia/Seoul');
       await createPointAction(supabase, {
         user_id: testUser.id,
-        type: 'ATTENDANCE',
+        type: 'COUPANG_VISIT',
         point_amount: 10,
         created_at: now.toISOString(),
       });
