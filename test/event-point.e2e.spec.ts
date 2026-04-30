@@ -6,8 +6,14 @@ import { AppModule } from '../src/app.module';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
 import { createTestUser } from './helpers/user.helper';
-import { createPointAction, createPointActions } from './helpers/point.helper';
+import { createPointAction } from './helpers/point.helper';
 import { generateTestToken } from './helpers/auth.helper';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 describe('EventPoint API (e2e)', () => {
   let app: INestApplication;
@@ -52,21 +58,25 @@ describe('EventPoint API (e2e)', () => {
       expect(response.body).toEqual([]);
     });
 
-    it('최근 24시간 내 COUPANG_VISIT 액션을 최신순으로 반환한다', async () => {
+    it('최근 24시간 내 coupang_visits 행을 최신순으로 반환한다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
       const now = Date.now();
-      await createPointActions(supabase, [
+      await supabase.from('coupang_visits').insert([
         {
           user_id: testUser.id,
-          type: 'COUPANG_VISIT',
+          created_at_date: dayjs(now - 60 * 60 * 1000)
+            .tz('Asia/Seoul')
+            .format('YYYY-MM-DD'),
           point_amount: 10,
           created_at: new Date(now - 60 * 60 * 1000).toISOString(),
         },
         {
           user_id: testUser.id,
-          type: 'COUPANG_VISIT',
+          created_at_date: dayjs(now - 30 * 60 * 1000)
+            .tz('Asia/Seoul')
+            .format('YYYY-MM-DD'),
           point_amount: 10,
           created_at: new Date(now - 30 * 60 * 1000).toISOString(),
         },
@@ -83,21 +93,25 @@ describe('EventPoint API (e2e)', () => {
       );
     });
 
-    it('24시간보다 오래된 COUPANG_VISIT은 포함하지 않는다', async () => {
+    it('24시간보다 오래된 행은 포함하지 않는다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
       const now = Date.now();
-      await createPointActions(supabase, [
+      await supabase.from('coupang_visits').insert([
         {
           user_id: testUser.id,
-          type: 'COUPANG_VISIT',
+          created_at_date: dayjs(now - 25 * 60 * 60 * 1000)
+            .tz('Asia/Seoul')
+            .format('YYYY-MM-DD'),
           point_amount: 10,
           created_at: new Date(now - 25 * 60 * 60 * 1000).toISOString(),
         },
         {
           user_id: testUser.id,
-          type: 'COUPANG_VISIT',
+          created_at_date: dayjs(now - 60 * 60 * 1000)
+            .tz('Asia/Seoul')
+            .format('YYYY-MM-DD'),
           point_amount: 10,
           created_at: new Date(now - 60 * 60 * 1000).toISOString(),
         },
@@ -111,71 +125,41 @@ describe('EventPoint API (e2e)', () => {
       expect(response.body).toHaveLength(1);
     });
 
-    it('COUPANG_VISIT이 아닌 타입은 포함하지 않는다', async () => {
+    it('point_actions의 COUPANG_VISIT은 더 이상 포함하지 않는다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      await createPointActions(supabase, [
-        {
-          user_id: testUser.id,
-          type: 'COUPANG_VISIT',
-          point_amount: 10,
-          created_at: recent,
-        },
-        {
-          user_id: testUser.id,
-          type: 'LOTTERY',
-          point_amount: 500,
-          created_at: recent,
-        },
-        {
-          user_id: testUser.id,
-          type: 'ONBOARDING_EVENT',
-          point_amount: 200,
-          created_at: recent,
-        },
-        {
-          user_id: testUser.id,
-          type: 'AFFILIATE',
-          point_amount: 150,
-          created_at: recent,
-        },
-        {
-          user_id: testUser.id,
-          type: 'EVERY_RECEIPT',
-          point_amount: 250,
-          created_at: recent,
-        },
-      ]);
+      await createPointAction(supabase, {
+        user_id: testUser.id,
+        type: 'COUPANG_VISIT',
+        point_amount: 10,
+        created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      });
 
       const response = await request(app.getHttpServer())
         .get('/event-points')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].type).toBe('COUPANG_VISIT');
+      expect(response.body).toEqual([]);
     });
 
-    it('다른 사용자의 COUPANG_VISIT은 포함하지 않는다', async () => {
+    it('다른 사용자의 행은 포함하지 않는다', async () => {
       const testUser = await createTestUser(supabase);
       const otherUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      await createPointActions(supabase, [
+      const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert([
         {
           user_id: testUser.id,
-          type: 'COUPANG_VISIT',
+          created_at_date: today,
           point_amount: 10,
-          created_at: recent,
         },
         {
           user_id: otherUser.id,
-          type: 'COUPANG_VISIT',
+          created_at_date: today,
           point_amount: 10,
-          created_at: recent,
         },
       ]);
 
@@ -192,11 +176,11 @@ describe('EventPoint API (e2e)', () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      await createPointAction(supabase, {
+      const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
         user_id: testUser.id,
-        type: 'COUPANG_VISIT',
+        created_at_date: today,
         point_amount: 10,
-        created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
       });
 
       const response = await request(app.getHttpServer())
