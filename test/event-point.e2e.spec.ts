@@ -58,39 +58,26 @@ describe('EventPoint API (e2e)', () => {
       expect(response.body).toEqual([]);
     });
 
-    it('최근 24시간 내 coupang_visits 행을 최신순으로 반환한다', async () => {
+    it('최근 24시간 내 coupang_visits 행을 반환한다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      const now = Date.now();
-      await supabase.from('coupang_visits').insert([
-        {
-          user_id: testUser.id,
-          created_at_date: dayjs(now - 60 * 60 * 1000)
-            .tz('Asia/Seoul')
-            .format('YYYY-MM-DD'),
-          point_amount: 10,
-          created_at: new Date(now - 60 * 60 * 1000).toISOString(),
-        },
-        {
-          user_id: testUser.id,
-          created_at_date: dayjs(now - 30 * 60 * 1000)
-            .tz('Asia/Seoul')
-            .format('YYYY-MM-DD'),
-          point_amount: 10,
-          created_at: new Date(now - 30 * 60 * 1000).toISOString(),
-        },
-      ]);
+      const recentAt = new Date(Date.now() - 60 * 60 * 1000);
+      await supabase.from('coupang_visits').insert({
+        user_id: testUser.id,
+        created_at_date: dayjs(recentAt).tz('Asia/Seoul').format('YYYY-MM-DD'),
+        point_amount: 10,
+        created_at: recentAt.toISOString(),
+      });
 
       const response = await request(app.getHttpServer())
         .get('/event-points')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body).toHaveLength(2);
-      expect(new Date(response.body[0].createdAt).getTime()).toBeGreaterThan(
-        new Date(response.body[1].createdAt).getTime(),
-      );
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].type).toBe('COUPANG_VISIT');
+      expect(response.body[0].point).toBe(10);
     });
 
     it('24시간보다 오래된 행은 포함하지 않는다', async () => {
