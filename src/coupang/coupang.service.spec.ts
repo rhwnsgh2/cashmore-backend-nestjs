@@ -359,4 +359,51 @@ describe('CoupangService', () => {
       expect(result).toEqual({ hasVisitedToday: false });
     });
   });
+
+  describe('KST 날짜 변환', () => {
+    const userId = 'user-1';
+
+    it('insertVisit에 전달되는 date는 KST YYYY-MM-DD 형식이다', async () => {
+      await service.recordVisit(userId);
+
+      const visits = stubVisitRepo.getInsertedVisits();
+      expect(visits).toHaveLength(1);
+      expect(visits[0].createdAtDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+      // 현재 시각의 KST 날짜와 일치
+      const expectedKstDate = new Date(
+        Date.now() + 9 * 60 * 60 * 1000,
+      )
+        .toISOString()
+        .slice(0, 10);
+      expect(visits[0].createdAtDate).toBe(expectedKstDate);
+    });
+
+    it('같은 KST 날짜에 호출하면 같은 createdAtDate가 된다', async () => {
+      await service.recordVisit('user-A');
+      await service.recordVisit('user-B');
+
+      const visits = stubVisitRepo.getInsertedVisits();
+      expect(visits).toHaveLength(2);
+      expect(visits[0].createdAtDate).toBe(visits[1].createdAtDate);
+    });
+  });
+
+  describe('insertVisit DB 에러 처리', () => {
+    const userId = 'user-1';
+
+    it('insertVisit가 일반 DB 에러를 throw해도 Already received로 응답한다', async () => {
+      const originalInsert = stubVisitRepo.insertVisit.bind(stubVisitRepo);
+      stubVisitRepo.insertVisit = async () => {
+        throw new Error('connection reset by peer');
+      };
+
+      const result = await service.recordVisit(userId);
+
+      expect(result).toEqual({ success: false, message: 'Already received' });
+      expect(stubPointWriteRepo.getInsertedActions()).toHaveLength(0);
+
+      stubVisitRepo.insertVisit = originalInsert;
+    });
+  });
 });

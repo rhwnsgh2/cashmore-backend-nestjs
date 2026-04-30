@@ -318,6 +318,63 @@ describe('Coupang API (e2e)', () => {
 
       expect(action!.additional_data).toEqual({ coupang_visit_id: visits!.id });
     });
+
+    it('동시에 여러 번 호출해도 정확히 한 번만 적립된다 (UNIQUE 제약)', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const responses = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          request(app.getHttpServer())
+            .post('/coupang/visit')
+            .set('Authorization', `Bearer ${token}`)
+            .send({}),
+        ),
+      );
+
+      const successCount = responses.filter(
+        (r) => r.body.success === true,
+      ).length;
+      const alreadyCount = responses.filter(
+        (r) => r.body.success === false,
+      ).length;
+
+      expect(successCount).toBe(1);
+      expect(alreadyCount).toBe(4);
+
+      const { data: visits } = await supabase
+        .from('coupang_visits')
+        .select('*')
+        .eq('user_id', testUser.id);
+      expect(visits).toHaveLength(1);
+
+      const { data: actions } = await supabase
+        .from('point_actions')
+        .select('*')
+        .eq('user_id', testUser.id)
+        .eq('type', 'COUPANG_VISIT');
+      expect(actions).toHaveLength(1);
+    });
+
+    it('coupang_visits.created_at_date가 KST 오늘 날짜와 일치한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/coupang/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(200);
+
+      const { data } = await supabase
+        .from('coupang_visits')
+        .select('created_at_date')
+        .eq('user_id', testUser.id)
+        .single();
+
+      const todayKst = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      expect(data!.created_at_date).toBe(todayKst);
+    });
   });
 
   describe('GET /coupang/visit/today', () => {
