@@ -27,33 +27,15 @@ export class AttendanceService {
   ) {}
 
   async getAttendances(userId: string): Promise<Attendance[]> {
-    const [attendanceRecords, pointActions] = await Promise.all([
-      this.attendanceRepository.findByUserId(userId),
-      this.attendanceRepository.findPointActionsByUserId(userId),
-    ]);
+    const attendanceRecords =
+      await this.attendanceRepository.findByUserId(userId);
 
-    return attendanceRecords.map((record) => {
-      const attendancePoint = pointActions.find(
-        (action) =>
-          action.additionalData.attendance_id === record.id &&
-          action.type === 'ATTENDANCE',
-      );
-
-      const adShowPointAction = pointActions.find(
-        (action) =>
-          action.additionalData.attendance_id === record.id &&
-          action.type === 'ATTENDANCE_AD',
-      );
-
-      return {
-        id: record.id,
-        userId: record.userId,
-        attendanceDate: record.createdAtDate,
-        point: attendancePoint?.pointAmount ?? null,
-        adShowPoint: adShowPointAction?.pointAmount ?? null,
-        createdAt: record.createdAt,
-      };
-    });
+    return attendanceRecords.map((record) => ({
+      id: record.id,
+      userId: record.userId,
+      attendanceDate: record.createdAtDate,
+      createdAt: record.createdAt,
+    }));
   }
 
   async checkIn(userId: string): Promise<CheckInResult> {

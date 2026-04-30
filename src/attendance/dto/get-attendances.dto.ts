@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class AttendanceDto {
   @ApiProperty({
@@ -18,20 +18,6 @@ export class AttendanceDto {
     example: '2026-01-15',
   })
   attendanceDate: string;
-
-  @ApiPropertyOptional({
-    description: '출석 포인트',
-    example: 100,
-    nullable: true,
-  })
-  point: number | null;
-
-  @ApiPropertyOptional({
-    description: '광고 시청 보너스 포인트',
-    example: 50,
-    nullable: true,
-  })
-  adShowPoint: number | null;
 
   @ApiProperty({
     description: '생성 일시',

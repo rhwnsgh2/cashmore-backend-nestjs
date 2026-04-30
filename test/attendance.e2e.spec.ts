@@ -10,7 +10,6 @@ import {
   createAttendance,
   createAttendances,
 } from './helpers/attendance.helper';
-import { createPointAction, createPointActions } from './helpers/point.helper';
 import { generateTestToken } from './helpers/auth.helper';
 
 describe('Attendance API (e2e)', () => {
@@ -85,99 +84,6 @@ describe('Attendance API (e2e)', () => {
       expect(response.body[0]).toHaveProperty('createdAt');
     });
 
-    it('출석 포인트가 올바르게 매핑된다', async () => {
-      const testUser = await createTestUser(supabase);
-      const token = generateTestToken(testUser.auth_id);
-
-      const attendance = await createAttendance(supabase, {
-        user_id: testUser.id,
-        created_at_date: '2026-01-15',
-        created_at: '2026-01-15T09:00:00+09:00',
-      });
-
-      await createPointAction(supabase, {
-        user_id: testUser.id,
-        type: 'ATTENDANCE',
-        point_amount: 100,
-        status: 'done',
-        additional_data: { attendance_id: attendance.id },
-      });
-
-      const response = await request(app.getHttpServer())
-        .get('/attendances')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].point).toBe(100);
-      expect(response.body[0].adShowPoint).toBeNull();
-    });
-
-    it('광고 시청 포인트가 올바르게 매핑된다', async () => {
-      const testUser = await createTestUser(supabase);
-      const token = generateTestToken(testUser.auth_id);
-
-      const attendance = await createAttendance(supabase, {
-        user_id: testUser.id,
-        created_at_date: '2026-01-15',
-        created_at: '2026-01-15T09:00:00+09:00',
-      });
-
-      await createPointAction(supabase, {
-        user_id: testUser.id,
-        type: 'ATTENDANCE_AD',
-        point_amount: 50,
-        status: 'done',
-        additional_data: { attendance_id: attendance.id },
-      });
-
-      const response = await request(app.getHttpServer())
-        .get('/attendances')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].point).toBeNull();
-      expect(response.body[0].adShowPoint).toBe(50);
-    });
-
-    it('출석 포인트와 광고 포인트 모두 매핑된다', async () => {
-      const testUser = await createTestUser(supabase);
-      const token = generateTestToken(testUser.auth_id);
-
-      const attendance = await createAttendance(supabase, {
-        user_id: testUser.id,
-        created_at_date: '2026-01-15',
-        created_at: '2026-01-15T09:00:00+09:00',
-      });
-
-      await createPointActions(supabase, [
-        {
-          user_id: testUser.id,
-          type: 'ATTENDANCE',
-          point_amount: 100,
-          status: 'done',
-          additional_data: { attendance_id: attendance.id },
-        },
-        {
-          user_id: testUser.id,
-          type: 'ATTENDANCE_AD',
-          point_amount: 50,
-          status: 'done',
-          additional_data: { attendance_id: attendance.id },
-        },
-      ]);
-
-      const response = await request(app.getHttpServer())
-        .get('/attendances')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].point).toBe(100);
-      expect(response.body[0].adShowPoint).toBe(50);
-    });
-
     it('다른 사용자의 출석 기록은 포함하지 않는다', async () => {
       const testUser = await createTestUser(supabase);
       const otherUser = await createTestUser(supabase);
@@ -205,59 +111,15 @@ describe('Attendance API (e2e)', () => {
       expect(response.body[0].userId).toBe(testUser.id);
     });
 
-    it('pending 상태의 포인트 액션은 매핑하지 않는다', async () => {
-      const testUser = await createTestUser(supabase);
-      const token = generateTestToken(testUser.auth_id);
-
-      const attendance = await createAttendance(supabase, {
-        user_id: testUser.id,
-        created_at_date: '2026-01-15',
-        created_at: '2026-01-15T09:00:00+09:00',
-      });
-
-      await createPointAction(supabase, {
-        user_id: testUser.id,
-        type: 'ATTENDANCE',
-        point_amount: 100,
-        status: 'pending', // pending 상태
-        additional_data: { attendance_id: attendance.id },
-      });
-
-      const response = await request(app.getHttpServer())
-        .get('/attendances')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].point).toBeNull();
-    });
-
     it('응답에 모든 필드가 포함된다', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      const attendance = await createAttendance(supabase, {
+      await createAttendance(supabase, {
         user_id: testUser.id,
         created_at_date: '2026-01-15',
         created_at: '2026-01-15T09:30:00+09:00',
       });
-
-      await createPointActions(supabase, [
-        {
-          user_id: testUser.id,
-          type: 'ATTENDANCE',
-          point_amount: 100,
-          status: 'done',
-          additional_data: { attendance_id: attendance.id },
-        },
-        {
-          user_id: testUser.id,
-          type: 'ATTENDANCE_AD',
-          point_amount: 50,
-          status: 'done',
-          additional_data: { attendance_id: attendance.id },
-        },
-      ]);
 
       const response = await request(app.getHttpServer())
         .get('/attendances')
@@ -268,9 +130,9 @@ describe('Attendance API (e2e)', () => {
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('userId', testUser.id);
       expect(result).toHaveProperty('attendanceDate', '2026-01-15');
-      expect(result).toHaveProperty('point', 100);
-      expect(result).toHaveProperty('adShowPoint', 50);
       expect(result).toHaveProperty('createdAt');
+      expect(result).not.toHaveProperty('point');
+      expect(result).not.toHaveProperty('adShowPoint');
     });
   });
 });
