@@ -129,7 +129,7 @@ export class EveryReceiptService {
       (r) => r.status === 'pending' || r.status === 'rejected',
     ).length;
 
-    const totalTickets = 3;
+    const totalTickets = 5;
     const remainingTickets = Math.max(0, totalTickets - usedTickets);
 
     return {

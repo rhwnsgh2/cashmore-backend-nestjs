@@ -607,12 +607,12 @@ describe('EveryReceiptService', () => {
   });
 
   describe('getReReviewTickets', () => {
-    it('재검수 기록이 없으면 3개 전부 남아있다', async () => {
+    it('재검수 기록이 없으면 5개 전부 남아있다', async () => {
       const result = await service.getReReviewTickets(userId);
 
-      expect(result.ticketCount).toBe(3);
+      expect(result.ticketCount).toBe(5);
       expect(result.usedTickets).toBe(0);
-      expect(result.totalTickets).toBe(3);
+      expect(result.totalTickets).toBe(5);
     });
 
     it('pending 상태의 재검수는 사용한 티켓으로 카운트한다', async () => {
@@ -622,7 +622,7 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getReReviewTickets(userId);
 
-      expect(result.ticketCount).toBe(2);
+      expect(result.ticketCount).toBe(4);
       expect(result.usedTickets).toBe(1);
     });
 
@@ -633,7 +633,7 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getReReviewTickets(userId);
 
-      expect(result.ticketCount).toBe(2);
+      expect(result.ticketCount).toBe(4);
       expect(result.usedTickets).toBe(1);
     });
 
@@ -644,37 +644,41 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getReReviewTickets(userId);
 
-      expect(result.ticketCount).toBe(3);
+      expect(result.ticketCount).toBe(5);
       expect(result.usedTickets).toBe(0);
     });
 
-    it('3개 모두 사용하면 ticketCount는 0이다', async () => {
-      const now = new Date().toISOString();
-      repository.setReReviewRecords(userId, [
-        { id: 1, status: 'pending', created_at: now },
-        { id: 2, status: 'pending', created_at: now },
-        { id: 3, status: 'rejected', created_at: now },
-      ]);
-
-      const result = await service.getReReviewTickets(userId);
-
-      expect(result.ticketCount).toBe(0);
-      expect(result.usedTickets).toBe(3);
-    });
-
-    it('3개 초과 사용해도 ticketCount는 0 미만이 되지 않는다', async () => {
+    it('5개 모두 사용하면 ticketCount는 0이다', async () => {
       const now = new Date().toISOString();
       repository.setReReviewRecords(userId, [
         { id: 1, status: 'pending', created_at: now },
         { id: 2, status: 'pending', created_at: now },
         { id: 3, status: 'pending', created_at: now },
-        { id: 4, status: 'rejected', created_at: now },
+        { id: 4, status: 'pending', created_at: now },
+        { id: 5, status: 'rejected', created_at: now },
       ]);
 
       const result = await service.getReReviewTickets(userId);
 
       expect(result.ticketCount).toBe(0);
-      expect(result.usedTickets).toBe(4);
+      expect(result.usedTickets).toBe(5);
+    });
+
+    it('5개 초과 사용해도 ticketCount는 0 미만이 되지 않는다', async () => {
+      const now = new Date().toISOString();
+      repository.setReReviewRecords(userId, [
+        { id: 1, status: 'pending', created_at: now },
+        { id: 2, status: 'pending', created_at: now },
+        { id: 3, status: 'pending', created_at: now },
+        { id: 4, status: 'pending', created_at: now },
+        { id: 5, status: 'pending', created_at: now },
+        { id: 6, status: 'rejected', created_at: now },
+      ]);
+
+      const result = await service.getReReviewTickets(userId);
+
+      expect(result.ticketCount).toBe(0);
+      expect(result.usedTickets).toBe(6);
     });
 
     it('이번주 이전 데이터는 카운트하지 않는다', async () => {
@@ -691,7 +695,7 @@ describe('EveryReceiptService', () => {
 
       const result = await service.getReReviewTickets(userId);
 
-      expect(result.ticketCount).toBe(3);
+      expect(result.ticketCount).toBe(5);
       expect(result.usedTickets).toBe(0);
     });
   });

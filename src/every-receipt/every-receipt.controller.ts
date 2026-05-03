@@ -86,7 +86,7 @@ export class EveryReceiptController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '재검수 티켓 조회',
-    description: '이번주 재검수 티켓 사용 현황을 조회합니다. 주당 3개 제공.',
+    description: '이번주 재검수 티켓 사용 현황을 조회합니다. 주당 5개 제공.',
   })
   @ApiResponse({ status: 200, description: '재검수 티켓 조회 성공' })
   @ApiUnauthorizedResponse({ description: '인증 실패' })
