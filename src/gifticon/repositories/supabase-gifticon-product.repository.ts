@@ -9,9 +9,7 @@ import type {
 } from '../interfaces/gifticon-product-repository.interface';
 
 @Injectable()
-export class SupabaseGifticonProductRepository
-  implements IGifticonProductRepository
-{
+export class SupabaseGifticonProductRepository implements IGifticonProductRepository {
   private readonly logger = new Logger(SupabaseGifticonProductRepository.name);
 
   constructor(private supabaseService: SupabaseService) {}
@@ -85,15 +83,26 @@ export class SupabaseGifticonProductRepository
     if (error) throw error;
 
     return (data ?? []).map((row) => {
-      const g = (row as unknown as { smartcon_goods: { goods_id: string; brand_name: string | null; goods_name: string | null; msg: string | null; img_url_https: string | null; cached_img_url: string | null } }).smartcon_goods;
+      const g = (
+        row as unknown as {
+          smartcon_goods: {
+            goods_id: string;
+            brand_name: string | null;
+            goods_name: string | null;
+            msg: string | null;
+            img_url_https: string | null;
+            cached_img_url: string | null;
+          };
+        }
+      ).smartcon_goods;
       return {
-        id: row.id as number,
+        id: row.id,
         goods_id: g.goods_id,
         brand_name: g.brand_name,
         goods_name: g.goods_name,
         msg: g.msg,
         img_url: g.cached_img_url ?? g.img_url_https ?? null,
-        point_price: row.point_price as number,
+        point_price: row.point_price,
       };
     });
   }

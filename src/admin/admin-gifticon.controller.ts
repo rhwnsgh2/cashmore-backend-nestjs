@@ -5,7 +5,6 @@ import {
   Headers,
   Param,
   Put,
-  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -13,7 +12,6 @@ import {
   ApiOperation,
   ApiResponse,
   ApiHeader,
-  ApiQuery,
   ApiParam,
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
@@ -39,18 +37,12 @@ export class AdminGifticonController {
       '단종된 상품도 포함되며 is_active 필드로 구분 가능. 큐레이션 안 된 상품은 id, point_price가 null.',
   })
   @ApiHeader({ name: 'x-admin-api-key', required: true })
-  @ApiQuery({
-    name: 'eventId',
-    required: false,
-    description: '미지정 시 SMARTCON_CONFIG.eventId 사용',
-  })
   @ApiResponse({ status: 200, type: [CatalogItemDto] })
   async listCatalog(
     @Headers('x-admin-api-key') apiKey: string,
-    @Query('eventId') eventId?: string,
   ): Promise<CatalogItemDto[]> {
     this.validateApiKey(apiKey);
-    return this.gifticonService.listCatalogForAdmin(eventId);
+    return this.gifticonService.listCatalogForAdmin();
   }
 
   @Put('products/:goodsId')

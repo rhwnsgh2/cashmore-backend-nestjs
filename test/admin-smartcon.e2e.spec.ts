@@ -95,7 +95,7 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
@@ -137,13 +137,13 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
     it('동일 goods_id 재호출 → UPSERT (가격 갱신)', async () => {
       getEventGoods.mockResolvedValueOnce([makeItem('A', { PRICE: 1000 })]);
       await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
       getEventGoods.mockResolvedValueOnce([makeItem('A', { PRICE: 9999 })]);
       const response = await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
@@ -168,13 +168,13 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
     it('응답에서 빠진 상품은 is_active=false', async () => {
       getEventGoods.mockResolvedValueOnce([makeItem('A'), makeItem('B')]);
       await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
       getEventGoods.mockResolvedValueOnce([makeItem('A')]);
       const response = await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
@@ -203,13 +203,13 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
     it('빈 응답 → EVENT의 모든 활성 상품이 비활성화', async () => {
       getEventGoods.mockResolvedValueOnce([makeItem('A'), makeItem('B')]);
       await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
       getEventGoods.mockResolvedValueOnce([]);
       const response = await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
@@ -229,43 +229,15 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
       expect(rows?.every((r) => r.is_active === false)).toBe(true);
     });
 
-    it('다른 EVENT 상품은 비활성화되지 않는다', async () => {
-      // EVENT 64385에 A 등록
-      getEventGoods.mockResolvedValueOnce([makeItem('A')]);
-      await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
-        .set('x-admin-api-key', ADMIN_API_KEY)
-        .expect(201);
-
-      // EVENT 99999 빈 응답
-      getEventGoods.mockResolvedValueOnce([]);
-      const response = await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=99999')
-        .set('x-admin-api-key', ADMIN_API_KEY)
-        .expect(201);
-
-      expect(response.body).toEqual({
-        fetched: 0,
-        upserted: 0,
-        deactivated: 0,
-        imagesCached: 0,
-        imagesFailed: 0,
-      });
-
-      const { data: rowA } = await supabase
-        .from('smartcon_goods')
-        .select('is_active')
-        .eq('goods_id', 'A')
-        .single();
-      expect(rowA?.is_active).toBe(true);
-    });
+    // 다른 EVENT 시나리오는 컨트롤러에서 eventId 쿼리 제거 후 단위 테스트가 커버.
+    // (smartcon.service.spec.ts: "다른 EVENT의 상품은 비활성화되지 않는다")
 
     it('raw_data에 응답 원본이 그대로 박제된다', async () => {
       const item = makeItem('A', { PRICE: 1234, DISC_PRICE: 1100 });
       getEventGoods.mockResolvedValueOnce([item]);
 
       await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
@@ -281,21 +253,21 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
     it('비활성화된 상품이 응답에 다시 들어오면 is_active=true로 복구된다', async () => {
       getEventGoods.mockResolvedValueOnce([makeItem('A')]);
       await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
       // A 비활성화
       getEventGoods.mockResolvedValueOnce([]);
       await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
       // 다시 A 응답
       getEventGoods.mockResolvedValueOnce([makeItem('A')]);
       const response = await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
@@ -320,7 +292,7 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .post('/admin/smartcon/sync?eventId=64385')
+        .post('/admin/smartcon/sync')
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 

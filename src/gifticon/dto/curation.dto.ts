@@ -33,7 +33,10 @@ export class CurationResponseDto {
 }
 
 export class CatalogItemDto {
-  @ApiProperty({ nullable: true, description: 'gifticon_products.id (큐레이션 안 된 상품은 null)' })
+  @ApiProperty({
+    nullable: true,
+    description: 'gifticon_products.id (큐레이션 안 된 상품은 null)',
+  })
   id!: number | null;
 
   @ApiProperty()
@@ -54,7 +57,10 @@ export class CatalogItemDto {
   @ApiProperty({ nullable: true })
   smartcon_disc_price!: number | null;
 
-  @ApiProperty({ nullable: true, description: 'CloudFront 캐시 URL 우선, 없으면 원본 URL' })
+  @ApiProperty({
+    nullable: true,
+    description: 'CloudFront 캐시 URL 우선, 없으면 원본 URL',
+  })
   img_url!: string | null;
 
   @ApiProperty({ nullable: true })

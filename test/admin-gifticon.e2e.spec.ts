@@ -1,11 +1,4 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterAll,
-  beforeEach,
-} from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -93,7 +86,7 @@ describe('Admin Gifticon (e2e) - Real DB', () => {
       await seedGoods(supabase, [{ goods_id: 'A' }, { goods_id: 'B' }]);
 
       const response = await request(app.getHttpServer())
-        .get(`/admin/gifticon/products?eventId=${EVENT_ID}`)
+        .get(`/admin/gifticon/products`)
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(200);
 
@@ -119,7 +112,7 @@ describe('Admin Gifticon (e2e) - Real DB', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get(`/admin/gifticon/products?eventId=${EVENT_ID}`)
+        .get(`/admin/gifticon/products`)
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(200);
 
@@ -136,7 +129,7 @@ describe('Admin Gifticon (e2e) - Real DB', () => {
       ]);
 
       const response = await request(app.getHttpServer())
-        .get(`/admin/gifticon/products?eventId=${EVENT_ID}`)
+        .get(`/admin/gifticon/products`)
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(200);
 

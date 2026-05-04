@@ -2,7 +2,6 @@ import {
   Controller,
   Post,
   Headers,
-  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -10,7 +9,6 @@ import {
   ApiOperation,
   ApiResponse,
   ApiHeader,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { SmartconService } from '../smartcon/smartcon.service';
@@ -30,21 +28,14 @@ export class AdminSmartconController {
       'GetEventGoods.sc 응답을 받아 smartcon_goods 테이블에 UPSERT. 응답에서 빠진 상품은 is_active=false 처리.',
   })
   @ApiHeader({ name: 'x-admin-api-key', required: true })
-  @ApiQuery({
-    name: 'eventId',
-    required: false,
-    description: '미지정 시 SMARTCON_CONFIG.eventId 사용',
-  })
   @ApiResponse({
     status: 200,
-    description: '동기화 결과 { fetched, upserted, deactivated }',
+    description:
+      '동기화 결과 { fetched, upserted, deactivated, imagesCached, imagesFailed }',
   })
-  async sync(
-    @Headers('x-admin-api-key') apiKey: string,
-    @Query('eventId') eventId?: string,
-  ) {
+  async sync(@Headers('x-admin-api-key') apiKey: string) {
     this.validateApiKey(apiKey);
-    return this.smartconService.syncEventGoods(eventId);
+    return this.smartconService.syncEventGoods();
   }
 
   private validateApiKey(apiKey: string): void {

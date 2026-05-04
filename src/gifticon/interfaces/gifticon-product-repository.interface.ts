@@ -57,4 +57,6 @@ export interface IGifticonProductRepository {
   findByGoodsId(goodsId: string): Promise<GifticonProductRow | null>;
 }
 
-export const GIFTICON_PRODUCT_REPOSITORY = Symbol('GIFTICON_PRODUCT_REPOSITORY');
+export const GIFTICON_PRODUCT_REPOSITORY = Symbol(
+  'GIFTICON_PRODUCT_REPOSITORY',
+);
