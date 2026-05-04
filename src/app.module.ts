@@ -48,6 +48,7 @@ import { AdvertiserAuthModule } from './advertiser-auth/advertiser-auth.module';
 import { AdvertiserModule } from './advertiser/advertiser.module';
 import { PointWriteModule } from './point-write/point-write.module';
 import { AffiliateModule } from './affiliate/affiliate.module';
+import { GifticonModule } from './gifticon/gifticon.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -112,6 +113,7 @@ import configuration from './config/configuration';
     BannerAdModule,
     AdvertiserAuthModule,
     AdvertiserModule,
+    GifticonModule,
   ],
   controllers: [AppController],
   providers: [
