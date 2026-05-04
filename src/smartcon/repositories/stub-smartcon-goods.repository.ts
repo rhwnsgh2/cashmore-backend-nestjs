@@ -4,6 +4,7 @@ import type {
   SmartconGoodsRow,
   SmartconGoodsUpsertInput,
   SyncByEventResult,
+  UncachedGoods,
 } from '../interfaces/smartcon-goods-repository.interface';
 
 @Injectable()
@@ -24,6 +25,8 @@ export class StubSmartconGoodsRepository implements ISmartconGoodsRepository {
       this.store.set(it.goods_id, {
         ...it,
         is_active: true,
+        cached_img_url: existing?.cached_img_url ?? null,
+        cached_img_at: existing?.cached_img_at ?? null,
         created_at: existing?.created_at ?? now,
         updated_at: now,
       });
@@ -44,6 +47,33 @@ export class StubSmartconGoodsRepository implements ISmartconGoodsRepository {
       }
     }
     return { upserted, deactivated };
+  }
+
+  async findUncachedByEvent(eventId: string): Promise<UncachedGoods[]> {
+    return [...this.store.values()]
+      .filter(
+        (r) =>
+          r.event_id === eventId &&
+          r.is_active &&
+          r.cached_img_url === null &&
+          r.img_url_https !== null,
+      )
+      .map((r) => ({
+        goods_id: r.goods_id,
+        img_url_https: r.img_url_https as string,
+      }));
+  }
+
+  async updateCachedImage(
+    goodsId: string,
+    cachedImgUrl: string,
+    cachedImgAt: string,
+  ): Promise<void> {
+    const row = this.store.get(goodsId);
+    if (!row) return;
+    row.cached_img_url = cachedImgUrl;
+    row.cached_img_at = cachedImgAt;
+    row.updated_at = cachedImgAt;
   }
 
   async findAllByEvent(eventId: string): Promise<SmartconGoodsRow[]> {

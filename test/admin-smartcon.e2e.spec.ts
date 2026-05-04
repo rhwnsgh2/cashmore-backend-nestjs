@@ -12,6 +12,8 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { SmartconApiService } from '../src/smartcon/smartcon-api.service';
+import { GIFTICON_IMAGE_STORAGE } from '../src/storage/interfaces/gifticon-image-storage.interface';
+import { StubGifticonImageStorage } from '../src/storage/stub-gifticon-image-storage.service';
 import { getTestSupabaseAdminClient } from './supabase-client';
 import { truncateAllTables } from './setup';
 import type { SmartconGoodsResponseItem } from '../src/smartcon/dto/smartcon-goods.dto';
@@ -45,6 +47,7 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
   let app: INestApplication;
   const supabase = getTestSupabaseAdminClient();
   const getEventGoods = vi.fn();
+  const imageStorage = new StubGifticonImageStorage();
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -52,6 +55,8 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
     })
       .overrideProvider(SmartconApiService)
       .useValue({ getEventGoods })
+      .overrideProvider(GIFTICON_IMAGE_STORAGE)
+      .useValue(imageStorage)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -66,6 +71,7 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
   beforeEach(async () => {
     await truncateAllTables();
     getEventGoods.mockReset();
+    imageStorage.clear();
   });
 
   describe('POST /admin/smartcon/sync', () => {
@@ -97,6 +103,8 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         fetched: 2,
         upserted: 2,
         deactivated: 0,
+        imagesCached: 2,
+        imagesFailed: 0,
       });
 
       const { data: rows } = await supabase
@@ -111,12 +119,19 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         event_id: '64385',
         price: 1000,
         is_active: true,
+        cached_img_url: 'https://stub-cdn.example/gifticon/A',
       });
       expect(rows?.[1]).toMatchObject({
         goods_id: 'B',
         price: 2000,
         is_active: true,
+        cached_img_url: 'https://stub-cdn.example/gifticon/B',
       });
+      expect(rows?.[0].cached_img_at).not.toBeNull();
+      expect(imageStorage.uploads).toEqual([
+        { path: 'gifticon/A', sourceUrl: 'https://example/img.jpg' },
+        { path: 'gifticon/B', sourceUrl: 'https://example/img.jpg' },
+      ]);
     });
 
     it('동일 goods_id 재호출 → UPSERT (가격 갱신)', async () => {
@@ -136,6 +151,8 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         fetched: 1,
         upserted: 1,
         deactivated: 0,
+        imagesCached: 0,
+        imagesFailed: 0,
       });
 
       const { data: row } = await supabase
@@ -144,6 +161,8 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         .eq('goods_id', 'A')
         .single();
       expect(row?.price).toBe(9999);
+      // 첫 호출에서 캐시되었으므로 두 번째 호출에서는 다시 받지 않음
+      expect(imageStorage.uploads).toHaveLength(1);
     });
 
     it('응답에서 빠진 상품은 is_active=false', async () => {
@@ -163,6 +182,8 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         fetched: 1,
         upserted: 1,
         deactivated: 1,
+        imagesCached: 0,
+        imagesFailed: 0,
       });
 
       const { data: rowA } = await supabase
@@ -196,6 +217,8 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         fetched: 0,
         upserted: 0,
         deactivated: 2,
+        imagesCached: 0,
+        imagesFailed: 0,
       });
 
       const { data: rows } = await supabase
@@ -225,6 +248,8 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         fetched: 0,
         upserted: 0,
         deactivated: 0,
+        imagesCached: 0,
+        imagesFailed: 0,
       });
 
       const { data: rowA } = await supabase
@@ -278,6 +303,8 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         fetched: 1,
         upserted: 1,
         deactivated: 0,
+        imagesCached: 0,
+        imagesFailed: 0,
       });
       const { data: row } = await supabase
         .from('smartcon_goods')
@@ -285,6 +312,34 @@ describe('Admin Smartcon (e2e) - Real DB', () => {
         .eq('goods_id', 'A')
         .single();
       expect(row?.is_active).toBe(true);
+    });
+
+    it('img_url_https가 없는 상품은 캐시되지 않는다', async () => {
+      getEventGoods.mockResolvedValueOnce([
+        makeItem('A', { IMG_URL_HTTPS: null }),
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .post('/admin/smartcon/sync?eventId=64385')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(201);
+
+      expect(response.body).toEqual({
+        fetched: 1,
+        upserted: 1,
+        deactivated: 0,
+        imagesCached: 0,
+        imagesFailed: 0,
+      });
+      expect(imageStorage.uploads).toHaveLength(0);
+
+      const { data: row } = await supabase
+        .from('smartcon_goods')
+        .select('cached_img_url, cached_img_at')
+        .eq('goods_id', 'A')
+        .single();
+      expect(row?.cached_img_url).toBeNull();
+      expect(row?.cached_img_at).toBeNull();
     });
   });
 });

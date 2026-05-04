@@ -17,6 +17,7 @@
 - [x] 카탈로그 데이터 모델 (스마트콘 원본 / 우리 노출 분리)
 - [x] 어드민 큐레이션 흐름
 - [x] **prd 환경 `GetEventGoods.sc` 응답 검증** (2026-05-04)
+- [x] **카탈로그 이미지 캐시 (S3 + CloudFront)** — sync 시 자동, `smartcon_goods.cached_img_url`
 - [ ] dev 환경 동작 확인 (현재 timeout — 99-H 참고)
 - [ ] 수신번호 등록 / 인증 정책
 - [ ] 주문/결제 흐름 (포인트 차감 ↔ 스마트콘 발송 atomicity)

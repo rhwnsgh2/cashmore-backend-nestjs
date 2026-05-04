@@ -2869,6 +2869,8 @@ export type Database = {
         Row: {
           b2c_item_no: string | null
           brand_name: string | null
+          cached_img_at: string | null
+          cached_img_url: string | null
           created_at: string
           disc_price: number | null
           disc_rate: number | null
@@ -2891,6 +2893,8 @@ export type Database = {
         Insert: {
           b2c_item_no?: string | null
           brand_name?: string | null
+          cached_img_at?: string | null
+          cached_img_url?: string | null
           created_at?: string
           disc_price?: number | null
           disc_rate?: number | null
@@ -2913,6 +2917,8 @@ export type Database = {
         Update: {
           b2c_item_no?: string | null
           brand_name?: string | null
+          cached_img_at?: string | null
+          cached_img_url?: string | null
           created_at?: string
           disc_price?: number | null
           disc_rate?: number | null

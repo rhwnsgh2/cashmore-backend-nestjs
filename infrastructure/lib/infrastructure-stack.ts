@@ -16,6 +16,8 @@ import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as appscaling from 'aws-cdk-lib/aws-applicationautoscaling';
 
 import { Construct } from 'constructs';
@@ -332,6 +334,48 @@ export class InfrastructureStack extends cdk.Stack {
         ],
         resources: ['*'],
       }),
+    );
+
+    // S3 Bucket for Gifticon Catalog Images
+    // 스마트콘 카탈로그 이미지가 임시 호스팅이라 우리 버킷에 캐시 후 CloudFront로 노출
+    // 계정 차원의 BlockPublicAccess 정책으로 public 버킷이 막혀있어 private + CloudFront(OAC) 구성
+    const gifticonImagesBucket = new s3.Bucket(this, 'GifticonImagesBucket', {
+      bucketName: `cashmore-gifticon-images-${this.account}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    // ECS Task가 버킷에 업로드 가능하도록 PutObject 권한 부여
+    gifticonImagesBucket.grantPut(taskDefinition.taskRole);
+
+    // CloudFront 분배 — OAC로 S3에 직접 접근, 캐싱
+    const gifticonImagesDistribution = new cloudfront.Distribution(
+      this,
+      'GifticonImagesDistribution',
+      {
+        defaultBehavior: {
+          origin: origins.S3BucketOrigin.withOriginAccessControl(
+            gifticonImagesBucket,
+          ),
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          compress: true,
+        },
+        priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
+        comment: 'Gifticon catalog images',
+      },
+    );
+
+    container.addEnvironment(
+      'GIFTICON_IMAGES_BUCKET',
+      gifticonImagesBucket.bucketName,
+    );
+    container.addEnvironment('GIFTICON_IMAGES_REGION', this.region);
+    container.addEnvironment(
+      'GIFTICON_IMAGES_PUBLIC_HOST',
+      gifticonImagesDistribution.distributionDomainName,
     );
 
     // S3 Bucket for ALB Access Logs

@@ -110,6 +110,30 @@
 
 ---
 
+## ~~I. 카탈로그 이미지 캐시 정책~~ (결정됨, 2026-05-04)
+
+스마트콘이 제공하는 `IMG_URL_HTTPS`가 임시 호스팅이라 우리 인프라에 캐시 후 노출.
+
+### 결정
+
+- **저장소**: AWS S3 (private 버킷) + CloudFront 분배
+  - 버킷: `cashmore-gifticon-images-{account}` (BLOCK_ALL public access)
+  - CloudFront: OAC로 S3 접근, 기본 도메인 `d2lpyu6gguvriv.cloudfront.net`
+  - 커스텀 도메인은 추후 트래픽 늘면 도입
+- **다운로드 시점**: `POST /admin/smartcon/sync` 호출 시 자동 캐시 (큐레이션 전)
+  - 이유: 임시 URL 만료 시 어드민 화면에서 깨진 이미지 보일 위험 회피
+- **저장 위치**: `smartcon_goods.cached_img_url`, `cached_img_at`
+- **멱등성**: `cached_img_url IS NULL`인 항목만 다운로드 (이미 캐시된 상품은 skip)
+- **실패 처리**: best-effort — 이미지 캐시 실패해도 sync 자체는 성공. `imagesFailed` 카운트로 응답
+- **노출 쿼리**: `COALESCE(cached_img_url, img_url_https)` — 캐시 실패한 상품은 원본 URL fallback
+
+### 미해결
+
+- 스마트콘 IMG_URL_HTTPS가 변경됐을 때 재캐시 트리거 정책 (현재는 변경 감지 없이 한 번만 캐시)
+- 단종 상품의 캐시된 이미지 보존 / 정리 정책
+
+---
+
 ## H. 스마트콘 dev 환경 / 응답 스펙 차이 (2026-05-04 검증)
 
 ECS 운영 컨테이너에서 `GetEventGoods.sc` 직접 호출하여 검증한 결과.

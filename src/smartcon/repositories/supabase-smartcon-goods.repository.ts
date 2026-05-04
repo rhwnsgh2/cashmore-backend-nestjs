@@ -6,12 +6,11 @@ import type {
   SmartconGoodsRow,
   SmartconGoodsUpsertInput,
   SyncByEventResult,
+  UncachedGoods,
 } from '../interfaces/smartcon-goods-repository.interface';
 
 @Injectable()
-export class SupabaseSmartconGoodsRepository
-  implements ISmartconGoodsRepository
-{
+export class SupabaseSmartconGoodsRepository implements ISmartconGoodsRepository {
   private readonly logger = new Logger(SupabaseSmartconGoodsRepository.name);
 
   constructor(private supabaseService: SupabaseService) {}
@@ -50,7 +49,7 @@ export class SupabaseSmartconGoodsRepository
     if (fetchError) throw fetchError;
 
     const toDeactivate = (existing ?? [])
-      .map((r) => r.goods_id as string)
+      .map((r) => r.goods_id)
       .filter((id) => !presentIds.has(id));
 
     if (toDeactivate.length > 0) {
@@ -65,6 +64,41 @@ export class SupabaseSmartconGoodsRepository
       `syncByEvent eventId=${eventId} upserted=${upserted} deactivated=${toDeactivate.length}`,
     );
     return { upserted, deactivated: toDeactivate.length };
+  }
+
+  async findUncachedByEvent(eventId: string): Promise<UncachedGoods[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('smartcon_goods')
+      .select('goods_id, img_url_https')
+      .eq('event_id', eventId)
+      .eq('is_active', true)
+      .is('cached_img_url', null)
+      .not('img_url_https', 'is', null);
+    if (error) throw error;
+    return (data ?? [])
+      .filter(
+        (r): r is { goods_id: string; img_url_https: string } =>
+          typeof r.img_url_https === 'string',
+      )
+      .map((r) => ({ goods_id: r.goods_id, img_url_https: r.img_url_https }));
+  }
+
+  async updateCachedImage(
+    goodsId: string,
+    cachedImgUrl: string,
+    cachedImgAt: string,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('smartcon_goods')
+      .update({
+        cached_img_url: cachedImgUrl,
+        cached_img_at: cachedImgAt,
+        updated_at: cachedImgAt,
+      })
+      .eq('goods_id', goodsId);
+    if (error) throw error;
   }
 
   async findAllByEvent(eventId: string): Promise<SmartconGoodsRow[]> {

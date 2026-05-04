@@ -19,8 +19,15 @@ export interface SmartconGoodsRow {
   raw_data: SmartconGoodsResponseItem;
   is_active: boolean;
   last_synced_at: string | null;
+  cached_img_url: string | null;
+  cached_img_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface UncachedGoods {
+  goods_id: string;
+  img_url_https: string;
 }
 
 export interface SmartconGoodsUpsertInput {
@@ -56,6 +63,20 @@ export interface ISmartconGoodsRepository {
     eventId: string;
     items: SmartconGoodsUpsertInput[];
   }): Promise<SyncByEventResult>;
+
+  /**
+   * 캐시 미수행 상품 (cached_img_url IS NULL AND img_url_https IS NOT NULL).
+   */
+  findUncachedByEvent(eventId: string): Promise<UncachedGoods[]>;
+
+  /**
+   * 이미지 캐시 결과를 row에 반영.
+   */
+  updateCachedImage(
+    goodsId: string,
+    cachedImgUrl: string,
+    cachedImgAt: string,
+  ): Promise<void>;
 
   findAllByEvent(eventId: string): Promise<SmartconGoodsRow[]>;
   findById(goodsId: string): Promise<SmartconGoodsRow | null>;

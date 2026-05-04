@@ -43,6 +43,11 @@ CREATE TABLE smartcon_goods (
   -- 우리 측 상태
   is_active         boolean NOT NULL DEFAULT true, -- 응답에서 사라지면 false
   last_synced_at    timestamptz,
+
+  -- 이미지 캐시 (sync 시점에 S3+CloudFront로 자동 캐시)
+  cached_img_url    text,                    -- CloudFront 공개 URL
+  cached_img_at     timestamptz,             -- 마지막 캐시 시점
+
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
@@ -112,7 +117,7 @@ SELECT
   p.id,
   g.brand_name,
   g.goods_name,
-  g.img_url_https AS img_url,    -- HTTPS만 노출
+  COALESCE(g.cached_img_url, g.img_url_https) AS img_url, -- CloudFront 캐시 우선
   g.msg,
   g.extra_charge,                 -- 추가 요금 안내 필요 시
   g.sc_limit_date,                -- 유효기간 안내
