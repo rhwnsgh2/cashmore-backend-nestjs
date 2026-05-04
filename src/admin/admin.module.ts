@@ -6,12 +6,14 @@ import { AdminBannerAdController } from './admin-banner-ad.controller';
 import { AdminEveryReceiptController } from './admin-every-receipt.controller';
 import { AdminInvitationPartnerController } from './admin-invitation-partner.controller';
 import { AdminUserController } from './admin-user.controller';
+import { AdminSmartconController } from './admin-smartcon.controller';
 import { NaverPayModule } from '../naver-pay/naver-pay.module';
 import { ExchangePointModule } from '../exchange-point/exchange-point.module';
 import { AdvertiserAuthModule } from '../advertiser-auth/advertiser-auth.module';
 import { BannerAdModule } from '../banner-ad/banner-ad.module';
 import { EveryReceiptModule } from '../every-receipt/every-receipt.module';
 import { InvitationModule } from '../invitation/invitation.module';
+import { SmartconModule } from '../smartcon/smartcon.module';
 
 @Module({
   imports: [
@@ -21,6 +23,7 @@ import { InvitationModule } from '../invitation/invitation.module';
     BannerAdModule,
     EveryReceiptModule,
     InvitationModule,
+    SmartconModule,
   ],
   controllers: [
     AdminNaverPayController,
@@ -30,6 +33,7 @@ import { InvitationModule } from '../invitation/invitation.module';
     AdminEveryReceiptController,
     AdminInvitationPartnerController,
     AdminUserController,
+    AdminSmartconController,
   ],
 })
 export class AdminModule {}
