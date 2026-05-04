@@ -49,6 +49,7 @@ import { AdvertiserModule } from './advertiser/advertiser.module';
 import { PointWriteModule } from './point-write/point-write.module';
 import { AffiliateModule } from './affiliate/affiliate.module';
 import { GifticonModule } from './gifticon/gifticon.module';
+import { UserInfoModule } from './user-info/user-info.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -114,6 +115,7 @@ import configuration from './config/configuration';
     AdvertiserAuthModule,
     AdvertiserModule,
     GifticonModule,
+    UserInfoModule,
   ],
   controllers: [AppController],
   providers: [

@@ -7,7 +7,10 @@ export class VisibleProductDto {
   @ApiProperty({ description: '스마트콘 상품 ID' })
   goods_id!: string;
 
-  @ApiProperty({ nullable: true, description: '브랜드명 (프론트에서 그룹핑용)' })
+  @ApiProperty({
+    nullable: true,
+    description: '브랜드명 (프론트에서 그룹핑용)',
+  })
   brand_name!: string | null;
 
   @ApiProperty({ nullable: true })

@@ -1,11 +1,4 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterAll,
-  beforeEach,
-} from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -99,9 +92,7 @@ describe('Gifticon (e2e) - Real DB', () => {
 
   describe('GET /gifticon/products', () => {
     it('인증 없이 호출 → 401', async () => {
-      await request(app.getHttpServer())
-        .get('/gifticon/products')
-        .expect(401);
+      await request(app.getHttpServer()).get('/gifticon/products').expect(401);
     });
 
     it('큐레이션 안 된 상품은 반환되지 않는다', async () => {
@@ -168,10 +159,9 @@ describe('Gifticon (e2e) - Real DB', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.body.map((p: { goods_id: string }) => p.goods_id)).toEqual([
-        'B',
-        'A',
-      ]);
+      expect(
+        response.body.map((p: { goods_id: string }) => p.goods_id),
+      ).toEqual(['B', 'A']);
     });
   });
 });
