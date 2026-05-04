@@ -24,7 +24,9 @@ describe('S3GifticonImageStorage', () => {
       ok: true,
       status: 200,
       arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
-      headers: { get: (name: string) => (name === 'content-type' ? 'image/jpeg' : null) },
+      headers: {
+        get: (name: string) => (name === 'content-type' ? 'image/jpeg' : null),
+      },
     });
     global.fetch = fetchMock as unknown as typeof fetch;
   });

@@ -21,6 +21,6 @@ import { SupabaseSmartconGoodsRepository } from './repositories/supabase-smartco
       useClass: SupabaseSmartconGoodsRepository,
     },
   ],
-  exports: [SmartconApiService, SmartconService],
+  exports: [SmartconApiService, SmartconService, SMARTCON_GOODS_REPOSITORY],
 })
 export class SmartconModule {}

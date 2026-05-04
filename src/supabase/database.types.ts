@@ -1490,6 +1490,41 @@ export type Database = {
         }
         Relationships: []
       }
+      gifticon_products: {
+        Row: {
+          created_at: string
+          id: number
+          is_visible: boolean
+          point_price: number
+          smartcon_goods_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          is_visible?: boolean
+          point_price: number
+          smartcon_goods_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          is_visible?: boolean
+          point_price?: number
+          smartcon_goods_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gifticon_products_smartcon_goods_id_fkey"
+            columns: ["smartcon_goods_id"]
+            isOneToOne: true
+            referencedRelation: "smartcon_goods"
+            referencedColumns: ["goods_id"]
+          },
+        ]
+      }
       global_retailer_info: {
         Row: {
           created_at: string

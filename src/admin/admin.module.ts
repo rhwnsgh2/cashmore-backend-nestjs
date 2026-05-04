@@ -7,6 +7,7 @@ import { AdminEveryReceiptController } from './admin-every-receipt.controller';
 import { AdminInvitationPartnerController } from './admin-invitation-partner.controller';
 import { AdminUserController } from './admin-user.controller';
 import { AdminSmartconController } from './admin-smartcon.controller';
+import { AdminGifticonController } from './admin-gifticon.controller';
 import { NaverPayModule } from '../naver-pay/naver-pay.module';
 import { ExchangePointModule } from '../exchange-point/exchange-point.module';
 import { AdvertiserAuthModule } from '../advertiser-auth/advertiser-auth.module';
@@ -14,6 +15,7 @@ import { BannerAdModule } from '../banner-ad/banner-ad.module';
 import { EveryReceiptModule } from '../every-receipt/every-receipt.module';
 import { InvitationModule } from '../invitation/invitation.module';
 import { SmartconModule } from '../smartcon/smartcon.module';
+import { GifticonModule } from '../gifticon/gifticon.module';
 
 @Module({
   imports: [
@@ -24,6 +26,7 @@ import { SmartconModule } from '../smartcon/smartcon.module';
     EveryReceiptModule,
     InvitationModule,
     SmartconModule,
+    GifticonModule,
   ],
   controllers: [
     AdminNaverPayController,
@@ -34,6 +37,7 @@ import { SmartconModule } from '../smartcon/smartcon.module';
     AdminInvitationPartnerController,
     AdminUserController,
     AdminSmartconController,
+    AdminGifticonController,
   ],
 })
 export class AdminModule {}
