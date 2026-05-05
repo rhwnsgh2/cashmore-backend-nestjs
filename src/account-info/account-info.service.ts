@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import {
+  BadRequestException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -61,14 +62,33 @@ export class AccountInfoService {
     accountHolder: string,
     accountNumber: string,
   ): Promise<{ success: boolean; message: string }> {
-    const encrypted = this.encryptAccountNumber(accountNumber);
+    let encrypted: string;
+    let plaintext: string;
 
-    // 암호화 검증
-    const decrypted = this.decryptAccountNumber(encrypted);
-    if (decrypted !== accountNumber) {
-      throw new InternalServerErrorException(
-        'Failed to encrypt account number',
-      );
+    // RSA-2048-OAEP 암호문은 항상 256바이트 → base64 344자 고정.
+    // 평문(8~20자리 숫자)과 길이가 겹치지 않으므로 길이로 안전하게 분기.
+    if (accountNumber.length === 344) {
+      encrypted = accountNumber;
+      try {
+        plaintext = this.decryptAccountNumber(encrypted);
+      } catch {
+        throw new BadRequestException('Invalid encrypted account number');
+      }
+      if (!/^[0-9]{8,20}$/.test(plaintext)) {
+        throw new BadRequestException(
+          'Decrypted value is not a valid account number',
+        );
+      }
+    } else {
+      plaintext = accountNumber;
+      encrypted = this.encryptAccountNumber(plaintext);
+
+      const decrypted = this.decryptAccountNumber(encrypted);
+      if (decrypted !== plaintext) {
+        throw new InternalServerErrorException(
+          'Failed to encrypt account number',
+        );
+      }
     }
 
     await this.accountInfoRepository.create({
@@ -76,7 +96,7 @@ export class AccountInfoService {
       accountBank: bank,
       accountNumber: encrypted,
       accountUserName: accountHolder,
-      displayNumber: accountNumber.slice(-4),
+      displayNumber: plaintext.slice(-4),
     });
 
     return { success: true, message: '계좌 정보가 등록되었습니다.' };
@@ -87,6 +107,7 @@ export class AccountInfoService {
       {
         key: this.publicKeyObject,
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha1',
       },
       Buffer.from(text, 'utf-8'),
     );
@@ -136,6 +157,7 @@ export class AccountInfoService {
         {
           key: this.privateKeyObject,
           padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha1',
         },
         Buffer.from(encryptedBase64, 'base64'),
       )

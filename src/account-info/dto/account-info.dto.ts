@@ -27,12 +27,15 @@ export class CreateAccountInfoRequestDto {
   accountHolder: string;
 
   @ApiProperty({
-    description: '계좌번호 (숫자와 -만 허용)',
-    example: '123-456-789012',
+    description:
+      '계좌번호 (평문: 8~20자리 숫자 / 또는 RSA-2048-OAEP 암호화된 base64 344자 문자열)',
+    example: '1234567890123',
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[0-9-]+$/, { message: 'Invalid account number format' })
+  @Matches(/^([0-9]{8,20}|[A-Za-z0-9+/=]{344})$/, {
+    message: 'Invalid account number format',
+  })
   accountNumber: string;
 }
 
