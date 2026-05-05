@@ -16,7 +16,11 @@ const PUBLIC_KEY =
 export function encryptAccountNumber(accountNumber: string): string {
   return crypto
     .publicEncrypt(
-      { key: PUBLIC_KEY, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING },
+      {
+        key: PUBLIC_KEY,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha1',
+      },
       Buffer.from(accountNumber, 'utf-8'),
     )
     .toString('base64');
