@@ -67,6 +67,7 @@ export class AdminGifticonController {
       goods_id: goodsId,
       point_price: body.point_price,
       is_visible: body.is_visible,
+      display_name: body.display_name,
     });
   }
 

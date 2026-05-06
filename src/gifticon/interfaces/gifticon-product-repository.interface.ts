@@ -3,6 +3,7 @@ export interface GifticonProductRow {
   smartcon_goods_id: string;
   point_price: number;
   is_visible: boolean;
+  display_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -11,7 +12,8 @@ export interface CatalogItem {
   id: number | null; // 큐레이션 안 된 상품은 null
   goods_id: string;
   brand_name: string | null;
-  goods_name: string | null;
+  goods_name: string | null; // smartcon_goods.goods_name (원본)
+  display_name: string | null; // 어드민이 override한 노출용 이름
   msg: string | null;
   smartcon_price: number | null;
   smartcon_disc_price: number | null;
@@ -36,6 +38,7 @@ export interface UpsertCurationInput {
   smartcon_goods_id: string;
   point_price: number;
   is_visible: boolean;
+  display_name?: string | null; // null이면 smartcon_goods.goods_name 사용
 }
 
 export interface IGifticonProductRepository {

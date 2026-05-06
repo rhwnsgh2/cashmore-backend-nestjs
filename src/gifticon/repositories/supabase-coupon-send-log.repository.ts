@@ -6,9 +6,7 @@ import type {
 } from '../interfaces/coupon-send-log-repository.interface';
 
 @Injectable()
-export class SupabaseCouponSendLogRepository
-  implements ICouponSendLogRepository
-{
+export class SupabaseCouponSendLogRepository implements ICouponSendLogRepository {
   constructor(private supabaseService: SupabaseService) {}
 
   async insert(

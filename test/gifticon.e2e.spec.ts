@@ -55,11 +55,13 @@ async function curate(
   goodsId: string,
   pointPrice: number,
   isVisible: boolean,
+  displayName?: string | null,
 ): Promise<void> {
   const { error } = await supabase.from('gifticon_products').insert({
     smartcon_goods_id: goodsId,
     point_price: pointPrice,
     is_visible: isVisible,
+    display_name: displayName ?? null,
   });
   if (error) throw error;
 }
@@ -163,6 +165,36 @@ describe('Gifticon (e2e) - Real DB', () => {
       expect(
         response.body.map((p: { goods_id: string }) => p.goods_id),
       ).toEqual(['B', 'A']);
+    });
+
+    it('display_name이 있으면 goods_name이 override 된다', async () => {
+      await seedGoods(supabase, [
+        { goods_id: 'A', goods_name: '[컴포즈커피] 아메리카노(ICE)(TAKE-OUT)' },
+      ]);
+      await curate(supabase, 'A', 1500, true, '아메리카노 ICE');
+
+      const response = await request(app.getHttpServer())
+        .get('/gifticon/products')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body[0].goods_name).toBe('아메리카노 ICE');
+    });
+
+    it('display_name이 NULL이면 원본 goods_name 그대로', async () => {
+      await seedGoods(supabase, [
+        { goods_id: 'A', goods_name: '[컴포즈커피] 아메리카노(ICE)(TAKE-OUT)' },
+      ]);
+      await curate(supabase, 'A', 1500, true, null);
+
+      const response = await request(app.getHttpServer())
+        .get('/gifticon/products')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body[0].goods_name).toBe(
+        '[컴포즈커피] 아메리카노(ICE)(TAKE-OUT)',
+      );
     });
   });
 });

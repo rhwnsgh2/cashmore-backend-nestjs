@@ -45,6 +45,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
         goods_id: g.goods_id,
         brand_name: g.brand_name ?? null,
         goods_name: g.goods_name ?? null,
+        display_name: p?.display_name ?? null,
         msg: g.msg ?? null,
         smartcon_price: g.price ?? null,
         smartcon_disc_price: g.disc_price ?? null,
@@ -64,6 +65,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
         `
         id,
         point_price,
+        display_name,
         smartcon_goods!inner (
           goods_id,
           event_id,
@@ -84,27 +86,29 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
     if (error) throw error;
 
     return (data ?? []).map((row) => {
-      const g = (
-        row as unknown as {
-          smartcon_goods: {
-            goods_id: string;
-            brand_name: string | null;
-            goods_name: string | null;
-            msg: string | null;
-            price: number | null;
-            img_url_https: string | null;
-            cached_img_url: string | null;
-          };
-        }
-      ).smartcon_goods;
+      const r = row as unknown as {
+        id: number;
+        point_price: number;
+        display_name: string | null;
+        smartcon_goods: {
+          goods_id: string;
+          brand_name: string | null;
+          goods_name: string | null;
+          msg: string | null;
+          price: number | null;
+          img_url_https: string | null;
+          cached_img_url: string | null;
+        };
+      };
+      const g = r.smartcon_goods;
       return {
-        id: row.id,
+        id: r.id,
         goods_id: g.goods_id,
         brand_name: g.brand_name,
-        goods_name: g.goods_name,
+        goods_name: r.display_name ?? g.goods_name, // override 우선
         msg: g.msg,
         img_url: g.cached_img_url ?? g.img_url_https ?? null,
-        point_price: row.point_price,
+        point_price: r.point_price,
         original_price: g.price ?? null,
       };
     });
@@ -122,6 +126,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
           smartcon_goods_id: input.smartcon_goods_id,
           point_price: input.point_price,
           is_visible: input.is_visible,
+          display_name: input.display_name ?? null,
           updated_at: now,
         },
         { onConflict: 'smartcon_goods_id' },

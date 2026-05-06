@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsInt, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CurationDto {
   @ApiProperty({ description: '차감 포인트', example: 1500, minimum: 0 })
@@ -10,6 +10,16 @@ export class CurationDto {
   @ApiProperty({ description: '노출 여부', example: true })
   @IsBoolean()
   is_visible!: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      '노출용 상품명 (override). 빈 문자열이거나 미전송 시 smartcon_goods.goods_name 그대로 사용',
+    example: '아메리카노 ICE',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  display_name?: string | null;
 }
 
 export class CurationResponseDto {
@@ -24,6 +34,9 @@ export class CurationResponseDto {
 
   @ApiProperty()
   is_visible!: boolean;
+
+  @ApiProperty({ nullable: true })
+  display_name!: string | null;
 
   @ApiProperty()
   created_at!: string;
@@ -45,8 +58,17 @@ export class CatalogItemDto {
   @ApiProperty({ nullable: true })
   brand_name!: string | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({
+    nullable: true,
+    description: '스마트콘 원본 상품명 (smartcon_goods.goods_name)',
+  })
   goods_name!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    description: '어드민이 override한 노출용 이름 (NULL이면 goods_name 사용)',
+  })
+  display_name!: string | null;
 
   @ApiProperty({ nullable: true })
   msg!: string | null;

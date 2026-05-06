@@ -125,6 +125,45 @@ describe('GifticonService', () => {
       expect(second.is_visible).toBe(false);
     });
 
+    it('display_name 입력 시 저장', async () => {
+      const result = await service.curate({
+        goods_id: 'A',
+        point_price: 1500,
+        is_visible: true,
+        display_name: '아메리카노 ICE',
+      });
+      expect(result.display_name).toBe('아메리카노 ICE');
+    });
+
+    it('display_name 빈 문자열 → NULL로 정규화', async () => {
+      const result = await service.curate({
+        goods_id: 'A',
+        point_price: 1500,
+        is_visible: true,
+        display_name: '',
+      });
+      expect(result.display_name).toBeNull();
+    });
+
+    it('display_name 양옆 공백 trim', async () => {
+      const result = await service.curate({
+        goods_id: 'A',
+        point_price: 1500,
+        is_visible: true,
+        display_name: '  short name  ',
+      });
+      expect(result.display_name).toBe('short name');
+    });
+
+    it('display_name 미전송 시 NULL', async () => {
+      const result = await service.curate({
+        goods_id: 'A',
+        point_price: 1500,
+        is_visible: true,
+      });
+      expect(result.display_name).toBeNull();
+    });
+
     it('존재하지 않는 goods_id → NotFoundException', async () => {
       await expect(
         service.curate({
@@ -274,6 +313,31 @@ describe('GifticonService', () => {
     it('큐레이션 안 된 상품은 반환되지 않는다', async () => {
       const list = await service.listVisible(EVENT_ID);
       expect(list).toHaveLength(0);
+    });
+
+    it('display_name이 있으면 goods_name을 override', async () => {
+      await productRepo.upsertCuration({
+        smartcon_goods_id: 'A',
+        point_price: 1500,
+        is_visible: true,
+        display_name: '아메리카노 ICE',
+      });
+
+      const list = await service.listVisible(EVENT_ID);
+      expect(list).toHaveLength(1);
+      expect(list[0].goods_name).toBe('아메리카노 ICE');
+    });
+
+    it('display_name 없으면 원본 goods_name 사용', async () => {
+      await productRepo.upsertCuration({
+        smartcon_goods_id: 'A',
+        point_price: 1500,
+        is_visible: true,
+      });
+
+      const list = await service.listVisible(EVENT_ID);
+      expect(list).toHaveLength(1);
+      expect(list[0].goods_name).toBe('상품-A');
     });
   });
 });

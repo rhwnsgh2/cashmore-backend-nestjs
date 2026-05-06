@@ -27,7 +27,7 @@ export interface CouponExchangeUpdateInput {
   send_status: 'sent' | 'send_failed' | 'refunded';
   order_id?: string | null;
   barcode_num?: string | null;
-  exp_date?: string | null;          // YYYY-MM-DD
+  exp_date?: string | null; // YYYY-MM-DD
   result_code?: string | null;
   result_msg?: string | null;
 }

@@ -1595,6 +1595,7 @@ export type Database = {
       gifticon_products: {
         Row: {
           created_at: string
+          display_name: string | null
           id: number
           is_visible: boolean
           point_price: number
@@ -1603,6 +1604,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          display_name?: string | null
           id?: number
           is_visible?: boolean
           point_price: number
@@ -1611,6 +1613,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          display_name?: string | null
           id?: number
           is_visible?: boolean
           point_price?: number

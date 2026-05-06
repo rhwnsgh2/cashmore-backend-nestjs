@@ -8,9 +8,7 @@ import type {
 } from '../interfaces/coupon-exchange-repository.interface';
 
 @Injectable()
-export class SupabaseCouponExchangeRepository
-  implements ICouponExchangeRepository
-{
+export class SupabaseCouponExchangeRepository implements ICouponExchangeRepository {
   private readonly logger = new Logger(SupabaseCouponExchangeRepository.name);
 
   constructor(private supabaseService: SupabaseService) {}
@@ -67,10 +65,7 @@ export class SupabaseCouponExchangeRepository
     return (data ?? null) as unknown as CouponExchangeRow | null;
   }
 
-  async findByUserId(
-    userId: string,
-    limit = 50,
-  ): Promise<CouponExchangeRow[]> {
+  async findByUserId(userId: string, limit = 50): Promise<CouponExchangeRow[]> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('coupon_exchanges')

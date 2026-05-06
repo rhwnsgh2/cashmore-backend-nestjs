@@ -61,12 +61,9 @@ export class CouponExchangeService {
     const { userId, goodsId } = input;
 
     // 1. 사전 검증
-    const product =
-      await this.gifticonProductRepository.findByGoodsId(goodsId);
+    const product = await this.gifticonProductRepository.findByGoodsId(goodsId);
     if (!product || !product.is_visible) {
-      throw new NotFoundException(
-        `gifticon product not visible: ${goodsId}`,
-      );
+      throw new NotFoundException(`gifticon product not visible: ${goodsId}`);
     }
 
     const goods = await this.smartconGoodsRepository.findById(goodsId);
@@ -165,12 +162,9 @@ export class CouponExchangeService {
    * send_status='sent' 상태만 환불 가능 (pending/send_failed/refunded는 거부).
    */
   async refund(exchangeId: number): Promise<CouponExchangeRow> {
-    const exchange =
-      await this.couponExchangeRepository.findById(exchangeId);
+    const exchange = await this.couponExchangeRepository.findById(exchangeId);
     if (!exchange) {
-      throw new NotFoundException(
-        `coupon_exchanges not found: ${exchangeId}`,
-      );
+      throw new NotFoundException(`coupon_exchanges not found: ${exchangeId}`);
     }
     if (exchange.send_status !== 'sent') {
       throw new BadRequestException(

@@ -112,9 +112,7 @@ describe('SmartconApiService', () => {
 
       expect(httpGet).toHaveBeenCalledOnce();
       const [url, config] = httpGet.mock.calls[0];
-      expect(url).toBe(
-        `${SMARTCON_CONFIG.apiBaseUrl}/coupon/couponCreate.sc`,
-      );
+      expect(url).toBe(`${SMARTCON_CONFIG.apiBaseUrl}/coupon/couponCreate.sc`);
       expect(config.responseType).toBe('arraybuffer');
       expect(config.params).toEqual({
         EVENT_ID: SMARTCON_CONFIG.eventId,

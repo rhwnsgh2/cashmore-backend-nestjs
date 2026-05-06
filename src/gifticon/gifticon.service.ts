@@ -43,6 +43,7 @@ export class GifticonService {
     goods_id: string;
     point_price: number;
     is_visible: boolean;
+    display_name?: string | null;
   }): Promise<GifticonProductRow> {
     const goods = await this.smartconGoodsRepository.findById(input.goods_id);
     if (!goods) {
@@ -55,10 +56,15 @@ export class GifticonService {
         `smartcon_goods is inactive: ${input.goods_id}`,
       );
     }
+    // 빈 문자열은 NULL로 정규화 (어드민이 명시적으로 비우면 원본 fallback)
+    const displayName = input.display_name?.trim()
+      ? input.display_name.trim()
+      : null;
     return this.productRepository.upsertCuration({
       smartcon_goods_id: input.goods_id,
       point_price: input.point_price,
       is_visible: input.is_visible,
+      display_name: displayName,
     });
   }
 }

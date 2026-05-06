@@ -7,9 +7,7 @@ import type {
 } from '../interfaces/coupon-exchange-repository.interface';
 
 @Injectable()
-export class StubCouponExchangeRepository
-  implements ICouponExchangeRepository
-{
+export class StubCouponExchangeRepository implements ICouponExchangeRepository {
   private store = new Map<number, CouponExchangeRow>();
   private byTrId = new Map<string, number>();
   private nextId = 1;
@@ -60,10 +58,7 @@ export class StubCouponExchangeRepository
     return this.store.get(id) ?? null;
   }
 
-  async findByUserId(
-    userId: string,
-    limit = 50,
-  ): Promise<CouponExchangeRow[]> {
+  async findByUserId(userId: string, limit = 50): Promise<CouponExchangeRow[]> {
     return [...this.store.values()]
       .filter((r) => r.user_id === userId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at))

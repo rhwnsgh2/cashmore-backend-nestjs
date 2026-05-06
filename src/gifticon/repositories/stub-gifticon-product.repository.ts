@@ -46,6 +46,7 @@ export class StubGifticonProductRepository implements IGifticonProductRepository
           goods_id: g.goods_id,
           brand_name: g.brand_name,
           goods_name: g.goods_name,
+          display_name: p?.display_name ?? null,
           msg: g.msg,
           smartcon_price: g.price,
           smartcon_disc_price: g.disc_price,
@@ -68,7 +69,7 @@ export class StubGifticonProductRepository implements IGifticonProductRepository
           id: p.id,
           goods_id: g.goods_id,
           brand_name: g.brand_name,
-          goods_name: g.goods_name,
+          goods_name: p.display_name ?? g.goods_name, // override 우선
           msg: g.msg,
           img_url: g.cached_img_url ?? g.img_url_https,
           point_price: p.point_price,
@@ -89,6 +90,7 @@ export class StubGifticonProductRepository implements IGifticonProductRepository
       smartcon_goods_id: input.smartcon_goods_id,
       point_price: input.point_price,
       is_visible: input.is_visible,
+      display_name: input.display_name ?? null,
       created_at: existing?.created_at ?? now,
       updated_at: now,
     };

@@ -58,10 +58,12 @@ describe('CouponExchangeService', () => {
   let getPhone: ReturnType<typeof vi.fn>;
   let couponCreate: ReturnType<typeof vi.fn>;
 
-  async function setupCuratedGoods(opts: {
-    isVisible?: boolean;
-    isActive?: boolean;
-  } = {}): Promise<void> {
+  async function setupCuratedGoods(
+    opts: {
+      isVisible?: boolean;
+      isActive?: boolean;
+    } = {},
+  ): Promise<void> {
     const { isVisible = true, isActive = true } = opts;
     await smartconRepo.syncByEvent({
       eventId: '64385',
@@ -118,16 +120,20 @@ describe('CouponExchangeService', () => {
     sendLogRepo = new StubCouponSendLogRepository();
     pointActions = [];
 
-    addPoint = vi.fn().mockImplementation(async (input: {
-      userId: string;
-      amount: number;
-      type: string;
-      additionalData?: Record<string, unknown>;
-    }) => {
-      const id = pointActions.length + 1;
-      pointActions.push({ id, ...input });
-      return { id };
-    });
+    addPoint = vi
+      .fn()
+      .mockImplementation(
+        async (input: {
+          userId: string;
+          amount: number;
+          type: string;
+          additionalData?: Record<string, unknown>;
+        }) => {
+          const id = pointActions.length + 1;
+          pointActions.push({ id, ...input });
+          return { id };
+        },
+      );
 
     getPointTotal = vi.fn().mockResolvedValue({ totalPoint: 10_000 });
     getPhone = vi.fn().mockResolvedValue(PHONE);
@@ -450,9 +456,7 @@ describe('CouponExchangeService', () => {
     });
 
     it('미존재 id → NotFoundException', async () => {
-      await expect(service.refund(999_999)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.refund(999_999)).rejects.toThrow(NotFoundException);
     });
   });
 

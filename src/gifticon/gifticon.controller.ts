@@ -38,8 +38,7 @@ export class GifticonController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '기프티콘 주문 (포인트 차감 + 스마트콘 발송)',
-    description:
-      '실패 시 자동 환불. 응답의 send_status로 성공/실패 판단.',
+    description: '실패 시 자동 환불. 응답의 send_status로 성공/실패 판단.',
   })
   @ApiResponse({ status: 201, type: OrderResponseDto })
   async createOrder(

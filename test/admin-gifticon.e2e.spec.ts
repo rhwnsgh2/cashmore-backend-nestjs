@@ -173,6 +173,30 @@ describe('Admin Gifticon (e2e) - Real DB', () => {
       expect(data?.point_price).toBe(1500);
     });
 
+    it('display_name 입력 시 저장 + 빈 문자열은 NULL', async () => {
+      await seedGoods(supabase, [{ goods_id: 'A' }]);
+
+      const r1 = await request(app.getHttpServer())
+        .put('/admin/gifticon/products/A')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({
+          point_price: 1500,
+          is_visible: true,
+          display_name: '아메리카노 ICE',
+        });
+      expect(r1.body.display_name).toBe('아메리카노 ICE');
+
+      const r2 = await request(app.getHttpServer())
+        .put('/admin/gifticon/products/A')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({
+          point_price: 1500,
+          is_visible: true,
+          display_name: '',
+        });
+      expect(r2.body.display_name).toBeNull();
+    });
+
     it('두 번째 호출 → UPDATE (id 유지)', async () => {
       await seedGoods(supabase, [{ goods_id: 'A' }]);
 
