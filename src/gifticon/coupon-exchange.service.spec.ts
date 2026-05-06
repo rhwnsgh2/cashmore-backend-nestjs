@@ -212,7 +212,7 @@ describe('CouponExchangeService', () => {
       expect(logs[0].receiver_phone).toBe(PHONE);
     });
 
-    it('스마트콘에 정확한 인자 전달 (goodsId, receiverMobile, trId)', async () => {
+    it('스마트콘에 정확한 인자 전달 (goodsId, receiverMobile, trId, title, contents)', async () => {
       await setupCuratedGoods();
       await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
 
@@ -220,6 +220,27 @@ describe('CouponExchangeService', () => {
       expect(call.goodsId).toBe(GOODS_ID);
       expect(call.receiverMobile).toBe(PHONE);
       expect(call.trId).toMatch(/^cashmore\d{17}[0-9a-f]{4}$/);
+      expect(call.title).toBe('캐시모어 기프티콘 도착');
+      expect(call.contents).toContain('[캐시모어]');
+      expect(call.contents).toContain('기프티콘이 도착했어요');
+    });
+
+    it('contents에 display_name 우선 사용 (없으면 원본 goods_name)', async () => {
+      // display_name 설정
+      await setupCuratedGoods();
+      await productRepo.upsertCuration({
+        smartcon_goods_id: GOODS_ID,
+        point_price: POINT_PRICE,
+        is_visible: true,
+        display_name: '아메리카노 ICE',
+      });
+
+      await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
+
+      const call = couponCreate.mock.calls[0][0];
+      expect(call.contents).toBe(
+        '[캐시모어]\n아메리카노 ICE 기프티콘이 도착했어요.',
+      );
     });
 
     it('coupon_exchanges.amount = 호출 시점 point_price 박제', async () => {

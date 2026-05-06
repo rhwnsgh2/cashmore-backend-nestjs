@@ -105,11 +105,14 @@ export class CouponExchangeService {
     await this.couponSendLogRepository.insert(exchange.id, phone);
 
     // 6. 스마트콘 호출
+    const displayName = product.display_name ?? goods.goods_name ?? '기프티콘';
     try {
       const response = await this.smartconApiService.couponCreate({
         goodsId,
         receiverMobile: phone,
         trId,
+        title: '캐시모어 기프티콘 도착',
+        contents: `[캐시모어]\n${displayName} 기프티콘이 도착했어요.`,
       });
 
       if (response.RESULTCODE === SMARTCON_RESULT_CODE_SUCCESS) {

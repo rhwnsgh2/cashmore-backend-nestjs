@@ -125,6 +125,56 @@ describe('SmartconApiService', () => {
       });
     });
 
+    it('title/contents 옵션 전달 시 params에 포함', async () => {
+      await service.couponCreate({
+        goodsId: '0000128425',
+        receiverMobile: '01012345678',
+        trId: 'cashmore20260506100000010',
+        title: '캐시모어 기프티콘 도착',
+        contents: '[캐시모어]\n아메리카노 기프티콘이 도착했어요.',
+      });
+      const config = httpGet.mock.calls[0][1];
+      expect(config.params.TITLE).toBe('캐시모어 기프티콘 도착');
+      expect(config.params.CONTENTS).toBe(
+        '[캐시모어]\n아메리카노 기프티콘이 도착했어요.',
+      );
+    });
+
+    it('title/contents 미전송 시 params에 없음', async () => {
+      await service.couponCreate({
+        goodsId: '0000128425',
+        receiverMobile: '01012345678',
+        trId: 'cashmore20260506100000011',
+      });
+      const config = httpGet.mock.calls[0][1];
+      expect(config.params.TITLE).toBeUndefined();
+      expect(config.params.CONTENTS).toBeUndefined();
+    });
+
+    it('paramsSerializer가 EUC-KR percent encoding을 한다', async () => {
+      await service.couponCreate({
+        goodsId: 'A',
+        receiverMobile: '01012345678',
+        trId: 'cashmore20260506100000012',
+        title: '가나',
+      });
+      const config = httpGet.mock.calls[0][1];
+      const serialized = config.paramsSerializer({ TITLE: '가나' });
+      // '가' = EUC-KR 0xB0 0xA1, '나' = 0xB3 0xAA
+      expect(serialized).toBe('TITLE=%B0%A1%B3%AA');
+    });
+
+    it('paramsSerializer가 ASCII는 그대로 둔다', async () => {
+      await service.couponCreate({
+        goodsId: 'A',
+        receiverMobile: '01012345678',
+        trId: 'cashmore-test',
+      });
+      const config = httpGet.mock.calls[0][1];
+      const serialized = config.paramsSerializer({ TR_ID: 'cashmore-test' });
+      expect(serialized).toBe('TR_ID=cashmore-test');
+    });
+
     it('성공 응답 → 모든 필드 파싱', async () => {
       const result = await service.couponCreate({
         goodsId: '0000128425',

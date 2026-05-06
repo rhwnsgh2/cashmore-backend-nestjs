@@ -17,6 +17,8 @@ export interface CouponCreateInput {
   goodsId: string;
   receiverMobile: string; // 하이픈 없는 번호
   trId: string; // 우리가 만든 거래번호 (50자 이내)
+  title?: string; // MMS 제목 (옵션, EUC-KR)
+  contents?: string; // MMS 본문 (옵션, EUC-KR)
 }
 
 export const SMARTCON_RESULT_CODE_SUCCESS = '00';

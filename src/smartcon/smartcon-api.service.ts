@@ -43,7 +43,7 @@ export class SmartconApiService {
    */
   async couponCreate(input: CouponCreateInput): Promise<CouponCreateResponse> {
     const url = `${SMARTCON_CONFIG.apiBaseUrl}/coupon/couponCreate.sc`;
-    const params = {
+    const params: Record<string, string> = {
       EVENT_ID: SMARTCON_CONFIG.eventId,
       GOODS_ID: input.goodsId,
       ORDER_CNT: '1',
@@ -52,10 +52,14 @@ export class SmartconApiService {
       USER_ID: SMARTCON_CONFIG.userId,
       TR_ID: input.trId,
     };
+    if (input.title) params.TITLE = input.title;
+    if (input.contents) params.CONTENTS = input.contents;
 
     const response = await firstValueFrom(
       this.httpService.get<ArrayBuffer>(url, {
         params,
+        // TITLE/CONTENTS는 EUC-KR percent encoding 필요 (스펙). 다른 필드는 ASCII라 영향 없음.
+        paramsSerializer: (p: Record<string, string>) => eucKrSerialize(p),
         responseType: 'arraybuffer',
       }),
     );
@@ -87,4 +91,33 @@ export class SmartconApiService {
     );
     return result;
   }
+}
+
+/** EUC-KR percent encoding으로 query string 직렬화. */
+function eucKrSerialize(params: Record<string, string>): string {
+  return Object.entries(params)
+    .map(([key, value]) => `${key}=${eucKrPercentEncode(String(value))}`)
+    .join('&');
+}
+
+function eucKrPercentEncode(text: string): string {
+  const buffer = iconv.encode(text, 'euc-kr');
+  let result = '';
+  for (let i = 0; i < buffer.length; i++) {
+    const b = buffer[i];
+    if (
+      (b >= 0x30 && b <= 0x39) || // 0-9
+      (b >= 0x41 && b <= 0x5a) || // A-Z
+      (b >= 0x61 && b <= 0x7a) || // a-z
+      b === 0x2d ||
+      b === 0x2e ||
+      b === 0x5f ||
+      b === 0x7e // -._~
+    ) {
+      result += String.fromCharCode(b);
+    } else {
+      result += '%' + b.toString(16).padStart(2, '0').toUpperCase();
+    }
+  }
+  return result;
 }
