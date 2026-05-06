@@ -27,4 +27,11 @@ export class VisibleProductDto {
 
   @ApiProperty({ description: '차감 포인트' })
   point_price!: number;
+
+  @ApiProperty({
+    nullable: true,
+    description: '스마트콘 정가 (원). UI에서 할인 표시용',
+    example: 1800,
+  })
+  original_price!: number | null;
 }

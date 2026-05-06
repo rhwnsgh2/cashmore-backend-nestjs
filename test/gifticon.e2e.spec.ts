@@ -127,6 +127,7 @@ describe('Gifticon (e2e) - Real DB', () => {
         goods_id: 'A',
         point_price: 1500,
         brand_name: '컴포즈커피',
+        original_price: 1800, // smartcon_goods.price
       });
     });
 

@@ -29,6 +29,7 @@ export interface VisibleProduct {
   msg: string | null;
   img_url: string | null;
   point_price: number;
+  original_price: number | null; // smartcon_goods.price (정가)
 }
 
 export interface UpsertCurationInput {

@@ -70,6 +70,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
           brand_name,
           goods_name,
           msg,
+          price,
           img_url_https,
           cached_img_url,
           is_active
@@ -90,6 +91,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
             brand_name: string | null;
             goods_name: string | null;
             msg: string | null;
+            price: number | null;
             img_url_https: string | null;
             cached_img_url: string | null;
           };
@@ -103,6 +105,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
         msg: g.msg,
         img_url: g.cached_img_url ?? g.img_url_https ?? null,
         point_price: row.point_price,
+        original_price: g.price ?? null,
       };
     });
   }

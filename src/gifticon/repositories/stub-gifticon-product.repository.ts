@@ -72,6 +72,7 @@ export class StubGifticonProductRepository implements IGifticonProductRepository
           msg: g.msg,
           img_url: g.cached_img_url ?? g.img_url_https,
           point_price: p.point_price,
+          original_price: g.price,
         };
       })
       .filter((v): v is VisibleProduct => v !== null)
