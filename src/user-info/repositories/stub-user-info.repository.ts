@@ -13,10 +13,7 @@ export class StubUserInfoRepository implements IUserInfoRepository {
     return this.store.get(userId)?.phone_number ?? null;
   }
 
-  async upsertPhone(
-    userId: string,
-    phoneNumber: string,
-  ): Promise<UserInfoRow> {
+  async upsertPhone(userId: string, phoneNumber: string): Promise<UserInfoRow> {
     const existing = this.store.get(userId);
     const row: UserInfoRow = {
       id: existing?.id ?? this.nextId++,

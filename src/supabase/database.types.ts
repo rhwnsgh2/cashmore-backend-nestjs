@@ -812,6 +812,108 @@ export type Database = {
           },
         ]
       }
+      coupon_exchanges: {
+        Row: {
+          amount: number
+          barcode_num: string | null
+          created_at: string
+          exp_date: string | null
+          id: number
+          order_id: string | null
+          point_action_id: number | null
+          result_code: string | null
+          result_msg: string | null
+          send_status: string
+          smartcon_goods_id: string
+          tr_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          barcode_num?: string | null
+          created_at?: string
+          exp_date?: string | null
+          id?: number
+          order_id?: string | null
+          point_action_id?: number | null
+          result_code?: string | null
+          result_msg?: string | null
+          send_status?: string
+          smartcon_goods_id: string
+          tr_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          barcode_num?: string | null
+          created_at?: string
+          exp_date?: string | null
+          id?: number
+          order_id?: string | null
+          point_action_id?: number | null
+          result_code?: string | null
+          result_msg?: string | null
+          send_status?: string
+          smartcon_goods_id?: string
+          tr_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_exchanges_point_action_id_fkey"
+            columns: ["point_action_id"]
+            isOneToOne: false
+            referencedRelation: "point_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_exchanges_smartcon_goods_id_fkey"
+            columns: ["smartcon_goods_id"]
+            isOneToOne: false
+            referencedRelation: "smartcon_goods"
+            referencedColumns: ["goods_id"]
+          },
+          {
+            foreignKeyName: "coupon_exchanges_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupon_send_logs: {
+        Row: {
+          exchange_id: number
+          id: number
+          receiver_phone: string
+          sent_at: string
+        }
+        Insert: {
+          exchange_id: number
+          id?: number
+          receiver_phone: string
+          sent_at?: string
+        }
+        Update: {
+          exchange_id?: number
+          id?: number
+          receiver_phone?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_send_logs_exchange_id_fkey"
+            columns: ["exchange_id"]
+            isOneToOne: false
+            referencedRelation: "coupon_exchanges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coupons: {
         Row: {
           cashback_percent: number

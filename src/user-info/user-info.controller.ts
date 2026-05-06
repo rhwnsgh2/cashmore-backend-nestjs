@@ -22,7 +22,9 @@ export class UserInfoController {
     summary: '내 기프티콘 수신용 휴대전화번호 조회',
   })
   @ApiResponse({ status: 200, type: PhoneResponseDto })
-  async getPhone(@CurrentUser('userId') userId: string): Promise<PhoneResponseDto> {
+  async getPhone(
+    @CurrentUser('userId') userId: string,
+  ): Promise<PhoneResponseDto> {
     const phone = await this.userInfoService.getPhone(userId);
     return { phone };
   }

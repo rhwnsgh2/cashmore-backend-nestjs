@@ -20,10 +20,7 @@ export class SupabaseUserInfoRepository implements IUserInfoRepository {
     return data?.phone_number ?? null;
   }
 
-  async upsertPhone(
-    userId: string,
-    phoneNumber: string,
-  ): Promise<UserInfoRow> {
+  async upsertPhone(userId: string, phoneNumber: string): Promise<UserInfoRow> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('user_info')

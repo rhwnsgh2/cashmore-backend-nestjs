@@ -1,11 +1,4 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterAll,
-  beforeEach,
-} from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -44,9 +37,7 @@ describe('UserInfo (e2e) - Real DB', () => {
 
   describe('GET /user-info/phone', () => {
     it('인증 없이 호출 → 401', async () => {
-      await request(app.getHttpServer())
-        .get('/user-info/phone')
-        .expect(401);
+      await request(app.getHttpServer()).get('/user-info/phone').expect(401);
     });
 
     it('등록된 적 없으면 phone null', async () => {

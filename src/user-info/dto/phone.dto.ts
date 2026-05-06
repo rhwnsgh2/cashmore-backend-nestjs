@@ -7,7 +7,9 @@ export class UpsertPhoneDto {
     description: '하이픈 포함 가능, 서버에서 정규화 후 저장',
   })
   @IsString()
-  @Matches(/^[\d-\s]+$/, { message: 'phone must contain only digits and dashes' })
+  @Matches(/^[\d-\s]+$/, {
+    message: 'phone must contain only digits and dashes',
+  })
   phone!: string;
 }
 

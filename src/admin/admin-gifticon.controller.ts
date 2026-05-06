@@ -4,6 +4,8 @@ import {
   Get,
   Headers,
   Param,
+  ParseIntPipe,
+  Post,
   Put,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -16,17 +18,20 @@ import {
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { GifticonService } from '../gifticon/gifticon.service';
+import { CouponExchangeService } from '../gifticon/coupon-exchange.service';
 import {
   CatalogItemDto,
   CurationDto,
   CurationResponseDto,
 } from '../gifticon/dto/curation.dto';
+import { OrderResponseDto } from '../gifticon/dto/order.dto';
 
 @ApiTags('Admin - Gifticon')
 @Controller('admin/gifticon')
 export class AdminGifticonController {
   constructor(
     private readonly gifticonService: GifticonService,
+    private readonly couponExchangeService: CouponExchangeService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -63,6 +68,31 @@ export class AdminGifticonController {
       point_price: body.point_price,
       is_visible: body.is_visible,
     });
+  }
+
+  @Post('refund/:id')
+  @ApiOperation({
+    summary: '쿠폰 발송 환불 (수동)',
+    description:
+      'send_status=sent 상태만 환불 가능. 환불 시 point_actions 복원 행 INSERT + send_status=refunded.',
+  })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiParam({ name: 'id', description: 'coupon_exchanges.id' })
+  @ApiResponse({ status: 201, type: OrderResponseDto })
+  async refund(
+    @Headers('x-admin-api-key') apiKey: string,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<OrderResponseDto> {
+    this.validateApiKey(apiKey);
+    const exchange = await this.couponExchangeService.refund(id);
+    return {
+      id: exchange.id,
+      send_status: exchange.send_status,
+      barcode_num: exchange.barcode_num,
+      exp_date: exchange.exp_date,
+      result_code: exchange.result_code,
+      result_msg: exchange.result_msg,
+    };
   }
 
   private validateApiKey(apiKey: string): void {
