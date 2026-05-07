@@ -15,5 +15,5 @@ export const SMARTCON_CONFIG = {
   apiBaseUrl: API_BASE_URLS[ENV],
   eventId: EVENT_IDS[ENV],
   userId: 'bridgeworks', // 4.1 쿠폰생성 USER_ID (스마트콘이 발급)
-  orderMobile: '01064456110', // 발신번호 (하이픈 없이)
+  orderMobile: '07080804891', // 발신번호 (하이픈 없이)
 };
