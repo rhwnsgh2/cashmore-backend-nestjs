@@ -340,6 +340,68 @@ describe('Cashback API (e2e) - Real DB', () => {
         expect(response.body.items).toHaveLength(20);
         expect(response.body.nextCursor).not.toBeNull();
       });
+
+      it('기프티콘 교환(send_status=sent) → gifticonExchange로 노출, 다른 상태는 제외', async () => {
+        // smartcon_goods 시드
+        await supabase.from('smartcon_goods').insert([
+          {
+            goods_id: 'A',
+            event_id: '64385',
+            brand_name: '컴포즈커피',
+            goods_name: '아메리카노 ICE',
+            raw_data: { GOODS_ID: 'A' },
+            is_active: true,
+          },
+          {
+            goods_id: 'B',
+            event_id: '64385',
+            brand_name: '이마트24',
+            goods_name: '츄파춥스',
+            raw_data: { GOODS_ID: 'B' },
+            is_active: true,
+          },
+        ]);
+
+        // sent 1건 + send_failed 1건 — sent만 노출돼야
+        await supabase.from('coupon_exchanges').insert([
+          {
+            user_id: testUser.id,
+            point_action_id: null,
+            amount: 1500,
+            smartcon_goods_id: 'A',
+            tr_id: 'tr-sent-1',
+            send_status: 'sent',
+          },
+          {
+            user_id: testUser.id,
+            point_action_id: null,
+            amount: 300,
+            smartcon_goods_id: 'B',
+            tr_id: 'tr-failed-1',
+            send_status: 'send_failed',
+          },
+        ]);
+
+        const response = await request(app.getHttpServer())
+          .get('/cashback/list')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+
+        const items = response.body.items as Array<{
+          type: string;
+          amount: number;
+          data: { brandName: string; goodsName: string };
+        }>;
+        const gifticonItems = items.filter(
+          (i) => i.type === 'gifticonExchange',
+        );
+        expect(gifticonItems).toHaveLength(1);
+        expect(gifticonItems[0]).toMatchObject({
+          type: 'gifticonExchange',
+          amount: -1500,
+          data: { brandName: '컴포즈커피', goodsName: '아메리카노 ICE' },
+        });
+      });
     });
   });
 });

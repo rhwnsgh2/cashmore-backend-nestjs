@@ -12,6 +12,7 @@ import {
   type RawClaim,
   type RawNaverPayExchange,
   type RawCashExchange,
+  type RawCouponExchange,
 } from '../interfaces/cashback-repository.interface';
 
 @Injectable()
@@ -242,5 +243,55 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     const { data, error } = await query;
     if (error || !data) return [];
     return data as unknown as RawNaverPayExchange[];
+  }
+
+  async findCouponExchanges(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<RawCouponExchange[]> {
+    let query = this.supabaseService
+      .getClient()
+      .from('coupon_exchanges')
+      .select(
+        `
+        id,
+        point_action_id,
+        created_at,
+        amount,
+        smartcon_goods!inner ( brand_name, goods_name )
+      `,
+      )
+      .eq('user_id', userId)
+      .eq('send_status', 'sent')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (cursor) {
+      query = query.lt('created_at', cursor);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+
+    return (
+      data as unknown as Array<{
+        id: number;
+        point_action_id: number | null;
+        created_at: string;
+        amount: number;
+        smartcon_goods: {
+          brand_name: string | null;
+          goods_name: string | null;
+        };
+      }>
+    ).map((row) => ({
+      id: row.id,
+      point_action_id: row.point_action_id,
+      created_at: row.created_at,
+      amount: row.amount,
+      brand_name: row.smartcon_goods.brand_name,
+      goods_name: row.smartcon_goods.goods_name,
+    }));
   }
 }

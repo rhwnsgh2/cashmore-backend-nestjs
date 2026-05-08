@@ -747,5 +747,29 @@ describe('CashbackService', () => {
       expect(result.items).toHaveLength(20);
       expect(result.nextCursor).not.toBeNull();
     });
+
+    it('couponExchanges (sent)을 gifticonExchange로 변환한다', async () => {
+      repository.setCouponExchanges(userId, [
+        {
+          id: 7,
+          point_action_id: 100,
+          created_at: '2026-05-08T12:00:00Z',
+          amount: 1500,
+          brand_name: '컴포즈커피',
+          goods_name: '아메리카노 ICE',
+        },
+      ]);
+
+      const result = await service.getCashbackList(userId, null, 20);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toEqual({
+        id: 'couponExchange-7',
+        type: 'gifticonExchange',
+        createdAt: '2026-05-08T12:00:00Z',
+        amount: -1500,
+        data: { brandName: '컴포즈커피', goodsName: '아메리카노 ICE' },
+      });
+    });
   });
 });

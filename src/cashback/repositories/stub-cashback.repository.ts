@@ -9,6 +9,7 @@ import type {
   RawClaim,
   RawNaverPayExchange,
   RawCashExchange,
+  RawCouponExchange,
 } from '../interfaces/cashback-repository.interface';
 
 export class StubCashbackRepository implements ICashbackRepository {
@@ -22,6 +23,7 @@ export class StubCashbackRepository implements ICashbackRepository {
   private claims: Map<string, RawClaim[]> = new Map();
   private naverPayExchanges: Map<string, RawNaverPayExchange[]> = new Map();
   private cashExchanges: Map<string, RawCashExchange[]> = new Map();
+  private couponExchanges: Map<string, RawCouponExchange[]> = new Map();
 
   // 데이터 설정 메서드들
   setEveryReceipts(userId: string, data: RawEveryReceipt[]): void {
@@ -63,6 +65,10 @@ export class StubCashbackRepository implements ICashbackRepository {
     this.cashExchanges.set(userId, data);
   }
 
+  setCouponExchanges(userId: string, data: RawCouponExchange[]): void {
+    this.couponExchanges.set(userId, data);
+  }
+
   clear(): void {
     this.everyReceipts.clear();
     this.pointActions.clear();
@@ -73,6 +79,7 @@ export class StubCashbackRepository implements ICashbackRepository {
     this.claims.clear();
     this.naverPayExchanges.clear();
     this.cashExchanges.clear();
+    this.couponExchanges.clear();
   }
 
   // ICashbackRepository 구현
@@ -182,6 +189,15 @@ export class StubCashbackRepository implements ICashbackRepository {
     limit: number,
   ): Promise<RawCashExchange[]> {
     const data = this.cashExchanges.get(userId) || [];
+    return Promise.resolve(this.applyPagination(data, cursor, limit));
+  }
+
+  findCouponExchanges(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<RawCouponExchange[]> {
+    const data = this.couponExchanges.get(userId) || [];
     return Promise.resolve(this.applyPagination(data, cursor, limit));
   }
 }

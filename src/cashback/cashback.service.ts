@@ -41,6 +41,7 @@ export class CashbackService {
       claims,
       naverPayExchanges,
       cashExchanges,
+      couponExchanges,
     ] = await Promise.all([
       this.cashbackRepository.findEveryReceipts(userId, cursor, limit),
       this.cashbackRepository.findPointActions(userId, cursor, limit),
@@ -50,6 +51,7 @@ export class CashbackService {
       this.cashbackRepository.findClaims(userId, cursor, limit),
       this.cashbackRepository.findNaverPayExchanges(userId, cursor, limit),
       this.cashbackRepository.findCashExchangesPaged(userId, cursor, limit),
+      this.cashbackRepository.findCouponExchanges(userId, cursor, limit),
     ]);
 
     // attendance는 point_actions 매칭이 필요
@@ -158,6 +160,18 @@ export class CashbackService {
           status: item.status ?? undefined,
           data: { title: item.location_info!.title },
         })),
+
+      // coupon_exchanges (기프티콘 — 'sent'만, point_actions의 GIFTICON_PURCHASE를 대체)
+      ...couponExchanges.map((item) => ({
+        id: `couponExchange-${item.id}`,
+        type: 'gifticonExchange' as const,
+        createdAt: item.created_at,
+        amount: -item.amount,
+        data: {
+          brandName: item.brand_name,
+          goodsName: item.goods_name,
+        },
+      })),
     ];
 
     // created_at 내림차순 정렬

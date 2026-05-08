@@ -21,7 +21,8 @@ export type CashbackItemType =
   | 'dividend'
   | 'buzzvilReward'
   | 'invitationReceipt'
-  | 'exchangePointToNaverpay';
+  | 'exchangePointToNaverpay'
+  | 'gifticonExchange';
 
 export interface CashbackItem {
   id: string;
@@ -148,6 +149,15 @@ export interface RawCashExchange {
   status: string;
 }
 
+export interface RawCouponExchange {
+  id: number;
+  point_action_id: number | null;
+  created_at: string;
+  amount: number;
+  brand_name: string | null;
+  goods_name: string | null; // display_name 우선, 없으면 원본 (repo에서 처리)
+}
+
 // Repository 인터페이스
 export interface ICashbackRepository {
   findEveryReceipts(
@@ -205,6 +215,13 @@ export interface ICashbackRepository {
     cursor: string | null,
     limit: number,
   ): Promise<RawCashExchange[]>;
+
+  /** send_status='sent'인 기프티콘 교환 (사용자 카탈로그 정보 JOIN). */
+  findCouponExchanges(
+    userId: string,
+    cursor: string | null,
+    limit: number,
+  ): Promise<RawCouponExchange[]>;
 }
 
 // DI 토큰
