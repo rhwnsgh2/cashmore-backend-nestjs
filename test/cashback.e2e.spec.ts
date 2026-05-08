@@ -402,6 +402,44 @@ describe('Cashback API (e2e) - Real DB', () => {
           data: { brandName: '컴포즈커피', goodsName: '아메리카노 ICE' },
         });
       });
+
+      it('display_name이 있으면 goodsName으로 override된다', async () => {
+        await supabase.from('smartcon_goods').insert({
+          goods_id: 'A',
+          event_id: '64385',
+          brand_name: '컴포즈커피',
+          goods_name: '[컴포즈커피] 아메리카노(ICE)(TAKE-OUT)',
+          raw_data: { GOODS_ID: 'A' },
+          is_active: true,
+        });
+        await supabase.from('gifticon_products').insert({
+          smartcon_goods_id: 'A',
+          point_price: 1500,
+          is_visible: true,
+          display_name: '아메리카노 ICE',
+        });
+        await supabase.from('coupon_exchanges').insert({
+          user_id: testUser.id,
+          point_action_id: null,
+          amount: 1500,
+          smartcon_goods_id: 'A',
+          tr_id: 'tr-display-1',
+          send_status: 'sent',
+        });
+
+        const response = await request(app.getHttpServer())
+          .get('/cashback/list')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+
+        const item = (
+          response.body.items as Array<{
+            type: string;
+            data: { goodsName: string };
+          }>
+        ).find((i) => i.type === 'gifticonExchange');
+        expect(item?.data.goodsName).toBe('아메리카노 ICE');
+      });
     });
   });
 });

@@ -250,8 +250,8 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     cursor: string | null,
     limit: number,
   ): Promise<RawCouponExchange[]> {
-    let query = this.supabaseService
-      .getClient()
+    const client = this.supabaseService.getClient();
+    let query = client
       .from('coupon_exchanges')
       .select(
         `
@@ -259,6 +259,7 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
         point_action_id,
         created_at,
         amount,
+        smartcon_goods_id,
         smartcon_goods!inner ( brand_name, goods_name )
       `,
       )
@@ -274,24 +275,41 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     const { data, error } = await query;
     if (error || !data) return [];
 
-    return (
-      data as unknown as Array<{
-        id: number;
-        point_action_id: number | null;
-        created_at: string;
-        amount: number;
-        smartcon_goods: {
-          brand_name: string | null;
-          goods_name: string | null;
-        };
-      }>
-    ).map((row) => ({
+    const rows = data as unknown as Array<{
+      id: number;
+      point_action_id: number | null;
+      created_at: string;
+      amount: number;
+      smartcon_goods_id: string;
+      smartcon_goods: {
+        brand_name: string | null;
+        goods_name: string | null;
+      };
+    }>;
+
+    // display_name override 매핑
+    const goodsIds = Array.from(new Set(rows.map((r) => r.smartcon_goods_id)));
+    const displayMap = new Map<string, string>();
+    if (goodsIds.length > 0) {
+      const { data: products } = await client
+        .from('gifticon_products')
+        .select('smartcon_goods_id, display_name')
+        .in('smartcon_goods_id', goodsIds);
+      for (const p of products ?? []) {
+        if (p.display_name) {
+          displayMap.set(p.smartcon_goods_id, p.display_name);
+        }
+      }
+    }
+
+    return rows.map((row) => ({
       id: row.id,
       point_action_id: row.point_action_id,
       created_at: row.created_at,
       amount: row.amount,
       brand_name: row.smartcon_goods.brand_name,
-      goods_name: row.smartcon_goods.goods_name,
+      goods_name:
+        displayMap.get(row.smartcon_goods_id) ?? row.smartcon_goods.goods_name,
     }));
   }
 }
