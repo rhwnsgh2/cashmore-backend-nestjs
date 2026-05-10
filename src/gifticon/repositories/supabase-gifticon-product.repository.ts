@@ -15,31 +15,58 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
   constructor(private supabaseService: SupabaseService) {}
 
   async listCatalog(eventId: string): Promise<CatalogItem[]> {
+    // PostgREST embedded select로 한 번에 JOIN.
+    // 이전엔 smartcon_goods + .in(goodsIds) 두 번 호출이라 carousel 100개+ 시
+    // URL이 길어져 undici HeadersOverflowError 발생.
     const client = this.supabaseService.getClient();
-    const { data: goods, error: goodsError } = await client
+    const { data, error } = await client
       .from('smartcon_goods')
       .select(
-        'goods_id, brand_name, goods_name, msg, price, disc_price, img_url_https, cached_img_url, is_active',
+        `
+        goods_id,
+        brand_name,
+        goods_name,
+        msg,
+        price,
+        disc_price,
+        img_url_https,
+        cached_img_url,
+        is_active,
+        gifticon_products ( id, point_price, is_visible, display_name )
+      `,
       )
       .eq('event_id', eventId);
-    if (goodsError) throw goodsError;
+    if (error) throw error;
 
-    const goodsIds = (goods ?? []).map((g) => g.goods_id);
-    let products: GifticonProductRow[] = [];
-    if (goodsIds.length > 0) {
-      const { data, error } = await client
-        .from('gifticon_products')
-        .select('*')
-        .in('smartcon_goods_id', goodsIds);
-      if (error) throw error;
-      products = (data ?? []) as unknown as GifticonProductRow[];
-    }
-    const productByGoodsId = new Map(
-      products.map((p) => [p.smartcon_goods_id, p]),
-    );
+    type Row = {
+      goods_id: string;
+      brand_name: string | null;
+      goods_name: string | null;
+      msg: string | null;
+      price: number | null;
+      disc_price: number | null;
+      img_url_https: string | null;
+      cached_img_url: string | null;
+      is_active: boolean;
+      gifticon_products:
+        | Array<{
+            id: number;
+            point_price: number;
+            is_visible: boolean;
+            display_name: string | null;
+          }>
+        | {
+            id: number;
+            point_price: number;
+            is_visible: boolean;
+            display_name: string | null;
+          }
+        | null;
+    };
 
-    return (goods ?? []).map((g) => {
-      const p = productByGoodsId.get(g.goods_id) ?? null;
+    return (data as unknown as Row[] | null ?? []).map((g) => {
+      const products = g.gifticon_products;
+      const p = Array.isArray(products) ? (products[0] ?? null) : products;
       return {
         id: p?.id ?? null,
         goods_id: g.goods_id,
