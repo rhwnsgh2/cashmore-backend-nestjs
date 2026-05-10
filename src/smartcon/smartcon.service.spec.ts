@@ -239,6 +239,18 @@ describe('SmartconService', () => {
       expect(imageStorage.uploads).toHaveLength(0);
     });
 
+    it('소수 가격(DISC_PRICE=1187.5 등)은 반올림되어 정수 컬럼에 저장, raw_data는 원본 보존', async () => {
+      const item = makeItem('A', { PRICE: 1250, DISC_PRICE: 1187.5 });
+      getEventGoods.mockResolvedValueOnce([item]);
+
+      await service.syncEventGoods(EVENT_ID);
+
+      const row = await repo.findById('A');
+      expect(row?.disc_price).toBe(1188); // 1187.5 → 반올림
+      expect(row?.price).toBe(1250);
+      expect(row?.raw_data.DISC_PRICE).toBe(1187.5); // 원본 보존
+    });
+
     it('raw_data에 응답 원본이 그대로 박제된다', async () => {
       const item = makeItem('A', { PRICE: 1234 });
       getEventGoods.mockResolvedValueOnce([item]);

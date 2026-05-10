@@ -94,6 +94,15 @@ export class SmartconService {
   }
 }
 
+/**
+ * 정수 컬럼에 NULL/소수 모두 안전하게 저장.
+ * 스마트콘이 5% 할인 적용된 상품의 DISC_PRICE를 1187.5처럼 소수로 보낼 수 있어 반올림.
+ * raw_data 컬럼에는 원본 그대로 박제되어 정보 손실 없음.
+ */
+function roundOrNull(value: number | null | undefined): number | null {
+  return value == null ? null : Math.round(value);
+}
+
 function toUpsertInput(
   eventId: string,
   item: SmartconGoodsResponseItem,
@@ -104,15 +113,15 @@ function toUpsertInput(
     brand_name: item.BRAND_NAME ?? null,
     goods_name: item.GOODS_NAME ?? null,
     msg: item.MSG ?? null,
-    price: item.PRICE ?? null,
-    disc_price: item.DISC_PRICE ?? null,
-    disc_rate: item.DISC_RATE ?? null,
-    extra_charge: item.EXTRA_CHARGE ?? null,
+    price: roundOrNull(item.PRICE),
+    disc_price: roundOrNull(item.DISC_PRICE),
+    disc_rate: roundOrNull(item.DISC_RATE),
+    extra_charge: roundOrNull(item.EXTRA_CHARGE),
     img_url: item.IMG_URL ?? null,
     img_url_https: item.IMG_URL_HTTPS ?? null,
     goods_sale_type: item.GOODS_SALE_TYPE ?? null,
     goods_use_type: item.GOODS_USE_TYPE ?? null,
-    sc_limit_date: item.SC_LIMIT_DATE ?? null,
+    sc_limit_date: roundOrNull(item.SC_LIMIT_DATE),
     b2c_item_no: item.B2C_ITEM_NO ?? null,
     raw_data: item,
     last_synced_at: new Date().toISOString(),

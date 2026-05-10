@@ -27,6 +27,14 @@ import { UserModalService } from '../user-modal/user-modal.service';
 import { SlackService } from '../slack/slack.service';
 import type { IPointWriteService } from '../point-write/point-write.interface';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TIMEZONE = 'Asia/Seoul';
 
 // 포인트 → 등급 계산 (cash-more-web의 getGradeFromPoint 이관)
 function getGradeFromPoint(point: number): string {
@@ -158,11 +166,11 @@ export class EveryReceiptService {
   async getMonthlyReceiptCount(
     userId: string,
   ): Promise<MonthlyReceiptCountResponseDto> {
-    const now = new Date();
+    const nowKst = dayjs().tz(TIMEZONE);
     const count = await this.everyReceiptRepository.countByUserIdAndMonth(
       userId,
-      now.getFullYear(),
-      now.getMonth() + 1,
+      nowKst.year(),
+      nowKst.month() + 1,
     );
     return { count };
   }

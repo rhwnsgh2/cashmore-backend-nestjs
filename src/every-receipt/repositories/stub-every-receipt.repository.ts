@@ -13,6 +13,14 @@ import {
   EveryReceiptDetail,
   ReReviewStatus,
 } from '../interfaces/every-receipt-repository.interface';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TIMEZONE = 'Asia/Seoul';
 
 export class StubEveryReceiptRepository implements IEveryReceiptRepository {
   private receipts = new Map<string, EveryReceipt[]>();
@@ -132,12 +140,9 @@ export class StubEveryReceiptRepository implements IEveryReceiptRepository {
   ): Promise<number> {
     const userReceipts = this.receipts.get(userId) || [];
     const count = userReceipts.filter((r) => {
-      const date = new Date(r.createdAt);
-      return (
-        date.getFullYear() === year &&
-        date.getMonth() + 1 === month &&
-        r.status === 'completed'
-      );
+      if (r.status !== 'completed') return false;
+      const kst = dayjs(r.createdAt).tz(TIMEZONE);
+      return kst.year() === year && kst.month() + 1 === month;
     }).length;
     return Promise.resolve(count);
   }

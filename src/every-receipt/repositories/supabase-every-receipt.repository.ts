@@ -17,6 +17,14 @@ import {
   ScoreData,
 } from '../interfaces/every-receipt-repository.interface';
 import type { Json } from '../../supabase/database.types';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TIMEZONE = 'Asia/Seoul';
 
 interface EveryReceiptRow {
   id: string;
@@ -114,17 +122,20 @@ export class SupabaseEveryReceiptRepository implements IEveryReceiptRepository {
     year: number,
     month: number,
   ): Promise<number> {
-    const startDate = new Date(year, month - 1, 1).toISOString();
-    const endDate = new Date(year, month, 1).toISOString();
+    const startKst = dayjs.tz(
+      `${year}-${String(month).padStart(2, '0')}-01`,
+      TIMEZONE,
+    );
+    const endKst = startKst.add(1, 'month');
 
     const { count, error } = await this.supabaseService
       .getClient()
       .from('every_receipt')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('status', 'completed')
-      .gte('created_at', startDate)
-      .lt('created_at', endDate);
+      .gte('created_at', startKst.toISOString())
+      .lt('created_at', endKst.toISOString());
 
     if (error) {
       throw error;

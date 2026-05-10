@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EveryReceiptService } from './every-receipt.service';
 import { EVERY_RECEIPT_REPOSITORY } from './interfaces/every-receipt-repository.interface';
@@ -496,6 +497,134 @@ describe('EveryReceiptService', () => {
       const result = await service.getMonthlyReceiptCount(userId);
 
       expect(result.count).toBe(0);
+    });
+
+    describe('KST 타임존 경계 처리', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+        // "현재 시각" = KST 2026-05-15 12:00 (UTC 03:00)
+        vi.setSystemTime(new Date('2026-05-15T03:00:00.000Z'));
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('KST 5월 1일 00:30 (UTC 4월 30일 15:30) 영수증을 5월 카운트에 포함한다', async () => {
+        repository.setReceipts(userId, [
+          {
+            id: 'r-kst-month-start',
+            createdAt: '2026-04-30T15:30:00.000Z',
+            pointAmount: 250,
+            status: 'completed',
+            imageUrl: null,
+          },
+        ]);
+
+        const result = await service.getMonthlyReceiptCount(userId);
+
+        expect(result.count).toBe(1);
+      });
+
+      it('KST 5월 31일 23:30 (UTC 14:30) 영수증을 5월 카운트에 포함한다', async () => {
+        repository.setReceipts(userId, [
+          {
+            id: 'r-kst-month-end',
+            createdAt: '2026-05-31T14:30:00.000Z',
+            pointAmount: 250,
+            status: 'completed',
+            imageUrl: null,
+          },
+        ]);
+
+        const result = await service.getMonthlyReceiptCount(userId);
+
+        expect(result.count).toBe(1);
+      });
+
+      it('KST 4월 30일 23:30 (UTC 14:30) 영수증은 5월 카운트에서 제외한다', async () => {
+        repository.setReceipts(userId, [
+          {
+            id: 'r-kst-prev-month',
+            createdAt: '2026-04-30T14:30:00.000Z',
+            pointAmount: 250,
+            status: 'completed',
+            imageUrl: null,
+          },
+        ]);
+
+        const result = await service.getMonthlyReceiptCount(userId);
+
+        expect(result.count).toBe(0);
+      });
+
+      it('KST 6월 1일 00:30 (UTC 5월 31일 15:30) 영수증은 5월 카운트에서 제외한다', async () => {
+        // 이전 native Date + UTC 로직에서는 5월로 잘못 잡혔던 경계 케이스
+        repository.setReceipts(userId, [
+          {
+            id: 'r-kst-next-month',
+            createdAt: '2026-05-31T15:30:00.000Z',
+            pointAmount: 250,
+            status: 'completed',
+            imageUrl: null,
+          },
+        ]);
+
+        const result = await service.getMonthlyReceiptCount(userId);
+
+        expect(result.count).toBe(0);
+      });
+
+      it('"현재"가 KST 6월 1일 00:30 (UTC 5월 31일 15:30) 일 때 6월을 기준으로 집계한다', async () => {
+        vi.setSystemTime(new Date('2026-05-31T15:30:00.000Z'));
+
+        repository.setReceipts(userId, [
+          {
+            id: 'r-may',
+            createdAt: '2026-05-15T03:00:00.000Z',
+            pointAmount: 250,
+            status: 'completed',
+            imageUrl: null,
+          },
+          {
+            id: 'r-jun-boundary',
+            createdAt: '2026-05-31T15:30:00.000Z', // KST 6/1 00:30
+            pointAmount: 250,
+            status: 'completed',
+            imageUrl: null,
+          },
+        ]);
+
+        const result = await service.getMonthlyReceiptCount(userId);
+
+        expect(result.count).toBe(1);
+      });
+
+      it('KST 12월 → 1월 경계에서 연도가 정확히 처리된다', async () => {
+        // "현재" = KST 2026-12-15 12:00
+        vi.setSystemTime(new Date('2026-12-15T03:00:00.000Z'));
+
+        repository.setReceipts(userId, [
+          {
+            id: 'r-dec',
+            createdAt: '2026-12-31T14:30:00.000Z', // KST 12/31 23:30
+            pointAmount: 250,
+            status: 'completed',
+            imageUrl: null,
+          },
+          {
+            id: 'r-jan',
+            createdAt: '2026-12-31T15:30:00.000Z', // KST 2027-01-01 00:30
+            pointAmount: 250,
+            status: 'completed',
+            imageUrl: null,
+          },
+        ]);
+
+        const result = await service.getMonthlyReceiptCount(userId);
+
+        expect(result.count).toBe(1);
+      });
     });
   });
 
