@@ -120,15 +120,21 @@ export class StubGifticonProductRepository implements IGifticonProductRepository
     return row;
   }
 
-  async reorder(goodsIds: string[]): Promise<void> {
+  async reorder(
+    scopeGoodsIds: string[],
+    orderedGoodsIds: string[],
+  ): Promise<void> {
     const now = new Date().toISOString();
-    // 1. 모두 NULL 초기화
+    const scope = new Set(scopeGoodsIds);
+    // 1. scope 안만 NULL 초기화
     for (const row of this.products.values()) {
-      row.display_order = null;
-      row.updated_at = now;
+      if (scope.has(row.smartcon_goods_id)) {
+        row.display_order = null;
+        row.updated_at = now;
+      }
     }
-    // 2. goodsIds 순서대로 1, 2, 3...
-    goodsIds.forEach((goodsId, idx) => {
+    // 2. orderedGoodsIds 순서대로 1, 2, 3...
+    orderedGoodsIds.forEach((goodsId, idx) => {
       const row = this.products.get(goodsId);
       if (row) {
         row.display_order = idx + 1;

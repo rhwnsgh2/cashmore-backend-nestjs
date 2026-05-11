@@ -171,25 +171,28 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
     return (data ?? null) as unknown as GifticonProductRow | null;
   }
 
-  async reorder(goodsIds: string[]): Promise<void> {
+  async reorder(
+    scopeGoodsIds: string[],
+    orderedGoodsIds: string[],
+  ): Promise<void> {
     const client = this.supabaseService.getClient();
     const now = new Date().toISOString();
 
-    // 1. 모든 큐레이션 상품의 display_order를 NULL로 초기화
-    //    (배열에 없는 상품은 뒤로 빠지도록)
-    const { error: resetError } = await client
-      .from('gifticon_products')
-      .update({ display_order: null, updated_at: now })
-      .not('display_order', 'is', null);
-    if (resetError) throw resetError;
+    // 1. scope 안 상품의 display_order만 NULL로 초기화
+    if (scopeGoodsIds.length > 0) {
+      const { error: resetError } = await client
+        .from('gifticon_products')
+        .update({ display_order: null, updated_at: now })
+        .in('smartcon_goods_id', scopeGoodsIds);
+      if (resetError) throw resetError;
+    }
 
-    // 2. goodsIds 순서대로 1, 2, 3, ... 부여
-    //    미존재/미큐레이션 상품은 update 대상이 0이라 무시됨
-    for (let i = 0; i < goodsIds.length; i++) {
+    // 2. orderedGoodsIds 순서대로 1, 2, 3, ... 부여
+    for (let i = 0; i < orderedGoodsIds.length; i++) {
       const { error } = await client
         .from('gifticon_products')
         .update({ display_order: i + 1, updated_at: now })
-        .eq('smartcon_goods_id', goodsIds[i]);
+        .eq('smartcon_goods_id', orderedGoodsIds[i]);
       if (error) throw error;
     }
   }

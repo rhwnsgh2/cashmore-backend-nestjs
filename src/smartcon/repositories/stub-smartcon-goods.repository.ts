@@ -84,6 +84,12 @@ export class StubSmartconGoodsRepository implements ISmartconGoodsRepository {
     return this.store.get(goodsId) ?? null;
   }
 
+  async findGoodsIdsByBrand(brand: string): Promise<string[]> {
+    return [...this.store.values()]
+      .filter((r) => r.is_active && r.brand_name === brand)
+      .map((r) => r.goods_id);
+  }
+
   // 테스트 헬퍼
   seed(rows: SmartconGoodsRow[]): void {
     for (const r of rows) this.store.set(r.goods_id, r);

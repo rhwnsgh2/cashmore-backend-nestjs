@@ -65,11 +65,12 @@ export interface IGifticonProductRepository {
   findByGoodsId(goodsId: string): Promise<GifticonProductRow | null>;
 
   /**
-   * 어드민이 보낸 goodsIds 배열 순서대로 display_order = 1, 2, 3... 부여.
-   * 배열에 없는 상품은 display_order = NULL로 초기화 (뒤로 빠짐).
-   * goodsIds 중 미존재/미큐레이션 상품은 무시.
+   * scopeGoodsIds 범위 안의 상품들만 display_order 재배치.
+   * - scopeGoodsIds에 해당하는 상품의 display_order를 NULL로 초기화.
+   * - orderedGoodsIds 순서대로 1, 2, 3 부여 (scope의 부분집합이어야 함; 외부 검증).
+   * - scope에 없는 다른 브랜드 상품은 영향 없음.
    */
-  reorder(goodsIds: string[]): Promise<void>;
+  reorder(scopeGoodsIds: string[], orderedGoodsIds: string[]): Promise<void>;
 }
 
 export const GIFTICON_PRODUCT_REPOSITORY = Symbol(

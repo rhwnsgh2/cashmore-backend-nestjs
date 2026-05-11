@@ -55,7 +55,16 @@ export class CurationResponseDto {
 
 export class ReorderDto {
   @ApiProperty({
-    description: '노출 순서대로 정렬된 goods_id 배열. 배열에 없는 상품은 뒤로 빠짐.',
+    description:
+      '정렬 대상 브랜드명 (smartcon_goods.brand_name과 정확히 일치). 이 브랜드 상품의 display_order만 갱신됨.',
+    example: '이마트24',
+  })
+  @IsString()
+  brand!: string;
+
+  @ApiProperty({
+    description:
+      '해당 브랜드 안에서 노출 순서대로 정렬된 goods_id 배열. 배열에 없는 같은 브랜드 상품은 display_order=NULL로 초기화되어 뒤로 빠짐.',
     example: ['0000128425', '0000129119'],
     type: [String],
   })

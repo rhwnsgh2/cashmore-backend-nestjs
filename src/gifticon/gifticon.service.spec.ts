@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { GifticonService } from './gifticon.service';
 import { GIFTICON_PRODUCT_REPOSITORY } from './interfaces/gifticon-product-repository.interface';
 import { StubGifticonProductRepository } from './repositories/stub-gifticon-product.repository';
@@ -341,13 +341,95 @@ describe('GifticonService', () => {
     });
   });
 
-  describe('reorder', () => {
-    beforeEach(() => {
+  describe('reorder (브랜드 단위)', () => {
+    beforeEach(async () => {
+      // 컴포즈커피 A, B + BHC X, Y 셋업
+      await smartconRepo.syncByEvent({
+        eventId: EVENT_ID,
+        items: [
+          {
+            goods_id: 'A',
+            event_id: EVENT_ID,
+            brand_name: '컴포즈커피',
+            goods_name: '상품-A',
+            msg: null,
+            price: null,
+            disc_price: null,
+            disc_rate: null,
+            extra_charge: null,
+            img_url: null,
+            img_url_https: null,
+            goods_sale_type: null,
+            goods_use_type: null,
+            sc_limit_date: null,
+            b2c_item_no: null,
+            raw_data: makeRawItem('A'),
+            last_synced_at: new Date().toISOString(),
+          },
+          {
+            goods_id: 'B',
+            event_id: EVENT_ID,
+            brand_name: '컴포즈커피',
+            goods_name: '상품-B',
+            msg: null,
+            price: null,
+            disc_price: null,
+            disc_rate: null,
+            extra_charge: null,
+            img_url: null,
+            img_url_https: null,
+            goods_sale_type: null,
+            goods_use_type: null,
+            sc_limit_date: null,
+            b2c_item_no: null,
+            raw_data: makeRawItem('B'),
+            last_synced_at: new Date().toISOString(),
+          },
+          {
+            goods_id: 'X',
+            event_id: EVENT_ID,
+            brand_name: 'BHC',
+            goods_name: '상품-X',
+            msg: null,
+            price: null,
+            disc_price: null,
+            disc_rate: null,
+            extra_charge: null,
+            img_url: null,
+            img_url_https: null,
+            goods_sale_type: null,
+            goods_use_type: null,
+            sc_limit_date: null,
+            b2c_item_no: null,
+            raw_data: makeRawItem('X'),
+            last_synced_at: new Date().toISOString(),
+          },
+          {
+            goods_id: 'Y',
+            event_id: EVENT_ID,
+            brand_name: 'BHC',
+            goods_name: '상품-Y',
+            msg: null,
+            price: null,
+            disc_price: null,
+            disc_rate: null,
+            extra_charge: null,
+            img_url: null,
+            img_url_https: null,
+            goods_sale_type: null,
+            goods_use_type: null,
+            sc_limit_date: null,
+            b2c_item_no: null,
+            raw_data: makeRawItem('Y'),
+            last_synced_at: new Date().toISOString(),
+          },
+        ],
+      });
       productRepo.seedGoods([
         {
           goods_id: 'A',
           event_id: EVENT_ID,
-          brand_name: null,
+          brand_name: '컴포즈커피',
           goods_name: '상품-A',
           msg: null,
           price: null,
@@ -359,7 +441,7 @@ describe('GifticonService', () => {
         {
           goods_id: 'B',
           event_id: EVENT_ID,
-          brand_name: null,
+          brand_name: '컴포즈커피',
           goods_name: '상품-B',
           msg: null,
           price: null,
@@ -369,10 +451,22 @@ describe('GifticonService', () => {
           is_active: true,
         },
         {
-          goods_id: 'C',
+          goods_id: 'X',
           event_id: EVENT_ID,
-          brand_name: null,
-          goods_name: '상품-C',
+          brand_name: 'BHC',
+          goods_name: '상품-X',
+          msg: null,
+          price: null,
+          disc_price: null,
+          img_url_https: null,
+          cached_img_url: null,
+          is_active: true,
+        },
+        {
+          goods_id: 'Y',
+          event_id: EVENT_ID,
+          brand_name: 'BHC',
+          goods_name: '상품-Y',
           msg: null,
           price: null,
           disc_price: null,
@@ -381,66 +475,80 @@ describe('GifticonService', () => {
           is_active: true,
         },
       ]);
+      for (const id of ['A', 'B', 'X', 'Y']) {
+        await productRepo.upsertCuration({
+          smartcon_goods_id: id,
+          point_price: 1000,
+          is_visible: true,
+        });
+      }
     });
 
-    async function curateAll() {
-      await productRepo.upsertCuration({
-        smartcon_goods_id: 'A',
-        point_price: 1000,
-        is_visible: true,
-      });
-      await productRepo.upsertCuration({
-        smartcon_goods_id: 'B',
-        point_price: 2000,
-        is_visible: true,
-      });
-      await productRepo.upsertCuration({
-        smartcon_goods_id: 'C',
-        point_price: 3000,
-        is_visible: true,
-      });
-    }
+    it('해당 브랜드 안에서만 보낸 순서대로 정렬', async () => {
+      await service.reorder('컴포즈커피', ['B', 'A']);
 
-    it('보낸 순서대로 listVisible 결과가 정렬된다', async () => {
-      await curateAll();
-      await service.reorder(['C', 'A', 'B']);
-
-      const list = await service.listVisible(EVENT_ID);
-      expect(list.map((p) => p.goods_id)).toEqual(['C', 'A', 'B']);
+      const a = await productRepo.findByGoodsId('A');
+      const b = await productRepo.findByGoodsId('B');
+      expect(b?.display_order).toBe(1);
+      expect(a?.display_order).toBe(2);
     });
 
-    it('배열에 없는 상품은 뒤로 빠진다 (display_order=NULL → id 순)', async () => {
-      await curateAll();
-      // 처음 큐레이션 후 id 순: A(1), B(2), C(3)
-      await service.reorder(['C', 'A']); // B 빠짐
+    it('다른 브랜드(BHC)의 display_order는 영향 없음', async () => {
+      // BHC 먼저 정렬
+      await service.reorder('BHC', ['Y', 'X']);
+      const xBefore = (await productRepo.findByGoodsId('X'))?.display_order;
+      const yBefore = (await productRepo.findByGoodsId('Y'))?.display_order;
 
-      const list = await service.listVisible(EVENT_ID);
-      // 앞: 보낸 순서 (C, A), 뒤: NULL인 B
-      expect(list.map((p) => p.goods_id)).toEqual(['C', 'A', 'B']);
+      // 컴포즈커피 정렬
+      await service.reorder('컴포즈커피', ['B', 'A']);
+
+      // BHC 값 유지
+      expect((await productRepo.findByGoodsId('X'))?.display_order).toBe(
+        xBefore,
+      );
+      expect((await productRepo.findByGoodsId('Y'))?.display_order).toBe(
+        yBefore,
+      );
     });
 
-    it('빈 배열 → 모두 NULL → id 순 (큐레이션 시점 순)', async () => {
-      await curateAll();
-      await service.reorder(['B', 'C']); // 한 번 정렬 후
-      await service.reorder([]); // 다시 초기화
+    it('같은 브랜드인데 goodsIds에 빠진 상품은 NULL로 초기화', async () => {
+      await service.reorder('컴포즈커피', ['B', 'A']);
+      await service.reorder('컴포즈커피', ['A']); // B 빠짐
 
-      const list = await service.listVisible(EVENT_ID);
-      expect(list.map((p) => p.goods_id)).toEqual(['A', 'B', 'C']);
+      expect((await productRepo.findByGoodsId('A'))?.display_order).toBe(1);
+      expect((await productRepo.findByGoodsId('B'))?.display_order).toBeNull();
     });
 
-    it('미존재 goods_id가 섞여있어도 에러 없음 (무시)', async () => {
-      await curateAll();
+    it('다른 브랜드 goodsId가 섞여있으면 400 + display_order 변경 X', async () => {
+      await service.reorder('컴포즈커피', ['A', 'B']);
+      const aBefore = (await productRepo.findByGoodsId('A'))?.display_order;
+
       await expect(
-        service.reorder(['A', 'UNKNOWN', 'B']),
-      ).resolves.toBeUndefined();
+        service.reorder('컴포즈커피', ['A', 'X']), // X는 BHC
+      ).rejects.toThrow(BadRequestException);
+
+      expect((await productRepo.findByGoodsId('A'))?.display_order).toBe(
+        aBefore,
+      );
+    });
+
+    it('존재하지 않는 브랜드 → NotFoundException', async () => {
+      await expect(service.reorder('없는브랜드', [])).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('listVisible은 display_order ASC, 그룹 첫 상품의 order로 브랜드 그룹 순서가 결정됨', async () => {
+      // 컴포즈커피 먼저 (1, 2), BHC 그 다음 (3, 4) — 자연스럽게 그룹 순서 결정
+      await service.reorder('컴포즈커피', ['A', 'B']);
+      await service.reorder('BHC', ['X', 'Y']);
+      // BHC를 다시 더 낮은 값으로 만들 순 없지만, 컴포즈커피만 NULL 처리하면
+      await service.reorder('컴포즈커피', []); // 컴포즈 모두 NULL
 
       const list = await service.listVisible(EVENT_ID);
-      // UNKNOWN은 큐레이션 안 됐으니 무시. A=1, B=2 부여(중간 인덱스라도 stub은 idx+1)
-      // 실제 동작: A=1, UNKNOWN(skip), B=3 → A, B, C 순
-      // 단 stub은 idx 그대로 사용하므로 A=1, B=3. listVisible에선 A→B 순
-      expect(list[0].goods_id).toBe('A');
-      expect(list[1].goods_id).toBe('B');
-      expect(list[2].goods_id).toBe('C'); // NULL이라 뒤
+      // BHC가 1,2 / 컴포즈는 NULL이라 뒤로
+      expect(list.slice(0, 2).map((p) => p.goods_id)).toEqual(['X', 'Y']);
+      expect(list.slice(2).map((p) => p.goods_id).sort()).toEqual(['A', 'B']);
     });
   });
 });

@@ -68,9 +68,9 @@ export class AdminGifticonController {
 
   @Put('products/order')
   @ApiOperation({
-    summary: '노출 상품 순서 재배열',
+    summary: '브랜드별 노출 상품 순서 재배열',
     description:
-      '보낸 goodsIds 배열 순서대로 display_order=1,2,3... 부여. 배열에 없는 상품은 NULL로 초기화되어 뒤로 빠짐.',
+      'body.brand에 해당하는 활성 상품만 scope. goodsIds 순서대로 display_order=1,2,3 부여. 같은 브랜드인데 goodsIds에 없는 상품은 NULL로 뒤로 빠짐. 다른 브랜드는 영향 없음.',
   })
   @ApiHeader({ name: 'x-admin-api-key', required: true })
   @ApiResponse({ status: 200, description: '재배열 완료' })
@@ -79,7 +79,7 @@ export class AdminGifticonController {
     @Body() body: ReorderDto,
   ): Promise<{ success: boolean }> {
     this.validateApiKey(apiKey);
-    await this.gifticonService.reorder(body.goodsIds);
+    await this.gifticonService.reorder(body.brand, body.goodsIds);
     return { success: true };
   }
 

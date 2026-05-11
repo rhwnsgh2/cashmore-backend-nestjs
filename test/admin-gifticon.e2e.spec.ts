@@ -233,32 +233,39 @@ describe('Admin Gifticon (e2e) - Real DB', () => {
         .expect(404);
     });
 
-    it('reorder → display_order 부여, 배열 외 상품은 NULL', async () => {
+    it('reorder (브랜드 단위) → 해당 브랜드만 display_order 부여, 다른 브랜드 영향 X', async () => {
       await seedGoods(supabase, [
-        { goods_id: 'A' },
-        { goods_id: 'B' },
-        { goods_id: 'C' },
+        { goods_id: 'A', brand_name: '컴포즈커피' },
+        { goods_id: 'B', brand_name: '컴포즈커피' },
+        { goods_id: 'X', brand_name: 'BHC' },
+        { goods_id: 'Y', brand_name: 'BHC' },
       ]);
-      // 미리 큐레이션
-      for (const id of ['A', 'B', 'C']) {
+      for (const id of ['A', 'B', 'X', 'Y']) {
         await request(app.getHttpServer())
           .put(`/admin/gifticon/products/${id}`)
           .set('x-admin-api-key', ADMIN_API_KEY)
           .send({ point_price: 1000, is_visible: true });
       }
 
+      // BHC 먼저 정렬해서 다른 브랜드 값 확보
+      await request(app.getHttpServer())
+        .put('/admin/gifticon/products/order')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({ brand: 'BHC', goodsIds: ['Y', 'X'] })
+        .expect(200);
+
       // 잘못된 API 키
       await request(app.getHttpServer())
         .put('/admin/gifticon/products/order')
         .set('x-admin-api-key', 'wrong')
-        .send({ goodsIds: ['C', 'A'] })
+        .send({ brand: '컴포즈커피', goodsIds: ['B', 'A'] })
         .expect(401);
 
-      // 정상 호출
+      // 컴포즈커피 정렬
       await request(app.getHttpServer())
         .put('/admin/gifticon/products/order')
         .set('x-admin-api-key', ADMIN_API_KEY)
-        .send({ goodsIds: ['C', 'A'] })
+        .send({ brand: '컴포즈커피', goodsIds: ['B', 'A'] })
         .expect(200);
 
       const { data: rows } = await supabase
@@ -268,9 +275,46 @@ describe('Admin Gifticon (e2e) - Real DB', () => {
       const byId = new Map(
         rows?.map((r) => [r.smartcon_goods_id, r.display_order]),
       );
-      expect(byId.get('C')).toBe(1);
+      // 컴포즈커피: B=1, A=2
+      expect(byId.get('B')).toBe(1);
       expect(byId.get('A')).toBe(2);
-      expect(byId.get('B')).toBeNull();
+      // BHC는 그대로: Y=1, X=2
+      expect(byId.get('Y')).toBe(1);
+      expect(byId.get('X')).toBe(2);
+    });
+
+    it('다른 브랜드 goodsId가 섞이면 400 (display_order 변경 X)', async () => {
+      await seedGoods(supabase, [
+        { goods_id: 'A', brand_name: '컴포즈커피' },
+        { goods_id: 'X', brand_name: 'BHC' },
+      ]);
+      for (const id of ['A', 'X']) {
+        await request(app.getHttpServer())
+          .put(`/admin/gifticon/products/${id}`)
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({ point_price: 1000, is_visible: true });
+      }
+
+      await request(app.getHttpServer())
+        .put('/admin/gifticon/products/order')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({ brand: '컴포즈커피', goodsIds: ['A', 'X'] })
+        .expect(400);
+
+      const { data: a } = await supabase
+        .from('gifticon_products')
+        .select('display_order')
+        .eq('smartcon_goods_id', 'A')
+        .single();
+      expect(a?.display_order).toBeNull();
+    });
+
+    it('존재하지 않는 브랜드 → 404', async () => {
+      await request(app.getHttpServer())
+        .put('/admin/gifticon/products/order')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({ brand: '없는브랜드', goodsIds: [] })
+        .expect(404);
     });
 
     it('잘못된 body (음수 point_price) → 400', async () => {

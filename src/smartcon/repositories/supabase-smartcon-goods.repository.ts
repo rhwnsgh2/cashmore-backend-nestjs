@@ -121,4 +121,15 @@ export class SupabaseSmartconGoodsRepository implements ISmartconGoodsRepository
     if (error) throw error;
     return (data ?? null) as unknown as SmartconGoodsRow | null;
   }
+
+  async findGoodsIdsByBrand(brand: string): Promise<string[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('smartcon_goods')
+      .select('goods_id')
+      .eq('brand_name', brand)
+      .eq('is_active', true);
+    if (error) throw error;
+    return (data ?? []).map((r: { goods_id: string }) => r.goods_id);
+  }
 }

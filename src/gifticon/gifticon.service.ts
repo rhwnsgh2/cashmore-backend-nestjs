@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Redis } from '@upstash/redis';
 import { SMARTCON_CONFIG } from '../smartcon/smartcon.constants';
 import {
@@ -126,11 +132,25 @@ export class GifticonService {
   }
 
   /**
-   * 어드민 — 노출 순서 재배열. 보낸 goodsIds 순서대로 1, 2, 3... 부여.
-   * 배열에 없는 상품은 display_order=NULL로 초기화 (뒤로 빠짐).
+   * 어드민 — 브랜드 단위 노출 순서 재배열.
+   * - brand에 속한 활성 상품을 scope로 잡고, scope 내 display_order만 NULL → 보낸 순서대로 1, 2, 3.
+   * - 다른 브랜드 상품은 영향 없음.
+   * - goodsIds 안에 다른 브랜드 상품이 섞여 있으면 400.
    */
-  async reorder(goodsIds: string[]): Promise<void> {
-    await this.productRepository.reorder(goodsIds);
+  async reorder(brand: string, goodsIds: string[]): Promise<void> {
+    const scope =
+      await this.smartconGoodsRepository.findGoodsIdsByBrand(brand);
+    if (scope.length === 0) {
+      throw new NotFoundException(`brand not found: ${brand}`);
+    }
+    const scopeSet = new Set(scope);
+    const invalid = goodsIds.filter((id) => !scopeSet.has(id));
+    if (invalid.length > 0) {
+      throw new BadRequestException(
+        `goodsIds not in brand "${brand}": ${invalid.join(', ')}`,
+      );
+    }
+    await this.productRepository.reorder(scope, goodsIds);
     await this.invalidateVisibleCache();
   }
 }

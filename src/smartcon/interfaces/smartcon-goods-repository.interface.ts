@@ -80,6 +80,9 @@ export interface ISmartconGoodsRepository {
 
   findAllByEvent(eventId: string): Promise<SmartconGoodsRow[]>;
   findById(goodsId: string): Promise<SmartconGoodsRow | null>;
+
+  /** brand_name이 정확히 일치하는 활성 상품의 goods_id 목록. */
+  findGoodsIdsByBrand(brand: string): Promise<string[]>;
 }
 
 export const SMARTCON_GOODS_REPOSITORY = Symbol('SMARTCON_GOODS_REPOSITORY');
