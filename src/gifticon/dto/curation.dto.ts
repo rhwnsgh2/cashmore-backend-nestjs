@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CurationDto {
   @ApiProperty({ description: '차감 포인트', example: 1500, minimum: 0 })
@@ -45,6 +53,18 @@ export class CurationResponseDto {
   updated_at!: string;
 }
 
+export class ReorderDto {
+  @ApiProperty({
+    description: '노출 순서대로 정렬된 goods_id 배열. 배열에 없는 상품은 뒤로 빠짐.',
+    example: ['0000128425', '0000129119'],
+    type: [String],
+  })
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @IsString({ each: true })
+  goodsIds!: string[];
+}
+
 export class CatalogItemDto {
   @ApiProperty({
     nullable: true,
@@ -69,6 +89,12 @@ export class CatalogItemDto {
     description: '어드민이 override한 노출용 이름 (NULL이면 goods_name 사용)',
   })
   display_name!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    description: '노출 순서 (낮을수록 위, NULL은 뒤로)',
+  })
+  display_order!: number | null;
 
   @ApiProperty({ nullable: true })
   msg!: string | null;

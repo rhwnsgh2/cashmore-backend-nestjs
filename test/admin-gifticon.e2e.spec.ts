@@ -233,6 +233,46 @@ describe('Admin Gifticon (e2e) - Real DB', () => {
         .expect(404);
     });
 
+    it('reorder → display_order 부여, 배열 외 상품은 NULL', async () => {
+      await seedGoods(supabase, [
+        { goods_id: 'A' },
+        { goods_id: 'B' },
+        { goods_id: 'C' },
+      ]);
+      // 미리 큐레이션
+      for (const id of ['A', 'B', 'C']) {
+        await request(app.getHttpServer())
+          .put(`/admin/gifticon/products/${id}`)
+          .set('x-admin-api-key', ADMIN_API_KEY)
+          .send({ point_price: 1000, is_visible: true });
+      }
+
+      // 잘못된 API 키
+      await request(app.getHttpServer())
+        .put('/admin/gifticon/products/order')
+        .set('x-admin-api-key', 'wrong')
+        .send({ goodsIds: ['C', 'A'] })
+        .expect(401);
+
+      // 정상 호출
+      await request(app.getHttpServer())
+        .put('/admin/gifticon/products/order')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({ goodsIds: ['C', 'A'] })
+        .expect(200);
+
+      const { data: rows } = await supabase
+        .from('gifticon_products')
+        .select('smartcon_goods_id, display_order')
+        .order('smartcon_goods_id');
+      const byId = new Map(
+        rows?.map((r) => [r.smartcon_goods_id, r.display_order]),
+      );
+      expect(byId.get('C')).toBe(1);
+      expect(byId.get('A')).toBe(2);
+      expect(byId.get('B')).toBeNull();
+    });
+
     it('잘못된 body (음수 point_price) → 400', async () => {
       await seedGoods(supabase, [{ goods_id: 'A' }]);
 

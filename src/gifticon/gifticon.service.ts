@@ -124,4 +124,13 @@ export class GifticonService {
     await this.invalidateVisibleCache();
     return row;
   }
+
+  /**
+   * 어드민 — 노출 순서 재배열. 보낸 goodsIds 순서대로 1, 2, 3... 부여.
+   * 배열에 없는 상품은 display_order=NULL로 초기화 (뒤로 빠짐).
+   */
+  async reorder(goodsIds: string[]): Promise<void> {
+    await this.productRepository.reorder(goodsIds);
+    await this.invalidateVisibleCache();
+  }
 }

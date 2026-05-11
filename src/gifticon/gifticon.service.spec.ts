@@ -340,4 +340,107 @@ describe('GifticonService', () => {
       expect(list[0].goods_name).toBe('상품-A');
     });
   });
+
+  describe('reorder', () => {
+    beforeEach(() => {
+      productRepo.seedGoods([
+        {
+          goods_id: 'A',
+          event_id: EVENT_ID,
+          brand_name: null,
+          goods_name: '상품-A',
+          msg: null,
+          price: null,
+          disc_price: null,
+          img_url_https: null,
+          cached_img_url: null,
+          is_active: true,
+        },
+        {
+          goods_id: 'B',
+          event_id: EVENT_ID,
+          brand_name: null,
+          goods_name: '상품-B',
+          msg: null,
+          price: null,
+          disc_price: null,
+          img_url_https: null,
+          cached_img_url: null,
+          is_active: true,
+        },
+        {
+          goods_id: 'C',
+          event_id: EVENT_ID,
+          brand_name: null,
+          goods_name: '상품-C',
+          msg: null,
+          price: null,
+          disc_price: null,
+          img_url_https: null,
+          cached_img_url: null,
+          is_active: true,
+        },
+      ]);
+    });
+
+    async function curateAll() {
+      await productRepo.upsertCuration({
+        smartcon_goods_id: 'A',
+        point_price: 1000,
+        is_visible: true,
+      });
+      await productRepo.upsertCuration({
+        smartcon_goods_id: 'B',
+        point_price: 2000,
+        is_visible: true,
+      });
+      await productRepo.upsertCuration({
+        smartcon_goods_id: 'C',
+        point_price: 3000,
+        is_visible: true,
+      });
+    }
+
+    it('보낸 순서대로 listVisible 결과가 정렬된다', async () => {
+      await curateAll();
+      await service.reorder(['C', 'A', 'B']);
+
+      const list = await service.listVisible(EVENT_ID);
+      expect(list.map((p) => p.goods_id)).toEqual(['C', 'A', 'B']);
+    });
+
+    it('배열에 없는 상품은 뒤로 빠진다 (display_order=NULL → id 순)', async () => {
+      await curateAll();
+      // 처음 큐레이션 후 id 순: A(1), B(2), C(3)
+      await service.reorder(['C', 'A']); // B 빠짐
+
+      const list = await service.listVisible(EVENT_ID);
+      // 앞: 보낸 순서 (C, A), 뒤: NULL인 B
+      expect(list.map((p) => p.goods_id)).toEqual(['C', 'A', 'B']);
+    });
+
+    it('빈 배열 → 모두 NULL → id 순 (큐레이션 시점 순)', async () => {
+      await curateAll();
+      await service.reorder(['B', 'C']); // 한 번 정렬 후
+      await service.reorder([]); // 다시 초기화
+
+      const list = await service.listVisible(EVENT_ID);
+      expect(list.map((p) => p.goods_id)).toEqual(['A', 'B', 'C']);
+    });
+
+    it('미존재 goods_id가 섞여있어도 에러 없음 (무시)', async () => {
+      await curateAll();
+      await expect(
+        service.reorder(['A', 'UNKNOWN', 'B']),
+      ).resolves.toBeUndefined();
+
+      const list = await service.listVisible(EVENT_ID);
+      // UNKNOWN은 큐레이션 안 됐으니 무시. A=1, B=2 부여(중간 인덱스라도 stub은 idx+1)
+      // 실제 동작: A=1, UNKNOWN(skip), B=3 → A, B, C 순
+      // 단 stub은 idx 그대로 사용하므로 A=1, B=3. listVisible에선 A→B 순
+      expect(list[0].goods_id).toBe('A');
+      expect(list[1].goods_id).toBe('B');
+      expect(list[2].goods_id).toBe('C'); // NULL이라 뒤
+    });
+  });
 });

@@ -4,6 +4,7 @@ export interface GifticonProductRow {
   point_price: number;
   is_visible: boolean;
   display_name: string | null;
+  display_order: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -14,6 +15,7 @@ export interface CatalogItem {
   brand_name: string | null;
   goods_name: string | null; // smartcon_goods.goods_name (원본)
   display_name: string | null; // 어드민이 override한 노출용 이름
+  display_order: number | null;
   msg: string | null;
   smartcon_price: number | null;
   smartcon_disc_price: number | null;
@@ -39,6 +41,7 @@ export interface UpsertCurationInput {
   point_price: number;
   is_visible: boolean;
   display_name?: string | null; // null이면 smartcon_goods.goods_name 사용
+  display_order?: number | null;
 }
 
 export interface IGifticonProductRepository {
@@ -50,6 +53,7 @@ export interface IGifticonProductRepository {
 
   /**
    * 사용자용 — `is_active=true AND is_visible=true`인 상품만 반환.
+   * 정렬: display_order ASC NULLS LAST, id ASC.
    */
   listVisible(eventId: string): Promise<VisibleProduct[]>;
 
@@ -59,6 +63,13 @@ export interface IGifticonProductRepository {
   upsertCuration(input: UpsertCurationInput): Promise<GifticonProductRow>;
 
   findByGoodsId(goodsId: string): Promise<GifticonProductRow | null>;
+
+  /**
+   * 어드민이 보낸 goodsIds 배열 순서대로 display_order = 1, 2, 3... 부여.
+   * 배열에 없는 상품은 display_order = NULL로 초기화 (뒤로 빠짐).
+   * goodsIds 중 미존재/미큐레이션 상품은 무시.
+   */
+  reorder(goodsIds: string[]): Promise<void>;
 }
 
 export const GIFTICON_PRODUCT_REPOSITORY = Symbol(

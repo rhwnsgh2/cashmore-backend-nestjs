@@ -23,6 +23,7 @@ import {
   CatalogItemDto,
   CurationDto,
   CurationResponseDto,
+  ReorderDto,
 } from '../gifticon/dto/curation.dto';
 import { OrderResponseDto } from '../gifticon/dto/order.dto';
 
@@ -48,6 +49,23 @@ export class AdminGifticonController {
   ): Promise<CatalogItemDto[]> {
     this.validateApiKey(apiKey);
     return this.gifticonService.listCatalogForAdmin();
+  }
+
+  @Put('products/order')
+  @ApiOperation({
+    summary: '노출 상품 순서 재배열',
+    description:
+      '보낸 goodsIds 배열 순서대로 display_order=1,2,3... 부여. 배열에 없는 상품은 NULL로 초기화되어 뒤로 빠짐.',
+  })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiResponse({ status: 200, description: '재배열 완료' })
+  async reorderProducts(
+    @Headers('x-admin-api-key') apiKey: string,
+    @Body() body: ReorderDto,
+  ): Promise<{ success: boolean }> {
+    this.validateApiKey(apiKey);
+    await this.gifticonService.reorder(body.goodsIds);
+    return { success: true };
   }
 
   @Put('products/:goodsId')

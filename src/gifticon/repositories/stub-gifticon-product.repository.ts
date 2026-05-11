@@ -47,6 +47,7 @@ export class StubGifticonProductRepository implements IGifticonProductRepository
           brand_name: g.brand_name,
           goods_name: g.goods_name,
           display_name: p?.display_name ?? null,
+          display_order: p?.display_order ?? null,
           msg: g.msg,
           smartcon_price: g.price,
           smartcon_disc_price: g.disc_price,
@@ -60,24 +61,41 @@ export class StubGifticonProductRepository implements IGifticonProductRepository
 
   async listVisible(eventId: string): Promise<VisibleProduct[]> {
     const goodsByid = new Map(this.goods.map((g) => [g.goods_id, g]));
-    return [...this.products.values()]
+    const rows = [...this.products.values()]
       .filter((p) => p.is_visible)
       .map((p) => {
         const g = goodsByid.get(p.smartcon_goods_id);
         if (!g || !g.is_active || g.event_id !== eventId) return null;
         return {
-          id: p.id,
-          goods_id: g.goods_id,
-          brand_name: g.brand_name,
-          goods_name: p.display_name ?? g.goods_name, // override 우선
-          msg: g.msg,
-          img_url: g.cached_img_url ?? g.img_url_https,
-          point_price: p.point_price,
-          original_price: g.price,
+          product: p,
+          visible: {
+            id: p.id,
+            goods_id: g.goods_id,
+            brand_name: g.brand_name,
+            goods_name: p.display_name ?? g.goods_name, // override 우선
+            msg: g.msg,
+            img_url: g.cached_img_url ?? g.img_url_https,
+            point_price: p.point_price,
+            original_price: g.price,
+          } as VisibleProduct,
         };
       })
-      .filter((v): v is VisibleProduct => v !== null)
-      .sort((a, b) => a.id - b.id);
+      .filter(
+        (r): r is { product: GifticonProductRow; visible: VisibleProduct } =>
+          r !== null,
+      );
+
+    // display_order ASC NULLS LAST, id ASC
+    rows.sort((a, b) => {
+      const ao = a.product.display_order;
+      const bo = b.product.display_order;
+      if (ao !== null && bo !== null) return ao - bo;
+      if (ao !== null) return -1; // a 우선 (NULL 뒤로)
+      if (bo !== null) return 1;
+      return a.visible.id - b.visible.id;
+    });
+
+    return rows.map((r) => r.visible);
   }
 
   async upsertCuration(
@@ -91,11 +109,32 @@ export class StubGifticonProductRepository implements IGifticonProductRepository
       point_price: input.point_price,
       is_visible: input.is_visible,
       display_name: input.display_name ?? null,
+      display_order:
+        input.display_order !== undefined
+          ? input.display_order
+          : (existing?.display_order ?? null),
       created_at: existing?.created_at ?? now,
       updated_at: now,
     };
     this.products.set(input.smartcon_goods_id, row);
     return row;
+  }
+
+  async reorder(goodsIds: string[]): Promise<void> {
+    const now = new Date().toISOString();
+    // 1. 모두 NULL 초기화
+    for (const row of this.products.values()) {
+      row.display_order = null;
+      row.updated_at = now;
+    }
+    // 2. goodsIds 순서대로 1, 2, 3...
+    goodsIds.forEach((goodsId, idx) => {
+      const row = this.products.get(goodsId);
+      if (row) {
+        row.display_order = idx + 1;
+        row.updated_at = now;
+      }
+    });
   }
 
   async findByGoodsId(goodsId: string): Promise<GifticonProductRow | null> {

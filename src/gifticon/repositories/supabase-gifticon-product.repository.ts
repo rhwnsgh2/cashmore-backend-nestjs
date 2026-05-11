@@ -32,12 +32,19 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
         img_url_https,
         cached_img_url,
         is_active,
-        gifticon_products ( id, point_price, is_visible, display_name )
+        gifticon_products ( id, point_price, is_visible, display_name, display_order )
       `,
       )
       .eq('event_id', eventId);
     if (error) throw error;
 
+    type EmbeddedProduct = {
+      id: number;
+      point_price: number;
+      is_visible: boolean;
+      display_name: string | null;
+      display_order: number | null;
+    };
     type Row = {
       goods_id: string;
       brand_name: string | null;
@@ -48,20 +55,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
       img_url_https: string | null;
       cached_img_url: string | null;
       is_active: boolean;
-      gifticon_products:
-        | Array<{
-            id: number;
-            point_price: number;
-            is_visible: boolean;
-            display_name: string | null;
-          }>
-        | {
-            id: number;
-            point_price: number;
-            is_visible: boolean;
-            display_name: string | null;
-          }
-        | null;
+      gifticon_products: EmbeddedProduct[] | EmbeddedProduct | null;
     };
 
     return ((data as unknown as Row[] | null) ?? []).map((g) => {
@@ -73,6 +67,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
         brand_name: g.brand_name ?? null,
         goods_name: g.goods_name ?? null,
         display_name: p?.display_name ?? null,
+        display_order: p?.display_order ?? null,
         msg: g.msg ?? null,
         smartcon_price: g.price ?? null,
         smartcon_disc_price: g.disc_price ?? null,
@@ -109,6 +104,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
       .eq('is_visible', true)
       .eq('smartcon_goods.event_id', eventId)
       .eq('smartcon_goods.is_active', true)
+      .order('display_order', { ascending: true, nullsFirst: false })
       .order('id', { ascending: true });
     if (error) throw error;
 
@@ -173,5 +169,28 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
       .maybeSingle();
     if (error) throw error;
     return (data ?? null) as unknown as GifticonProductRow | null;
+  }
+
+  async reorder(goodsIds: string[]): Promise<void> {
+    const client = this.supabaseService.getClient();
+    const now = new Date().toISOString();
+
+    // 1. 모든 큐레이션 상품의 display_order를 NULL로 초기화
+    //    (배열에 없는 상품은 뒤로 빠지도록)
+    const { error: resetError } = await client
+      .from('gifticon_products')
+      .update({ display_order: null, updated_at: now })
+      .not('display_order', 'is', null);
+    if (resetError) throw resetError;
+
+    // 2. goodsIds 순서대로 1, 2, 3, ... 부여
+    //    미존재/미큐레이션 상품은 update 대상이 0이라 무시됨
+    for (let i = 0; i < goodsIds.length; i++) {
+      const { error } = await client
+        .from('gifticon_products')
+        .update({ display_order: i + 1, updated_at: now })
+        .eq('smartcon_goods_id', goodsIds[i]);
+      if (error) throw error;
+    }
   }
 }
