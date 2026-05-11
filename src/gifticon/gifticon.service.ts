@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Redis } from '@upstash/redis';
 import { SMARTCON_CONFIG } from '../smartcon/smartcon.constants';
 import {
   GIFTICON_PRODUCT_REPOSITORY,
@@ -12,14 +13,23 @@ import {
   type ISmartconGoodsRepository,
 } from '../smartcon/interfaces/smartcon-goods-repository.interface';
 
+const VISIBLE_CACHE_KEY = 'gifticon:visible-products';
+const VISIBLE_CACHE_TTL_SECONDS = 60;
+
 @Injectable()
 export class GifticonService {
+  private readonly logger = new Logger(GifticonService.name);
+  // 테스트 환경에선 캐시 우회 (테스트 간 격리 보장).
+  private readonly redis: Redis | null;
+
   constructor(
     @Inject(GIFTICON_PRODUCT_REPOSITORY)
     private productRepository: IGifticonProductRepository,
     @Inject(SMARTCON_GOODS_REPOSITORY)
     private smartconGoodsRepository: ISmartconGoodsRepository,
-  ) {}
+  ) {
+    this.redis = process.env.NODE_ENV === 'test' ? null : Redis.fromEnv();
+  }
 
   /** 어드민 — 전체 카탈로그 (큐레이션 상태 포함). */
   async listCatalogForAdmin(
@@ -28,11 +38,55 @@ export class GifticonService {
     return this.productRepository.listCatalog(eventId);
   }
 
-  /** 사용자 — 노출 ON 상품만. */
+  /** 사용자 — 노출 ON 상품만. Redis 60초 캐시. */
   async listVisible(
     eventId: string = SMARTCON_CONFIG.eventId,
   ): Promise<VisibleProduct[]> {
-    return this.productRepository.listVisible(eventId);
+    // 기본 eventId일 때만 캐시 (다른 eventId는 디버그 용도라 캐시 불필요)
+    // 테스트 환경(redis=null)에선도 캐시 우회.
+    if (!this.redis || eventId !== SMARTCON_CONFIG.eventId) {
+      return this.productRepository.listVisible(eventId);
+    }
+
+    try {
+      const cached = await this.redis.get<VisibleProduct[]>(VISIBLE_CACHE_KEY);
+      if (cached) return cached;
+    } catch (error) {
+      this.logger.warn(
+        `Redis get failed for ${VISIBLE_CACHE_KEY}, fallback to DB`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    const fresh = await this.productRepository.listVisible(eventId);
+
+    try {
+      await this.redis.setex(
+        VISIBLE_CACHE_KEY,
+        VISIBLE_CACHE_TTL_SECONDS,
+        fresh,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Redis setex failed for ${VISIBLE_CACHE_KEY}`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    return fresh;
+  }
+
+  /** 어드민 큐레이션 변경 시 캐시 무효화 (curate 내부에서 호출). */
+  private async invalidateVisibleCache(): Promise<void> {
+    if (!this.redis) return;
+    try {
+      await this.redis.del(VISIBLE_CACHE_KEY);
+    } catch (error) {
+      this.logger.warn(
+        `Redis del failed for ${VISIBLE_CACHE_KEY}`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   /**
@@ -60,11 +114,14 @@ export class GifticonService {
     const displayName = input.display_name?.trim()
       ? input.display_name.trim()
       : null;
-    return this.productRepository.upsertCuration({
+    const row = await this.productRepository.upsertCuration({
       smartcon_goods_id: input.goods_id,
       point_price: input.point_price,
       is_visible: input.is_visible,
       display_name: displayName,
     });
+    // 큐레이션 변경 시 사용자 노출 캐시 무효화
+    await this.invalidateVisibleCache();
+    return row;
   }
 }

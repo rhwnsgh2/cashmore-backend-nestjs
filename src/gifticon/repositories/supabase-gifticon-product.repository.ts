@@ -64,7 +64,7 @@ export class SupabaseGifticonProductRepository implements IGifticonProductReposi
         | null;
     };
 
-    return (data as unknown as Row[] | null ?? []).map((g) => {
+    return ((data as unknown as Row[] | null) ?? []).map((g) => {
       const products = g.gifticon_products;
       const p = Array.isArray(products) ? (products[0] ?? null) : products;
       return {
