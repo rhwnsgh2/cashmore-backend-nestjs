@@ -185,7 +185,9 @@ export class StubCashbackRepository implements ICashbackRepository {
 
   sumCouponExchangeSent(userId: string): Promise<number> {
     const exchanges = this.couponExchanges.get(userId) || [];
-    const sum = exchanges.reduce((acc, e) => acc + (e.amount || 0), 0);
+    const sum = exchanges
+      .filter((e) => e.send_status === 'sent')
+      .reduce((acc, e) => acc + (e.amount || 0), 0);
     return Promise.resolve(sum);
   }
 
@@ -203,7 +205,9 @@ export class StubCashbackRepository implements ICashbackRepository {
     cursor: string | null,
     limit: number,
   ): Promise<RawCouponExchange[]> {
-    const data = this.couponExchanges.get(userId) || [];
+    const data = (this.couponExchanges.get(userId) || []).filter((e) =>
+      ['pending', 'sent', 'rejected'].includes(e.send_status),
+    );
     return Promise.resolve(this.applyPagination(data, cursor, limit));
   }
 }

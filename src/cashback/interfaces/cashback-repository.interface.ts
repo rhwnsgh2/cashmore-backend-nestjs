@@ -156,6 +156,7 @@ export interface RawCouponExchange {
   amount: number;
   brand_name: string | null;
   goods_name: string | null; // display_name 우선, 없으면 원본 (repo에서 처리)
+  send_status: 'pending' | 'sent' | 'rejected';
 }
 
 // Repository 인터페이스
@@ -219,7 +220,10 @@ export interface ICashbackRepository {
     limit: number,
   ): Promise<RawCashExchange[]>;
 
-  /** send_status='sent'인 기프티콘 교환 (사용자 카탈로그 정보 JOIN). */
+  /**
+   * 기프티콘 교환 — pending(승인 대기), sent(발송 완료), rejected(어드민 거절+환불).
+   * send_failed/refunded는 제외 (스마트콘 실패로 자동 환불됐거나 사후 회수된 운영 흔적).
+   */
   findCouponExchanges(
     userId: string,
     cursor: string | null,

@@ -222,7 +222,10 @@ export class CouponExchangeService {
    * 어드민 거절 — pending만 받아 환불 후 'rejected'.
    * reason은 result_msg에 박제.
    */
-  async reject(exchangeId: number, reason?: string): Promise<CouponExchangeRow> {
+  async reject(
+    exchangeId: number,
+    reason?: string,
+  ): Promise<CouponExchangeRow> {
     const exchange = await this.couponExchangeRepository.findById(exchangeId);
     if (!exchange) {
       throw new NotFoundException(`coupon_exchanges not found: ${exchangeId}`);

@@ -462,9 +462,9 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .order('id');
       expect(pa).toHaveLength(2);
       expect(pa?.[1].point_amount).toBe(+1500);
-      expect(
-        (pa?.[1].additional_data as { reason?: string })?.reason,
-      ).toBe('admin_rejected');
+      expect((pa?.[1].additional_data as { reason?: string })?.reason).toBe(
+        'admin_rejected',
+      );
 
       expect(couponCreate).not.toHaveBeenCalled();
     });

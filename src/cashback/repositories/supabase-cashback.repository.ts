@@ -275,11 +275,12 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
         created_at,
         amount,
         smartcon_goods_id,
+        send_status,
         smartcon_goods!inner ( brand_name, goods_name )
       `,
       )
       .eq('user_id', userId)
-      .eq('send_status', 'sent')
+      .in('send_status', ['pending', 'sent', 'rejected'])
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -296,6 +297,7 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
       created_at: string;
       amount: number;
       smartcon_goods_id: string;
+      send_status: 'pending' | 'sent' | 'rejected';
       smartcon_goods: {
         brand_name: string | null;
         goods_name: string | null;
@@ -325,6 +327,7 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
       brand_name: row.smartcon_goods.brand_name,
       goods_name:
         displayMap.get(row.smartcon_goods_id) ?? row.smartcon_goods.goods_name,
+      send_status: row.send_status,
     }));
   }
 }

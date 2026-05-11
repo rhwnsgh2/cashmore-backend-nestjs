@@ -341,8 +341,7 @@ describe('Cashback API (e2e) - Real DB', () => {
         expect(response.body.nextCursor).not.toBeNull();
       });
 
-      it('기프티콘 교환(send_status=sent) → gifticonExchange로 노출, 다른 상태는 제외', async () => {
-        // smartcon_goods 시드
+      it('기프티콘 교환: pending/sent/rejected 노출, send_failed/refunded 제외', async () => {
         await supabase.from('smartcon_goods').insert([
           {
             goods_id: 'A',
@@ -355,14 +354,21 @@ describe('Cashback API (e2e) - Real DB', () => {
           {
             goods_id: 'B',
             event_id: '64385',
+            brand_name: 'BHC',
+            goods_name: '뿌링클',
+            raw_data: { GOODS_ID: 'B' },
+            is_active: true,
+          },
+          {
+            goods_id: 'C',
+            event_id: '64385',
             brand_name: '이마트24',
             goods_name: '츄파춥스',
-            raw_data: { GOODS_ID: 'B' },
+            raw_data: { GOODS_ID: 'C' },
             is_active: true,
           },
         ]);
 
-        // sent 1건 + send_failed 1건 — sent만 노출돼야
         await supabase.from('coupon_exchanges').insert([
           {
             user_id: testUser.id,
@@ -375,8 +381,24 @@ describe('Cashback API (e2e) - Real DB', () => {
           {
             user_id: testUser.id,
             point_action_id: null,
-            amount: 300,
+            amount: 2000,
             smartcon_goods_id: 'B',
+            tr_id: 'tr-pending-1',
+            send_status: 'pending',
+          },
+          {
+            user_id: testUser.id,
+            point_action_id: null,
+            amount: 1000,
+            smartcon_goods_id: 'C',
+            tr_id: 'tr-rejected-1',
+            send_status: 'rejected',
+          },
+          {
+            user_id: testUser.id,
+            point_action_id: null,
+            amount: 300,
+            smartcon_goods_id: 'C',
             tr_id: 'tr-failed-1',
             send_status: 'send_failed',
           },
@@ -387,20 +409,27 @@ describe('Cashback API (e2e) - Real DB', () => {
           .set('Authorization', `Bearer ${token}`)
           .expect(200);
 
-        const items = response.body.items as Array<{
-          type: string;
-          amount: number;
-          data: { brandName: string; goodsName: string };
-        }>;
-        const gifticonItems = items.filter(
-          (i) => i.type === 'gifticonExchange',
-        );
-        expect(gifticonItems).toHaveLength(1);
-        expect(gifticonItems[0]).toMatchObject({
-          type: 'gifticonExchange',
-          amount: -1500,
-          data: { brandName: '컴포즈커피', goodsName: '아메리카노 ICE' },
-        });
+        const gifticonItems = (
+          response.body.items as Array<{
+            type: string;
+            status?: string;
+            amount: number;
+          }>
+        )
+          .filter((i) => i.type === 'gifticonExchange')
+          .sort((a, b) => (a.status ?? '').localeCompare(b.status ?? ''));
+        expect(gifticonItems.map((i) => i.status)).toEqual([
+          'pending',
+          'rejected',
+          'sent',
+        ]);
+
+        // 합계는 sent만 반영 (received_cashback 엔드포인트)
+        const sumRes = await request(app.getHttpServer())
+          .get('/cashback/received_cashback')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+        expect(sumRes.body.receivedCashback).toBe(1500);
       });
 
       it('display_name이 있으면 goodsName으로 override된다', async () => {

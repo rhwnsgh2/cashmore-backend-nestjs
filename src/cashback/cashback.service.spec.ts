@@ -185,6 +185,7 @@ describe('CashbackService', () => {
           amount: 1500,
           brand_name: '컴포즈커피',
           goods_name: '아메리카노 ICE',
+          send_status: 'sent',
         },
         {
           id: 2,
@@ -193,6 +194,7 @@ describe('CashbackService', () => {
           amount: 2000,
           brand_name: 'BHC',
           goods_name: '뿌링클',
+          send_status: 'sent',
         },
       ]);
       repository.setCashExchanges(userId, [
@@ -783,7 +785,7 @@ describe('CashbackService', () => {
       expect(result.nextCursor).not.toBeNull();
     });
 
-    it('couponExchanges (sent)을 gifticonExchange로 변환한다', async () => {
+    it('couponExchanges (sent)을 gifticonExchange로 변환한다 (status="sent" 포함)', async () => {
       repository.setCouponExchanges(userId, [
         {
           id: 7,
@@ -792,6 +794,7 @@ describe('CashbackService', () => {
           amount: 1500,
           brand_name: '컴포즈커피',
           goods_name: '아메리카노 ICE',
+          send_status: 'sent',
         },
       ]);
 
@@ -803,8 +806,38 @@ describe('CashbackService', () => {
         type: 'gifticonExchange',
         createdAt: '2026-05-08T12:00:00Z',
         amount: -1500,
+        status: 'sent',
         data: { brandName: '컴포즈커피', goodsName: '아메리카노 ICE' },
       });
+    });
+
+    it('pending/rejected도 리스트에 노출되며 status가 그대로 전달된다', async () => {
+      repository.setCouponExchanges(userId, [
+        {
+          id: 10,
+          point_action_id: null,
+          created_at: '2026-05-10T10:00:00Z',
+          amount: 1500,
+          brand_name: '컴포즈커피',
+          goods_name: '아메리카노',
+          send_status: 'pending',
+        },
+        {
+          id: 11,
+          point_action_id: 200,
+          created_at: '2026-05-09T10:00:00Z',
+          amount: 2000,
+          brand_name: 'BHC',
+          goods_name: '뿌링클',
+          send_status: 'rejected',
+        },
+      ]);
+
+      const result = await service.getCashbackList(userId, null, 20);
+      const statuses = result.items
+        .filter((i) => i.type === 'gifticonExchange')
+        .map((i) => i.status);
+      expect(statuses).toEqual(['pending', 'rejected']);
     });
   });
 });

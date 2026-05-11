@@ -165,12 +165,13 @@ export class CashbackService {
           data: { title: item.location_info!.title },
         })),
 
-      // coupon_exchanges (기프티콘 — 'sent'만, point_actions의 GIFTICON_PURCHASE를 대체)
+      // coupon_exchanges (기프티콘 — pending/sent/rejected 노출)
       ...couponExchanges.map((item) => ({
         id: `couponExchange-${item.id}`,
         type: 'gifticonExchange' as const,
         createdAt: item.created_at,
         amount: -item.amount,
+        status: item.send_status,
         data: {
           brandName: item.brand_name,
           goodsName: item.goods_name,
