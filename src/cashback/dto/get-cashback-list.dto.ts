@@ -31,6 +31,7 @@ export class CashbackItemDto {
       'buzzvilReward',
       'invitationReceipt',
       'exchangePointToNaverpay',
+      'gifticonExchange',
     ],
   })
   type: CashbackItemType;
@@ -41,7 +42,11 @@ export class CashbackItemDto {
   @ApiProperty({ description: '금액 (포인트)', example: 100 })
   amount: number;
 
-  @ApiPropertyOptional({ description: '상태', example: 'done' })
+  @ApiPropertyOptional({
+    description:
+      '상태 — type별 의미 상이. gifticonExchange는 pending(승인 대기) / sent(발송 완료) / rejected(어드민 거절+환불).',
+    example: 'done',
+  })
   status?: string;
 
   @ApiPropertyOptional({
