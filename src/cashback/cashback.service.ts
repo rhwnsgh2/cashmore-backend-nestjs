@@ -19,12 +19,16 @@ export class CashbackService {
   async getReceivedCashback(
     userId: string,
   ): Promise<{ receivedCashback: number }> {
-    const [claimCashback, exchangeAmount] = await Promise.all([
-      this.cashbackRepository.sumCompletedClaimCashback(userId),
-      this.cashbackRepository.sumCashExchangeDone(userId),
-    ]);
+    const [claimCashback, exchangeAmount, couponExchangeAmount] =
+      await Promise.all([
+        this.cashbackRepository.sumCompletedClaimCashback(userId),
+        this.cashbackRepository.sumCashExchangeDone(userId),
+        this.cashbackRepository.sumCouponExchangeSent(userId),
+      ]);
 
-    return { receivedCashback: claimCashback + exchangeAmount };
+    return {
+      receivedCashback: claimCashback + exchangeAmount + couponExchangeAmount,
+    };
   }
 
   async getCashbackList(

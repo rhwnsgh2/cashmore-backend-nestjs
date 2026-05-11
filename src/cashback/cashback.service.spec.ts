@@ -175,6 +175,41 @@ describe('CashbackService', () => {
 
       expect(result.receivedCashback).toBe(0);
     });
+
+    it('기프티콘 교환(sent) 금액도 receivedCashback에 합산한다', async () => {
+      repository.setCouponExchanges(userId, [
+        {
+          id: 1,
+          point_action_id: 100,
+          created_at: '2026-05-08T12:00:00Z',
+          amount: 1500,
+          brand_name: '컴포즈커피',
+          goods_name: '아메리카노 ICE',
+        },
+        {
+          id: 2,
+          point_action_id: 101,
+          created_at: '2026-05-09T13:00:00Z',
+          amount: 2000,
+          brand_name: 'BHC',
+          goods_name: '뿌링클',
+        },
+      ]);
+      repository.setCashExchanges(userId, [
+        {
+          id: 1,
+          point_action_id: 200,
+          created_at: '2026-05-09T14:00:00Z',
+          amount: 5000,
+          status: 'done',
+        },
+      ]);
+
+      const result = await service.getReceivedCashback(userId);
+
+      // cash 5000 + coupon 1500 + 2000 = 8500
+      expect(result.receivedCashback).toBe(8500);
+    });
   });
 
   describe('getCashbackList', () => {

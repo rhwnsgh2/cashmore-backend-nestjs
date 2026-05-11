@@ -201,6 +201,21 @@ export class SupabaseCashbackRepository implements ICashbackRepository {
     );
   }
 
+  async sumCouponExchangeSent(userId: string): Promise<number> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('coupon_exchanges')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('send_status', 'sent');
+
+    if (error || !data) return 0;
+    return data.reduce(
+      (acc: number, row: { amount: number | null }) => acc + (row.amount ?? 0),
+      0,
+    );
+  }
+
   async findCashExchangesPaged(
     userId: string,
     cursor: string | null,

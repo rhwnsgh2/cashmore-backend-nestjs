@@ -183,6 +183,12 @@ export class StubCashbackRepository implements ICashbackRepository {
     return Promise.resolve(sum);
   }
 
+  sumCouponExchangeSent(userId: string): Promise<number> {
+    const exchanges = this.couponExchanges.get(userId) || [];
+    const sum = exchanges.reduce((acc, e) => acc + (e.amount || 0), 0);
+    return Promise.resolve(sum);
+  }
+
   findCashExchangesPaged(
     userId: string,
     cursor: string | null,

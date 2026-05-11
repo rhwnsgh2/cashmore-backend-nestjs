@@ -210,6 +210,9 @@ export interface ICashbackRepository {
 
   sumCashExchangeDone(userId: string): Promise<number>;
 
+  /** send_status='sent'인 기프티콘 교환 금액 합산. */
+  sumCouponExchangeSent(userId: string): Promise<number>;
+
   findCashExchangesPaged(
     userId: string,
     cursor: string | null,
