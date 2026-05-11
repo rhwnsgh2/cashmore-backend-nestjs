@@ -62,9 +62,7 @@ export class StubCouponExchangeRepository implements ICouponExchangeRepository {
     return this.insert(input);
   }
 
-  async findByIdempotencyKey(
-    key: string,
-  ): Promise<CouponExchangeRow | null> {
+  async findByIdempotencyKey(key: string): Promise<CouponExchangeRow | null> {
     const id = this.byIdempotencyKey.get(key);
     return id ? (this.store.get(id) ?? null) : null;
   }
@@ -104,6 +102,16 @@ export class StubCouponExchangeRepository implements ICouponExchangeRepository {
     return [...this.store.values()]
       .filter((r) => r.user_id === userId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, limit);
+  }
+
+  async findByStatus(
+    status: CouponExchangeRow['send_status'],
+    limit = 100,
+  ): Promise<CouponExchangeRow[]> {
+    return [...this.store.values()]
+      .filter((r) => r.send_status === status)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .slice(0, limit);
   }
 

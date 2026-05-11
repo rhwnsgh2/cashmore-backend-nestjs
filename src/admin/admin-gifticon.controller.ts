@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -15,6 +16,7 @@ import {
   ApiResponse,
   ApiHeader,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { GifticonService } from '../gifticon/gifticon.service';
@@ -25,7 +27,20 @@ import {
   CurationResponseDto,
   ReorderDto,
 } from '../gifticon/dto/curation.dto';
-import { OrderResponseDto } from '../gifticon/dto/order.dto';
+import {
+  AdminExchangeItemDto,
+  OrderResponseDto,
+  RejectDto,
+} from '../gifticon/dto/order.dto';
+import type { CouponExchangeStatus } from '../gifticon/interfaces/coupon-exchange-repository.interface';
+
+const VALID_STATUSES: CouponExchangeStatus[] = [
+  'pending',
+  'sent',
+  'send_failed',
+  'refunded',
+  'rejected',
+];
 
 @ApiTags('Admin - Gifticon')
 @Controller('admin/gifticon')
@@ -87,6 +102,95 @@ export class AdminGifticonController {
       is_visible: body.is_visible,
       display_name: body.display_name,
     });
+  }
+
+  @Get('exchanges')
+  @ApiOperation({
+    summary: '쿠폰 교환 목록 (status별)',
+    description:
+      'pending(승인 대기)은 오래된 순. status 미지정 시 pending. 최대 100건.',
+  })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['pending', 'sent', 'send_failed', 'refunded', 'rejected'],
+  })
+  @ApiResponse({ status: 200, type: [AdminExchangeItemDto] })
+  async listExchanges(
+    @Headers('x-admin-api-key') apiKey: string,
+    @Query('status') status?: string,
+  ): Promise<AdminExchangeItemDto[]> {
+    this.validateApiKey(apiKey);
+    const s = (status ?? 'pending') as CouponExchangeStatus;
+    if (!VALID_STATUSES.includes(s)) {
+      throw new UnauthorizedException(`invalid status: ${status}`);
+    }
+    const rows = await this.couponExchangeService.listByStatus(s);
+    return rows.map((r) => ({
+      id: r.id,
+      user_id: r.user_id,
+      amount: r.amount,
+      smartcon_goods_id: r.smartcon_goods_id,
+      tr_id: r.tr_id,
+      send_status: r.send_status,
+      barcode_num: r.barcode_num,
+      exp_date: r.exp_date,
+      result_code: r.result_code,
+      result_msg: r.result_msg,
+      created_at: r.created_at,
+    }));
+  }
+
+  @Post('approve/:id')
+  @ApiOperation({
+    summary: '쿠폰 교환 승인 (스마트콘 발송)',
+    description:
+      'pending만 받아 스마트콘 couponCreate 호출. 성공 → sent. 실패/네트워크 에러 → send_failed + 자동 환불.',
+  })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiParam({ name: 'id', description: 'coupon_exchanges.id' })
+  @ApiResponse({ status: 201, type: OrderResponseDto })
+  async approve(
+    @Headers('x-admin-api-key') apiKey: string,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<OrderResponseDto> {
+    this.validateApiKey(apiKey);
+    const exchange = await this.couponExchangeService.approve(id);
+    return {
+      id: exchange.id,
+      send_status: exchange.send_status,
+      barcode_num: exchange.barcode_num,
+      exp_date: exchange.exp_date,
+      result_code: exchange.result_code,
+      result_msg: exchange.result_msg,
+    };
+  }
+
+  @Post('reject/:id')
+  @ApiOperation({
+    summary: '쿠폰 교환 거절 (환불)',
+    description:
+      'pending만 받아 환불 + send_status=rejected. reason은 result_msg에 박제.',
+  })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiParam({ name: 'id', description: 'coupon_exchanges.id' })
+  @ApiResponse({ status: 201, type: OrderResponseDto })
+  async reject(
+    @Headers('x-admin-api-key') apiKey: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: RejectDto,
+  ): Promise<OrderResponseDto> {
+    this.validateApiKey(apiKey);
+    const exchange = await this.couponExchangeService.reject(id, body.reason);
+    return {
+      id: exchange.id,
+      send_status: exchange.send_status,
+      barcode_num: exchange.barcode_num,
+      exp_date: exchange.exp_date,
+      result_code: exchange.result_code,
+      result_msg: exchange.result_msg,
+    };
   }
 
   @Post('refund/:id')

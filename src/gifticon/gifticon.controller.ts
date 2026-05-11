@@ -37,8 +37,9 @@ export class GifticonController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '기프티콘 주문 (포인트 차감 + 스마트콘 발송)',
-    description: '실패 시 자동 환불. 응답의 send_status로 성공/실패 판단.',
+    summary: '기프티콘 주문 (포인트 차감 + 승인 대기)',
+    description:
+      '주문 즉시 포인트 차감 후 send_status=pending 상태로 어드민 승인 대기 큐에 들어감. 어드민 승인 시 스마트콘 발송, 거절 시 자동 환불.',
   })
   @ApiResponse({ status: 201, type: OrderResponseDto })
   async createOrder(

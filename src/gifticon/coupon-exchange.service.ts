@@ -130,16 +130,47 @@ export class CouponExchangeService {
       pointActionId,
     );
 
-    // 6. send_logs INSERT
+    // 6. 승인 대기 큐로 — 스마트콘 호출은 어드민 approve에서 수행.
+    //    여기서는 'pending' 상태 그대로 반환.
+    return (await this.couponExchangeRepository.findById(exchange.id))!;
+  }
+
+  /**
+   * 어드민 승인 — pending만 받아 스마트콘 발송.
+   * 성공 → 'sent' + send_logs INSERT.
+   * 스마트콘 실패/네트워크 에러 → 'send_failed' + 환불.
+   */
+  async approve(exchangeId: number): Promise<CouponExchangeRow> {
+    const exchange = await this.couponExchangeRepository.findById(exchangeId);
+    if (!exchange) {
+      throw new NotFoundException(`coupon_exchanges not found: ${exchangeId}`);
+    }
+    if (exchange.send_status !== 'pending') {
+      throw new BadRequestException(
+        `Cannot approve: status is "${exchange.send_status}"`,
+      );
+    }
+
+    const product = await this.gifticonProductRepository.findByGoodsId(
+      exchange.smartcon_goods_id,
+    );
+    const goods = await this.smartconGoodsRepository.findById(
+      exchange.smartcon_goods_id,
+    );
+    const phone = await this.userInfoService.getPhone(exchange.user_id);
+    if (!phone) {
+      throw new BadRequestException('phone not registered');
+    }
+    const displayName =
+      product?.display_name ?? goods?.goods_name ?? '기프티콘';
+
     await this.couponSendLogRepository.insert(exchange.id, phone);
 
-    // 6. 스마트콘 호출
-    const displayName = product.display_name ?? goods.goods_name ?? '기프티콘';
     try {
       const response = await this.smartconApiService.couponCreate({
-        goodsId,
+        goodsId: exchange.smartcon_goods_id,
         receiverMobile: phone,
-        trId,
+        trId: exchange.tr_id,
         title: '캐시모어 기프티콘 도착',
         contents: `[캐시모어]\n${displayName} 기프티콘이 도착했어요.`,
       });
@@ -160,28 +191,26 @@ export class CouponExchangeService {
         );
       }
 
-      // 스마트콘 실패 응답 → 환불
       this.logger.warn(
-        `couponCreate failed trId=${trId} resultCode=${response.RESULTCODE} msg=${response.RESULTMSG}`,
+        `couponCreate failed trId=${exchange.tr_id} resultCode=${response.RESULTCODE} msg=${response.RESULTMSG}`,
       );
       return await this.refundOnFailure({
-        userId,
-        amount: product.point_price,
-        originalPointActionId: pointActionId,
+        userId: exchange.user_id,
+        amount: exchange.amount,
+        originalPointActionId: exchange.point_action_id,
         exchangeId: exchange.id,
         resultCode: response.RESULTCODE,
         resultMsg: response.RESULTMSG,
       });
     } catch (error) {
-      // 네트워크 / timeout / 파싱 에러 → 환불
       this.logger.error(
-        `couponCreate threw trId=${trId}`,
+        `couponCreate threw trId=${exchange.tr_id}`,
         error instanceof Error ? error.stack : String(error),
       );
       return await this.refundOnFailure({
-        userId,
-        amount: product.point_price,
-        originalPointActionId: pointActionId,
+        userId: exchange.user_id,
+        amount: exchange.amount,
+        originalPointActionId: exchange.point_action_id,
         exchangeId: exchange.id,
         resultCode: 'NETWORK_ERROR',
         resultMsg: error instanceof Error ? error.message : String(error),
@@ -190,8 +219,47 @@ export class CouponExchangeService {
   }
 
   /**
+   * 어드민 거절 — pending만 받아 환불 후 'rejected'.
+   * reason은 result_msg에 박제.
+   */
+  async reject(exchangeId: number, reason?: string): Promise<CouponExchangeRow> {
+    const exchange = await this.couponExchangeRepository.findById(exchangeId);
+    if (!exchange) {
+      throw new NotFoundException(`coupon_exchanges not found: ${exchangeId}`);
+    }
+    if (exchange.send_status !== 'pending') {
+      throw new BadRequestException(
+        `Cannot reject: status is "${exchange.send_status}"`,
+      );
+    }
+
+    await this.pointWriteService.addPoint({
+      userId: exchange.user_id,
+      amount: exchange.amount,
+      type: POINT_TYPE,
+      additionalData: {
+        original_point_action_id: exchange.point_action_id,
+        reason: 'admin_rejected',
+      },
+    });
+
+    return this.couponExchangeRepository.updateSendResult(exchangeId, {
+      send_status: 'rejected',
+      result_code: 'ADMIN_REJECTED',
+      result_msg: reason ?? null,
+    });
+  }
+
+  async listByStatus(
+    status: CouponExchangeRow['send_status'],
+    limit = 100,
+  ): Promise<CouponExchangeRow[]> {
+    return this.couponExchangeRepository.findByStatus(status, limit);
+  }
+
+  /**
    * 어드민 수동 환불.
-   * send_status='sent' 상태만 환불 가능 (pending/send_failed/refunded는 거부).
+   * send_status='sent' 상태만 환불 가능 (pending/send_failed/refunded/rejected는 거부).
    */
   async refund(exchangeId: number): Promise<CouponExchangeRow> {
     const exchange = await this.couponExchangeRepository.findById(exchangeId);
@@ -222,7 +290,7 @@ export class CouponExchangeService {
   private async refundOnFailure(input: {
     userId: string;
     amount: number;
-    originalPointActionId: number;
+    originalPointActionId: number | null;
     exchangeId: number;
     resultCode: string;
     resultMsg: string;

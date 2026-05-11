@@ -128,4 +128,19 @@ export class SupabaseCouponExchangeRepository implements ICouponExchangeReposito
     if (error) throw error;
     return (data ?? []) as unknown as CouponExchangeRow[];
   }
+
+  async findByStatus(
+    status: CouponExchangeRow['send_status'],
+    limit = 100,
+  ): Promise<CouponExchangeRow[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('coupon_exchanges')
+      .select('*')
+      .eq('send_status', status)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as unknown as CouponExchangeRow[];
+  }
 }

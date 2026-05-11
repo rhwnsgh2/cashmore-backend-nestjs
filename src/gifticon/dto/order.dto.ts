@@ -22,9 +22,9 @@ export class OrderResponseDto {
   id!: number;
 
   @ApiProperty({
-    enum: ['pending', 'sent', 'send_failed', 'refunded'],
+    enum: ['pending', 'sent', 'send_failed', 'refunded', 'rejected'],
   })
-  send_status!: 'pending' | 'sent' | 'send_failed' | 'refunded';
+  send_status!: 'pending' | 'sent' | 'send_failed' | 'refunded' | 'rejected';
 
   @ApiProperty({ nullable: true, description: '발급된 쿠폰 바코드 번호' })
   barcode_num!: string | null;
@@ -37,4 +37,52 @@ export class OrderResponseDto {
 
   @ApiProperty({ nullable: true })
   result_msg!: string | null;
+}
+
+export class RejectDto {
+  @ApiPropertyOptional({
+    description: '거절 사유 (result_msg에 박제). 미전송 시 null.',
+    example: '재고 소진',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  reason?: string;
+}
+
+export class AdminExchangeItemDto {
+  @ApiProperty()
+  id!: number;
+
+  @ApiProperty()
+  user_id!: string;
+
+  @ApiProperty()
+  amount!: number;
+
+  @ApiProperty()
+  smartcon_goods_id!: string;
+
+  @ApiProperty()
+  tr_id!: string;
+
+  @ApiProperty({
+    enum: ['pending', 'sent', 'send_failed', 'refunded', 'rejected'],
+  })
+  send_status!: 'pending' | 'sent' | 'send_failed' | 'refunded' | 'rejected';
+
+  @ApiProperty({ nullable: true })
+  barcode_num!: string | null;
+
+  @ApiProperty({ nullable: true })
+  exp_date!: string | null;
+
+  @ApiProperty({ nullable: true })
+  result_code!: string | null;
+
+  @ApiProperty({ nullable: true })
+  result_msg!: string | null;
+
+  @ApiProperty()
+  created_at!: string;
 }

@@ -165,9 +165,9 @@ describe('CouponExchangeService', () => {
     service = module.get<CouponExchangeService>(CouponExchangeService);
   });
 
-  // === 카테고리 1: 정상 발송 ===
-  describe('정상 발송', () => {
-    it('성공 → status="sent", barcode_num/exp_date 채워짐', async () => {
+  // === 카테고리 1: 주문 생성 (pending) ===
+  describe('createOrder → pending (승인 대기)', () => {
+    it('정상: status=pending, 스마트콘 호출 X, send_logs INSERT X', async () => {
       await setupCuratedGoods();
 
       const result = await service.createOrder({
@@ -175,14 +175,16 @@ describe('CouponExchangeService', () => {
         goodsId: GOODS_ID,
       });
 
-      expect(result.send_status).toBe('sent');
-      expect(result.barcode_num).toBe('1234567890123');
-      expect(result.order_id).toBe('SC0001');
-      expect(result.exp_date).toBe('2026-06-05'); // YYYYMMDD → YYYY-MM-DD
-      expect(result.result_code).toBe('00');
+      expect(result.send_status).toBe('pending');
+      expect(result.barcode_num).toBeNull();
+      expect(result.exp_date).toBeNull();
+      expect(couponCreate).not.toHaveBeenCalled();
+
+      const logs = await sendLogRepo.findByExchangeId(result.id);
+      expect(logs).toHaveLength(0);
     });
 
-    it('point_actions 차감 행 INSERT (음수, type=GIFTICON_PURCHASE)', async () => {
+    it('차감 행 1개 INSERT (음수, type=GIFTICON_PURCHASE)', async () => {
       await setupCuratedGoods();
       await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
 
@@ -200,49 +202,6 @@ describe('CouponExchangeService', () => {
       );
     });
 
-    it('coupon_send_logs INSERT (receiver_phone = user_info.phone)', async () => {
-      await setupCuratedGoods();
-      const order = await service.createOrder({
-        userId: USER_ID,
-        goodsId: GOODS_ID,
-      });
-
-      const logs = await sendLogRepo.findByExchangeId(order.id);
-      expect(logs).toHaveLength(1);
-      expect(logs[0].receiver_phone).toBe(PHONE);
-    });
-
-    it('스마트콘에 정확한 인자 전달 (goodsId, receiverMobile, trId, title, contents)', async () => {
-      await setupCuratedGoods();
-      await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
-
-      const call = couponCreate.mock.calls[0][0];
-      expect(call.goodsId).toBe(GOODS_ID);
-      expect(call.receiverMobile).toBe(PHONE);
-      expect(call.trId).toMatch(/^cashmore\d{17}[0-9a-f]{4}$/);
-      expect(call.title).toBe('캐시모어 기프티콘 도착');
-      expect(call.contents).toContain('[캐시모어]');
-      expect(call.contents).toContain('기프티콘이 도착했어요');
-    });
-
-    it('contents에 display_name 우선 사용 (없으면 원본 goods_name)', async () => {
-      // display_name 설정
-      await setupCuratedGoods();
-      await productRepo.upsertCuration({
-        smartcon_goods_id: GOODS_ID,
-        point_price: POINT_PRICE,
-        is_visible: true,
-        display_name: '아메리카노 ICE',
-      });
-
-      await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
-
-      const call = couponCreate.mock.calls[0][0];
-      expect(call.contents).toBe(
-        '[캐시모어]\n아메리카노 ICE 기프티콘이 도착했어요.',
-      );
-    });
-
     it('coupon_exchanges.amount = 호출 시점 point_price 박제', async () => {
       await setupCuratedGoods();
       const order = await service.createOrder({
@@ -251,7 +210,6 @@ describe('CouponExchangeService', () => {
       });
 
       expect(order.amount).toBe(POINT_PRICE);
-      // 가격 변경해도 박제값 유지
       await productRepo.upsertCuration({
         smartcon_goods_id: GOODS_ID,
         point_price: 9999,
@@ -265,7 +223,6 @@ describe('CouponExchangeService', () => {
   // === 카테고리 2: 사전 검증 실패 (차감 X) ===
   describe('사전 검증 실패', () => {
     it('큐레이션 안 된 상품 → NotFoundException, 차감 X', async () => {
-      // 카탈로그만 있고 큐레이션 X
       productRepo.seedGoods([
         {
           goods_id: GOODS_ID,
@@ -333,25 +290,75 @@ describe('CouponExchangeService', () => {
     });
   });
 
-  // === 카테고리 3: 발송 실패 → 자동 환불 ===
-  describe('발송 실패 → 자동 환불', () => {
-    it('RESULTCODE=99 → 차감+환불 행, status=send_failed', async () => {
+  // === 카테고리 3: 승인 (approve) ===
+  describe('approve (어드민 승인 → 스마트콘 발송)', () => {
+    async function placePending() {
       await setupCuratedGoods();
+      return service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
+    }
+
+    it('pending → 스마트콘 호출 → sent + send_logs INSERT', async () => {
+      const order = await placePending();
+      expect(order.send_status).toBe('pending');
+
+      const result = await service.approve(order.id);
+
+      expect(result.send_status).toBe('sent');
+      expect(result.barcode_num).toBe('1234567890123');
+      expect(result.order_id).toBe('SC0001');
+      expect(result.exp_date).toBe('2026-06-05');
+      expect(result.result_code).toBe('00');
+
+      expect(couponCreate).toHaveBeenCalledTimes(1);
+      const logs = await sendLogRepo.findByExchangeId(order.id);
+      expect(logs).toHaveLength(1);
+      expect(logs[0].receiver_phone).toBe(PHONE);
+    });
+
+    it('스마트콘에 createOrder의 tr_id 그대로 사용', async () => {
+      const order = await placePending();
+      await service.approve(order.id);
+
+      const call = couponCreate.mock.calls[0][0];
+      expect(call.trId).toBe(order.tr_id);
+      expect(call.goodsId).toBe(GOODS_ID);
+      expect(call.receiverMobile).toBe(PHONE);
+    });
+
+    it('contents에 display_name 우선 사용', async () => {
+      await setupCuratedGoods();
+      await productRepo.upsertCuration({
+        smartcon_goods_id: GOODS_ID,
+        point_price: POINT_PRICE,
+        is_visible: true,
+        display_name: '아메리카노 ICE',
+      });
+      const order = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      await service.approve(order.id);
+
+      const call = couponCreate.mock.calls[0][0];
+      expect(call.contents).toBe(
+        '[캐시모어]\n아메리카노 ICE 기프티콘이 도착했어요.',
+      );
+    });
+
+    it('RESULTCODE=99 → send_failed + 자동 환불 (복원 행 INSERT)', async () => {
+      const order = await placePending();
       couponCreate.mockResolvedValueOnce({
         RESULTCODE: '99',
         RESULTMSG: '잘못된 URL 입니다.',
       });
 
-      const result = await service.createOrder({
-        userId: USER_ID,
-        goodsId: GOODS_ID,
-      });
+      const result = await service.approve(order.id);
 
       expect(result.send_status).toBe('send_failed');
       expect(result.result_code).toBe('99');
       expect(result.result_msg).toBe('잘못된 URL 입니다.');
 
-      // 차감 + 복원 두 행
+      // 차감(1) + 복원(2)
       expect(pointActions).toHaveLength(2);
       expect(pointActions[0].amount).toBe(-POINT_PRICE);
       expect(pointActions[1].amount).toBe(+POINT_PRICE);
@@ -361,14 +368,11 @@ describe('CouponExchangeService', () => {
       });
     });
 
-    it('네트워크 에러(throw) → 환불, result_code=NETWORK_ERROR', async () => {
-      await setupCuratedGoods();
+    it('네트워크 에러 → send_failed + 환불, result_code=NETWORK_ERROR', async () => {
+      const order = await placePending();
       couponCreate.mockRejectedValueOnce(new Error('connection timeout'));
 
-      const result = await service.createOrder({
-        userId: USER_ID,
-        goodsId: GOODS_ID,
-      });
+      const result = await service.approve(order.id);
 
       expect(result.send_status).toBe('send_failed');
       expect(result.result_code).toBe('NETWORK_ERROR');
@@ -377,52 +381,129 @@ describe('CouponExchangeService', () => {
       expect(pointActions[1].amount).toBe(+POINT_PRICE);
     });
 
-    it('실패해도 send_logs는 INSERT됨 (시도한 사실 기록)', async () => {
-      await setupCuratedGoods();
+    it('실패해도 send_logs는 INSERT (시도 사실 기록)', async () => {
+      const order = await placePending();
       couponCreate.mockResolvedValueOnce({
         RESULTCODE: '52',
         RESULTMSG: '수신자 번호 오류',
       });
 
-      const result = await service.createOrder({
-        userId: USER_ID,
-        goodsId: GOODS_ID,
-      });
-
+      const result = await service.approve(order.id);
       const logs = await sendLogRepo.findByExchangeId(result.id);
       expect(logs).toHaveLength(1);
-      expect(logs[0].receiver_phone).toBe(PHONE);
     });
 
-    it('환불 후 net = 0 (차감 + 복원 합)', async () => {
-      await setupCuratedGoods();
-      couponCreate.mockResolvedValueOnce({
-        RESULTCODE: '99',
-        RESULTMSG: 'fail',
-      });
+    it('이미 sent → BadRequestException (재승인 차단)', async () => {
+      const order = await placePending();
+      await service.approve(order.id);
 
-      await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
+      await expect(service.approve(order.id)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(couponCreate).toHaveBeenCalledTimes(1);
+    });
 
-      const net = pointActions.reduce((sum, p) => sum + p.amount, 0);
-      expect(net).toBe(0);
+    it('rejected → BadRequestException', async () => {
+      const order = await placePending();
+      await service.reject(order.id);
+
+      await expect(service.approve(order.id)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('미존재 id → NotFoundException', async () => {
+      await expect(service.approve(999_999)).rejects.toThrow(NotFoundException);
+    });
+
+    it('승인 시점 phone 미등록 → BadRequestException, 스마트콘 호출 X', async () => {
+      const order = await placePending();
+      getPhone.mockResolvedValueOnce(null);
+
+      await expect(service.approve(order.id)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(couponCreate).not.toHaveBeenCalled();
     });
   });
 
-  // === 카테고리 4: 어드민 환불 ===
-  describe('refund', () => {
-    async function createSentOrder() {
+  // === 카테고리 4: 거절 (reject) ===
+  describe('reject (어드민 거절 → 환불)', () => {
+    async function placePending() {
       await setupCuratedGoods();
       return service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
     }
 
+    it('pending → rejected + 복원 행, 스마트콘 호출 X', async () => {
+      const order = await placePending();
+      const result = await service.reject(order.id, '재고 소진');
+
+      expect(result.send_status).toBe('rejected');
+      expect(result.result_code).toBe('ADMIN_REJECTED');
+      expect(result.result_msg).toBe('재고 소진');
+
+      expect(pointActions).toHaveLength(2);
+      expect(pointActions[1].amount).toBe(+POINT_PRICE);
+      expect(pointActions[1].additionalData).toMatchObject({
+        original_point_action_id: pointActions[0].id,
+        reason: 'admin_rejected',
+      });
+      expect(couponCreate).not.toHaveBeenCalled();
+    });
+
+    it('reason 미전송 → result_msg = null', async () => {
+      const order = await placePending();
+      const result = await service.reject(order.id);
+      expect(result.result_msg).toBeNull();
+    });
+
+    it('net = 0 (차감 + 복원)', async () => {
+      const order = await placePending();
+      await service.reject(order.id);
+      const net = pointActions.reduce((s, p) => s + p.amount, 0);
+      expect(net).toBe(0);
+    });
+
+    it('sent → BadRequestException (이미 승인된 건은 reject 불가)', async () => {
+      const order = await placePending();
+      await service.approve(order.id);
+
+      await expect(service.reject(order.id)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('이미 rejected → BadRequestException', async () => {
+      const order = await placePending();
+      await service.reject(order.id);
+
+      await expect(service.reject(order.id)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('미존재 id → NotFoundException', async () => {
+      await expect(service.reject(999_999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // === 카테고리 5: 어드민 환불 (sent → refunded) ===
+  describe('refund (sent → refunded)', () => {
+    async function placeSentOrder() {
+      await setupCuratedGoods();
+      const o = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      return service.approve(o.id);
+    }
+
     it('"sent" → "refunded" + 복원 행', async () => {
-      const order = await createSentOrder();
+      const order = await placeSentOrder();
       expect(order.send_status).toBe('sent');
 
       const refunded = await service.refund(order.id);
-
       expect(refunded.send_status).toBe('refunded');
-      // 차감 1 + 복원 1
       expect(pointActions).toHaveLength(2);
       expect(pointActions[1]).toMatchObject({
         userId: USER_ID,
@@ -435,40 +516,50 @@ describe('CouponExchangeService', () => {
       });
     });
 
-    it('"pending" → BadRequestException', async () => {
+    it('"pending" → BadRequestException (reject로 처리해야 함)', async () => {
       await setupCuratedGoods();
-      const exchange = await exchangeRepo.insert({
-        user_id: USER_ID,
-        point_action_id: 1,
-        amount: POINT_PRICE,
-        smartcon_goods_id: GOODS_ID,
-        tr_id: 'cashmore-pending-1',
-      });
-
-      await expect(service.refund(exchange.id)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('"send_failed" → BadRequestException', async () => {
-      await setupCuratedGoods();
-      couponCreate.mockResolvedValueOnce({
-        RESULTCODE: '99',
-        RESULTMSG: 'fail',
-      });
       const order = await service.createOrder({
         userId: USER_ID,
         goodsId: GOODS_ID,
       });
-      expect(order.send_status).toBe('send_failed');
 
       await expect(service.refund(order.id)).rejects.toThrow(
         BadRequestException,
       );
     });
 
-    it('"refunded" → BadRequestException (이미 환불)', async () => {
-      const order = await createSentOrder();
+    it('"send_failed" → BadRequestException (이미 환불됨)', async () => {
+      await setupCuratedGoods();
+      const order = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      couponCreate.mockResolvedValueOnce({
+        RESULTCODE: '99',
+        RESULTMSG: 'fail',
+      });
+      await service.approve(order.id);
+
+      await expect(service.refund(order.id)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('"rejected" → BadRequestException', async () => {
+      await setupCuratedGoods();
+      const order = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      await service.reject(order.id);
+
+      await expect(service.refund(order.id)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('"refunded" → BadRequestException', async () => {
+      const order = await placeSentOrder();
       await service.refund(order.id);
 
       await expect(service.refund(order.id)).rejects.toThrow(
@@ -481,15 +572,50 @@ describe('CouponExchangeService', () => {
     });
   });
 
-  // === 카테고리 5: TR_ID ===
+  // === 카테고리 6: listByStatus (어드민 큐 조회) ===
+  describe('listByStatus', () => {
+    it('pending은 오래된 순(created_at ASC), sent/rejected는 제외', async () => {
+      await setupCuratedGoods();
+      const a = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      await new Promise((r) => setTimeout(r, 5));
+      const b = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      await new Promise((r) => setTimeout(r, 5));
+      const c = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+
+      // b는 승인 → sent, c는 거절 → rejected
+      await service.approve(b.id);
+      await service.reject(c.id);
+
+      const pending = await service.listByStatus('pending');
+      expect(pending.map((r) => r.id)).toEqual([a.id]);
+
+      const sent = await service.listByStatus('sent');
+      expect(sent.map((r) => r.id)).toEqual([b.id]);
+
+      const rejected = await service.listByStatus('rejected');
+      expect(rejected.map((r) => r.id)).toEqual([c.id]);
+    });
+  });
+
+  // === 카테고리 7: TR_ID ===
   describe('TR_ID', () => {
     it('형식: cashmore + 17자 timestamp + 4자 hex', async () => {
       await setupCuratedGoods();
-      await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
-
-      const trId = couponCreate.mock.calls[0][0].trId;
-      expect(trId).toMatch(/^cashmore\d{17}[0-9a-f]{4}$/);
-      expect(trId.length).toBeLessThanOrEqual(50);
+      const order = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      expect(order.tr_id).toMatch(/^cashmore\d{17}[0-9a-f]{4}$/);
+      expect(order.tr_id.length).toBeLessThanOrEqual(50);
     });
 
     it('동시 다중 호출 → TR_ID 모두 다름', async () => {
@@ -506,7 +632,7 @@ describe('CouponExchangeService', () => {
     });
   });
 
-  // === 카테고리 6: Idempotency Key ===
+  // === 카테고리 8: Idempotency Key ===
   describe('idempotencyKey', () => {
     const KEY = 'idem-550e8400-e29b-41d4';
 
@@ -526,27 +652,12 @@ describe('CouponExchangeService', () => {
 
       expect(second.id).toBe(first.id);
       expect(second.tr_id).toBe(first.tr_id);
-      // 차감은 1번만 (재요청은 기존 행 반환만 함)
       expect(pointActions).toHaveLength(1);
-      // 스마트콘도 1번만
-      expect(couponCreate).toHaveBeenCalledTimes(1);
+      // 승인 전이므로 스마트콘은 한 번도 호출 안됨
+      expect(couponCreate).not.toHaveBeenCalled();
     });
 
-    it('idempotencyKey 미지정 → 호출 2번 = 주문 2번 (기존 동작)', async () => {
-      await setupCuratedGoods();
-      const a = await service.createOrder({
-        userId: USER_ID,
-        goodsId: GOODS_ID,
-      });
-      const b = await service.createOrder({
-        userId: USER_ID,
-        goodsId: GOODS_ID,
-      });
-      expect(a.id).not.toBe(b.id);
-      expect(pointActions).toHaveLength(2);
-    });
-
-    it('동시 호출 (race) → 한 행만 만들어지고 차감도 1번', async () => {
+    it('동시 호출 (race) → 한 행만 만들어지고 차감 1번', async () => {
       await setupCuratedGoods();
 
       const results = await Promise.all([
@@ -570,7 +681,6 @@ describe('CouponExchangeService', () => {
       const ids = new Set(results.map((r) => r.id));
       expect(ids.size).toBe(1);
       expect(pointActions).toHaveLength(1);
-      expect(couponCreate).toHaveBeenCalledTimes(1);
     });
 
     it('coupon_exchanges.idempotency_key 컬럼에 키 박제', async () => {
@@ -599,18 +709,14 @@ describe('CouponExchangeService', () => {
       expect(pointActions).toHaveLength(2);
     });
 
-    it('첫 요청 실패(send_failed) 후 재요청 → 실패한 행 그대로 반환 (재시도 X)', async () => {
+    it('승인 후 같은 키 재요청 → 기존 sent 행 그대로 반환', async () => {
       await setupCuratedGoods();
-      couponCreate.mockResolvedValueOnce({
-        RESULTCODE: '99',
-        RESULTMSG: 'fail',
-      });
       const first = await service.createOrder({
         userId: USER_ID,
         goodsId: GOODS_ID,
         idempotencyKey: KEY,
       });
-      expect(first.send_status).toBe('send_failed');
+      await service.approve(first.id);
 
       const second = await service.createOrder({
         userId: USER_ID,
@@ -618,7 +724,7 @@ describe('CouponExchangeService', () => {
         idempotencyKey: KEY,
       });
       expect(second.id).toBe(first.id);
-      expect(second.send_status).toBe('send_failed');
+      expect(second.send_status).toBe('sent');
       expect(couponCreate).toHaveBeenCalledTimes(1);
     });
   });

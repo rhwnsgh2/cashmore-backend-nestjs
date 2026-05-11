@@ -98,6 +98,24 @@ describe('Gifticon Order (e2e) - Real DB', () => {
     });
   });
 
+  async function seedReady() {
+    await seedGoodsAndCuration(supabase, 'A', 1500);
+    await setPhone(supabase, testUser.id, '01012345678');
+    await createPointActions(supabase, [
+      { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
+    ]);
+  }
+
+  async function placeOrder(): Promise<{ id: number; send_status: string }> {
+    const res = await request(app.getHttpServer())
+      .post('/gifticon/order')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ goodsId: 'A' })
+      .expect(201);
+    return res.body;
+  }
+
+  // === POST /gifticon/order — 차감 + pending ===
   describe('POST /gifticon/order', () => {
     it('인증 없음 → 401', async () => {
       await request(app.getHttpServer())
@@ -106,12 +124,8 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .expect(401);
     });
 
-    it('정상: status=sent + 포인트 차감 + send_logs 기록', async () => {
-      await seedGoodsAndCuration(supabase, 'A', 1500);
-      await setPhone(supabase, testUser.id, '01012345678');
-      await createPointActions(supabase, [
-        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-      ]);
+    it('정상: status=pending, 스마트콘 호출 X, send_logs 없음, 차감 1번', async () => {
+      await seedReady();
 
       const response = await request(app.getHttpServer())
         .post('/gifticon/order')
@@ -119,29 +133,23 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .send({ goodsId: 'A' })
         .expect(201);
 
-      expect(response.body).toMatchObject({
-        send_status: 'sent',
-        barcode_num: '1234567890123',
-        exp_date: '2026-06-05',
-        result_code: '00',
-      });
+      expect(response.body.send_status).toBe('pending');
+      expect(response.body.barcode_num).toBeNull();
+      expect(couponCreate).not.toHaveBeenCalled();
 
-      // 차감 행 확인
       const { data: pa } = await supabase
         .from('point_actions')
-        .select('point_amount, type, additional_data')
+        .select('point_amount')
         .eq('user_id', testUser.id)
         .eq('type', 'GIFTICON_PURCHASE');
       expect(pa).toHaveLength(1);
       expect(pa?.[0].point_amount).toBe(-1500);
 
-      // send_logs 확인
       const { data: logs } = await supabase
         .from('coupon_send_logs')
-        .select('receiver_phone')
+        .select('id')
         .eq('exchange_id', response.body.id);
-      expect(logs).toHaveLength(1);
-      expect(logs?.[0].receiver_phone).toBe('01012345678');
+      expect(logs).toHaveLength(0);
     });
 
     it('포인트 부족 → 400, 차감 없음', async () => {
@@ -206,44 +214,8 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .expect(404);
     });
 
-    it('스마트콘 RESULTCODE=99 → status=send_failed + 자동 환불', async () => {
-      await seedGoodsAndCuration(supabase, 'A', 1500);
-      await setPhone(supabase, testUser.id, '01012345678');
-      await createPointActions(supabase, [
-        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-      ]);
-      couponCreate.mockResolvedValueOnce({
-        RESULTCODE: '99',
-        RESULTMSG: '잘못된 URL 입니다.',
-      });
-
-      const response = await request(app.getHttpServer())
-        .post('/gifticon/order')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ goodsId: 'A' })
-        .expect(201);
-
-      expect(response.body.send_status).toBe('send_failed');
-      expect(response.body.result_code).toBe('99');
-
-      // 차감 + 복원 두 행
-      const { data: pa } = await supabase
-        .from('point_actions')
-        .select('point_amount')
-        .eq('user_id', testUser.id)
-        .eq('type', 'GIFTICON_PURCHASE')
-        .order('id');
-      expect(pa).toHaveLength(2);
-      expect(pa?.[0].point_amount).toBe(-1500);
-      expect(pa?.[1].point_amount).toBe(+1500);
-    });
-
     it('idempotencyKey: 같은 키로 2번 호출 → 같은 row, 차감 1번', async () => {
-      await seedGoodsAndCuration(supabase, 'A', 1500);
-      await setPhone(supabase, testUser.id, '01012345678');
-      await createPointActions(supabase, [
-        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-      ]);
+      await seedReady();
 
       const key = `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -267,15 +239,11 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .eq('type', 'GIFTICON_PURCHASE');
       expect(pa).toHaveLength(1);
 
-      expect(couponCreate).toHaveBeenCalledTimes(1);
+      expect(couponCreate).not.toHaveBeenCalled();
     });
 
     it('idempotencyKey: 동시 5번 호출 (race) → 한 row, 차감 1번', async () => {
-      await seedGoodsAndCuration(supabase, 'A', 1500);
-      await setPhone(supabase, testUser.id, '01012345678');
-      await createPointActions(supabase, [
-        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-      ]);
+      await seedReady();
 
       const key = `race-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -308,11 +276,7 @@ describe('Gifticon Order (e2e) - Real DB', () => {
     });
 
     it('idempotencyKey 미지정: 2번 호출 → 주문 2번 (기존 동작)', async () => {
-      await seedGoodsAndCuration(supabase, 'A', 1500);
-      await setPhone(supabase, testUser.id, '01012345678');
-      await createPointActions(supabase, [
-        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-      ]);
+      await seedReady();
 
       const a = await request(app.getHttpServer())
         .post('/gifticon/order')
@@ -326,39 +290,248 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .expect(201);
       expect(a.body.id).not.toBe(b.body.id);
     });
+  });
 
-    it('네트워크 에러 → status=send_failed + 환불, result_code=NETWORK_ERROR', async () => {
-      await seedGoodsAndCuration(supabase, 'A', 1500);
-      await setPhone(supabase, testUser.id, '01012345678');
-      await createPointActions(supabase, [
-        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-      ]);
-      couponCreate.mockRejectedValueOnce(new Error('connection timeout'));
+  // === GET /admin/gifticon/exchanges ===
+  describe('GET /admin/gifticon/exchanges', () => {
+    it('잘못된 API 키 → 401', async () => {
+      await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges')
+        .set('x-admin-api-key', 'wrong')
+        .expect(401);
+    });
 
-      const response = await request(app.getHttpServer())
-        .post('/gifticon/order')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ goodsId: 'A' })
+    it('status 미지정 → pending만, 오래된 순', async () => {
+      await seedReady();
+      const a = await placeOrder();
+      await new Promise((r) => setTimeout(r, 10));
+      const b = await placeOrder();
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(200);
+
+      expect(res.body.map((r: { id: number }) => r.id)).toEqual([a.id, b.id]);
+    });
+
+    it('status=sent 필터', async () => {
+      await seedReady();
+      const a = await placeOrder();
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${a.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
-      expect(response.body.send_status).toBe('send_failed');
-      expect(response.body.result_code).toBe('NETWORK_ERROR');
+      const res = await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges?status=sent')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(200);
+
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].send_status).toBe('sent');
     });
   });
 
-  describe('POST /admin/gifticon/refund/:id', () => {
-    async function placeSentOrder() {
-      await seedGoodsAndCuration(supabase, 'A', 1500);
-      await setPhone(supabase, testUser.id, '01012345678');
-      await createPointActions(supabase, [
-        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-      ]);
-      const response = await request(app.getHttpServer())
-        .post('/gifticon/order')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ goodsId: 'A' })
+  // === POST /admin/gifticon/approve/:id ===
+  describe('POST /admin/gifticon/approve/:id', () => {
+    it('잘못된 API 키 → 401', async () => {
+      await request(app.getHttpServer())
+        .post('/admin/gifticon/approve/1')
+        .set('x-admin-api-key', 'wrong')
+        .expect(401);
+    });
+
+    it('pending → sent + send_logs INSERT', async () => {
+      await seedReady();
+      const order = await placeOrder();
+
+      const res = await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
-      return response.body as { id: number; send_status: string };
+
+      expect(res.body).toMatchObject({
+        send_status: 'sent',
+        barcode_num: '1234567890123',
+        exp_date: '2026-06-05',
+        result_code: '00',
+      });
+      expect(couponCreate).toHaveBeenCalledTimes(1);
+
+      const { data: logs } = await supabase
+        .from('coupon_send_logs')
+        .select('receiver_phone')
+        .eq('exchange_id', order.id);
+      expect(logs).toHaveLength(1);
+      expect(logs?.[0].receiver_phone).toBe('01012345678');
+    });
+
+    it('RESULTCODE=99 → send_failed + 자동 환불', async () => {
+      await seedReady();
+      const order = await placeOrder();
+      couponCreate.mockResolvedValueOnce({
+        RESULTCODE: '99',
+        RESULTMSG: '잘못된 URL 입니다.',
+      });
+
+      const res = await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(201);
+
+      expect(res.body.send_status).toBe('send_failed');
+      expect(res.body.result_code).toBe('99');
+
+      const { data: pa } = await supabase
+        .from('point_actions')
+        .select('point_amount')
+        .eq('user_id', testUser.id)
+        .eq('type', 'GIFTICON_PURCHASE')
+        .order('id');
+      expect(pa).toHaveLength(2);
+      expect(pa?.[0].point_amount).toBe(-1500);
+      expect(pa?.[1].point_amount).toBe(+1500);
+    });
+
+    it('네트워크 에러 → send_failed + 환불, result_code=NETWORK_ERROR', async () => {
+      await seedReady();
+      const order = await placeOrder();
+      couponCreate.mockRejectedValueOnce(new Error('connection timeout'));
+
+      const res = await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(201);
+
+      expect(res.body.send_status).toBe('send_failed');
+      expect(res.body.result_code).toBe('NETWORK_ERROR');
+    });
+
+    it('이미 sent → 400', async () => {
+      await seedReady();
+      const order = await placeOrder();
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(400);
+    });
+
+    it('미존재 id → 404', async () => {
+      await request(app.getHttpServer())
+        .post('/admin/gifticon/approve/999999')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(404);
+    });
+  });
+
+  // === POST /admin/gifticon/reject/:id ===
+  describe('POST /admin/gifticon/reject/:id', () => {
+    it('잘못된 API 키 → 401', async () => {
+      await request(app.getHttpServer())
+        .post('/admin/gifticon/reject/1')
+        .set('x-admin-api-key', 'wrong')
+        .send({})
+        .expect(401);
+    });
+
+    it('pending → rejected + 환불, reason은 result_msg에 박제', async () => {
+      await seedReady();
+      const order = await placeOrder();
+
+      const res = await request(app.getHttpServer())
+        .post(`/admin/gifticon/reject/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({ reason: '재고 소진' })
+        .expect(201);
+
+      expect(res.body.send_status).toBe('rejected');
+      expect(res.body.result_code).toBe('ADMIN_REJECTED');
+      expect(res.body.result_msg).toBe('재고 소진');
+
+      const { data: pa } = await supabase
+        .from('point_actions')
+        .select('point_amount, additional_data')
+        .eq('user_id', testUser.id)
+        .eq('type', 'GIFTICON_PURCHASE')
+        .order('id');
+      expect(pa).toHaveLength(2);
+      expect(pa?.[1].point_amount).toBe(+1500);
+      expect(
+        (pa?.[1].additional_data as { reason?: string })?.reason,
+      ).toBe('admin_rejected');
+
+      expect(couponCreate).not.toHaveBeenCalled();
+    });
+
+    it('reason 미전송 → result_msg = null', async () => {
+      await seedReady();
+      const order = await placeOrder();
+
+      const res = await request(app.getHttpServer())
+        .post(`/admin/gifticon/reject/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({})
+        .expect(201);
+
+      expect(res.body.result_msg).toBeNull();
+    });
+
+    it('sent → 400 (이미 발송된 건은 reject 불가)', async () => {
+      await seedReady();
+      const order = await placeOrder();
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/reject/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({})
+        .expect(400);
+    });
+
+    it('이미 rejected → 400', async () => {
+      await seedReady();
+      const order = await placeOrder();
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/reject/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({})
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/reject/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({})
+        .expect(400);
+    });
+
+    it('미존재 id → 404', async () => {
+      await request(app.getHttpServer())
+        .post('/admin/gifticon/reject/999999')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .send({})
+        .expect(404);
+    });
+  });
+
+  // === POST /admin/gifticon/refund/:id (sent → refunded) ===
+  describe('POST /admin/gifticon/refund/:id', () => {
+    async function placeSent() {
+      await seedReady();
+      const order = await placeOrder();
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(201);
+      return order;
     }
 
     it('잘못된 API 키 → 401', async () => {
@@ -368,16 +541,15 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .expect(401);
     });
 
-    it('"sent" → "refunded" + 복원 행 INSERT', async () => {
-      const order = await placeSentOrder();
-      expect(order.send_status).toBe('sent');
+    it('sent → refunded + 복원 행', async () => {
+      const order = await placeSent();
 
-      const response = await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .post(`/admin/gifticon/refund/${order.id}`)
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(201);
 
-      expect(response.body.send_status).toBe('refunded');
+      expect(res.body.send_status).toBe('refunded');
 
       const { data: pa } = await supabase
         .from('point_actions')
@@ -392,23 +564,27 @@ describe('Gifticon Order (e2e) - Real DB', () => {
       );
     });
 
-    it('"send_failed" → 400', async () => {
-      await seedGoodsAndCuration(supabase, 'A', 1500);
-      await setPhone(supabase, testUser.id, '01012345678');
-      await createPointActions(supabase, [
-        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-      ]);
+    it('pending → 400 (reject로 처리해야 함)', async () => {
+      await seedReady();
+      const order = await placeOrder();
+
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/refund/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(400);
+    });
+
+    it('send_failed → 400', async () => {
+      await seedReady();
+      const order = await placeOrder();
       couponCreate.mockResolvedValueOnce({
         RESULTCODE: '99',
         RESULTMSG: 'fail',
       });
-      const order = (
-        await request(app.getHttpServer())
-          .post('/gifticon/order')
-          .set('Authorization', `Bearer ${authToken}`)
-          .send({ goodsId: 'A' })
-          .expect(201)
-      ).body as { id: number };
+      await request(app.getHttpServer())
+        .post(`/admin/gifticon/approve/${order.id}`)
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(201);
 
       await request(app.getHttpServer())
         .post(`/admin/gifticon/refund/${order.id}`)
@@ -417,7 +593,7 @@ describe('Gifticon Order (e2e) - Real DB', () => {
     });
 
     it('이미 refunded → 400', async () => {
-      const order = await placeSentOrder();
+      const order = await placeSent();
       await request(app.getHttpServer())
         .post(`/admin/gifticon/refund/${order.id}`)
         .set('x-admin-api-key', ADMIN_API_KEY)

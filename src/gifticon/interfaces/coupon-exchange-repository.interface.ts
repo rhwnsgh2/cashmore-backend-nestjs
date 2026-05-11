@@ -10,11 +10,13 @@ export interface CouponExchangeRow {
   exp_date: string | null;
   result_code: string | null;
   result_msg: string | null;
-  send_status: 'pending' | 'sent' | 'send_failed' | 'refunded';
+  send_status: 'pending' | 'sent' | 'send_failed' | 'refunded' | 'rejected';
   idempotency_key: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export type CouponExchangeStatus = CouponExchangeRow['send_status'];
 
 export interface CouponExchangeInsertInput {
   user_id: string;
@@ -30,7 +32,7 @@ export interface CouponExchangeUpdatePointActionInput {
 }
 
 export interface CouponExchangeUpdateInput {
-  send_status: 'sent' | 'send_failed' | 'refunded';
+  send_status: 'sent' | 'send_failed' | 'refunded' | 'rejected';
   order_id?: string | null;
   barcode_num?: string | null;
   exp_date?: string | null; // YYYY-MM-DD
@@ -64,6 +66,12 @@ export interface ICouponExchangeRepository {
 
   findById(id: number): Promise<CouponExchangeRow | null>;
   findByUserId(userId: string, limit?: number): Promise<CouponExchangeRow[]>;
+
+  /** 어드민용 status별 조회 (오래된 것부터 — 승인 큐는 FIFO). */
+  findByStatus(
+    status: CouponExchangeStatus,
+    limit?: number,
+  ): Promise<CouponExchangeRow[]>;
 }
 
 export const COUPON_EXCHANGE_REPOSITORY = Symbol('COUPON_EXCHANGE_REPOSITORY');
