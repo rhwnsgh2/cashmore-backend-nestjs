@@ -12,9 +12,17 @@ export class StubCouponExchangeRepository implements ICouponExchangeRepository {
   private byTrId = new Map<string, number>();
   private nextId = 1;
 
+  private byIdempotencyKey = new Map<string, number>();
+
   async insert(input: CouponExchangeInsertInput): Promise<CouponExchangeRow> {
     if (this.byTrId.has(input.tr_id)) {
       throw new Error(`duplicate tr_id: ${input.tr_id}`);
+    }
+    if (
+      input.idempotency_key &&
+      this.byIdempotencyKey.has(input.idempotency_key)
+    ) {
+      throw new Error(`duplicate idempotency_key: ${input.idempotency_key}`);
     }
     const now = new Date().toISOString();
     const row: CouponExchangeRow = {
@@ -30,11 +38,45 @@ export class StubCouponExchangeRepository implements ICouponExchangeRepository {
       result_code: null,
       result_msg: null,
       send_status: 'pending',
+      idempotency_key: input.idempotency_key ?? null,
       created_at: now,
       updated_at: now,
     };
     this.store.set(row.id, row);
     this.byTrId.set(input.tr_id, row.id);
+    if (input.idempotency_key) {
+      this.byIdempotencyKey.set(input.idempotency_key, row.id);
+    }
+    return row;
+  }
+
+  async insertOrConflict(
+    input: CouponExchangeInsertInput,
+  ): Promise<CouponExchangeRow | null> {
+    if (
+      input.idempotency_key &&
+      this.byIdempotencyKey.has(input.idempotency_key)
+    ) {
+      return null;
+    }
+    return this.insert(input);
+  }
+
+  async findByIdempotencyKey(
+    key: string,
+  ): Promise<CouponExchangeRow | null> {
+    const id = this.byIdempotencyKey.get(key);
+    return id ? (this.store.get(id) ?? null) : null;
+  }
+
+  async updatePointActionId(
+    id: number,
+    pointActionId: number,
+  ): Promise<CouponExchangeRow> {
+    const row = this.store.get(id);
+    if (!row) throw new Error(`coupon_exchanges row not found: ${id}`);
+    row.point_action_id = pointActionId;
+    row.updated_at = new Date().toISOString();
     return row;
   }
 
@@ -68,6 +110,7 @@ export class StubCouponExchangeRepository implements ICouponExchangeRepository {
   clear(): void {
     this.store.clear();
     this.byTrId.clear();
+    this.byIdempotencyKey.clear();
     this.nextId = 1;
   }
 }

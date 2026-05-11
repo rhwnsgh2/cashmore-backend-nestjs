@@ -57,8 +57,18 @@ export class CouponExchangeService {
   async createOrder(input: {
     userId: string;
     goodsId: string;
+    idempotencyKey?: string;
   }): Promise<CouponExchangeRow> {
-    const { userId, goodsId } = input;
+    const { userId, goodsId, idempotencyKey } = input;
+
+    // 0. idempotency 사전 조회 — 같은 키로 이미 처리된 주문이면 즉시 반환
+    if (idempotencyKey) {
+      const existing =
+        await this.couponExchangeRepository.findByIdempotencyKey(
+          idempotencyKey,
+        );
+      if (existing) return existing;
+    }
 
     // 1. 사전 검증
     const product = await this.gifticonProductRepository.findByGoodsId(goodsId);
@@ -84,7 +94,29 @@ export class CouponExchangeService {
     // 2. TR_ID 생성
     const trId = generateTrId();
 
-    // 3. 차감
+    // 3. coupon_exchanges INSERT 먼저 (idempotency_key UNIQUE로 race 차단)
+    //    point_action_id는 일단 null, 차감 후 update.
+    const exchange = await this.couponExchangeRepository.insertOrConflict({
+      user_id: userId,
+      point_action_id: null,
+      amount: product.point_price,
+      smartcon_goods_id: goodsId,
+      tr_id: trId,
+      idempotency_key: idempotencyKey ?? null,
+    });
+
+    // 동시 요청으로 UNIQUE 충돌이면 → 다른 요청이 만든 행 반환
+    if (!exchange) {
+      const existing = idempotencyKey
+        ? await this.couponExchangeRepository.findByIdempotencyKey(
+            idempotencyKey,
+          )
+        : null;
+      if (existing) return existing;
+      throw new BadRequestException('Duplicate order request');
+    }
+
+    // 4. 차감
     const { id: pointActionId } = await this.pointWriteService.addPoint({
       userId,
       amount: -product.point_price,
@@ -92,16 +124,13 @@ export class CouponExchangeService {
       additionalData: { goods_id: goodsId, tr_id: trId },
     });
 
-    // 4. coupon_exchanges INSERT
-    const exchange = await this.couponExchangeRepository.insert({
-      user_id: userId,
-      point_action_id: pointActionId,
-      amount: product.point_price,
-      smartcon_goods_id: goodsId,
-      tr_id: trId,
-    });
+    // 5. 차감 결과를 coupon_exchanges에 연결
+    await this.couponExchangeRepository.updatePointActionId(
+      exchange.id,
+      pointActionId,
+    );
 
-    // 5. send_logs INSERT
+    // 6. send_logs INSERT
     await this.couponSendLogRepository.insert(exchange.id, phone);
 
     // 6. 스마트콘 호출

@@ -1,10 +1,20 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateOrderDto {
   @ApiProperty({ description: '스마트콘 GOODS_ID', example: '0000128425' })
   @IsString()
   goodsId!: string;
+
+  @ApiPropertyOptional({
+    description:
+      '중복 요청 방지용 idempotency key. 같은 키로 재요청 시 기존 주문 그대로 반환.',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  idempotencyKey?: string;
 }
 
 export class OrderResponseDto {

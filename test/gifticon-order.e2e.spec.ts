@@ -238,6 +238,95 @@ describe('Gifticon Order (e2e) - Real DB', () => {
       expect(pa?.[1].point_amount).toBe(+1500);
     });
 
+    it('idempotencyKey: 같은 키로 2번 호출 → 같은 row, 차감 1번', async () => {
+      await seedGoodsAndCuration(supabase, 'A', 1500);
+      await setPhone(supabase, testUser.id, '01012345678');
+      await createPointActions(supabase, [
+        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
+      ]);
+
+      const key = `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const first = await request(app.getHttpServer())
+        .post('/gifticon/order')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ goodsId: 'A', idempotencyKey: key })
+        .expect(201);
+      const second = await request(app.getHttpServer())
+        .post('/gifticon/order')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ goodsId: 'A', idempotencyKey: key })
+        .expect(201);
+
+      expect(second.body.id).toBe(first.body.id);
+
+      const { data: pa } = await supabase
+        .from('point_actions')
+        .select('id')
+        .eq('user_id', testUser.id)
+        .eq('type', 'GIFTICON_PURCHASE');
+      expect(pa).toHaveLength(1);
+
+      expect(couponCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('idempotencyKey: 동시 5번 호출 (race) → 한 row, 차감 1번', async () => {
+      await seedGoodsAndCuration(supabase, 'A', 1500);
+      await setPhone(supabase, testUser.id, '01012345678');
+      await createPointActions(supabase, [
+        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
+      ]);
+
+      const key = `race-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const responses = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          request(app.getHttpServer())
+            .post('/gifticon/order')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({ goodsId: 'A', idempotencyKey: key }),
+        ),
+      );
+      for (const r of responses) {
+        expect(r.status).toBe(201);
+      }
+      const ids = new Set(responses.map((r) => r.body.id));
+      expect(ids.size).toBe(1);
+
+      const { data: pa } = await supabase
+        .from('point_actions')
+        .select('id')
+        .eq('user_id', testUser.id)
+        .eq('type', 'GIFTICON_PURCHASE');
+      expect(pa).toHaveLength(1);
+
+      const { data: exchanges } = await supabase
+        .from('coupon_exchanges')
+        .select('id')
+        .eq('idempotency_key', key);
+      expect(exchanges).toHaveLength(1);
+    });
+
+    it('idempotencyKey 미지정: 2번 호출 → 주문 2번 (기존 동작)', async () => {
+      await seedGoodsAndCuration(supabase, 'A', 1500);
+      await setPhone(supabase, testUser.id, '01012345678');
+      await createPointActions(supabase, [
+        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
+      ]);
+
+      const a = await request(app.getHttpServer())
+        .post('/gifticon/order')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ goodsId: 'A' })
+        .expect(201);
+      const b = await request(app.getHttpServer())
+        .post('/gifticon/order')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ goodsId: 'A' })
+        .expect(201);
+      expect(a.body.id).not.toBe(b.body.id);
+    });
+
     it('네트워크 에러 → status=send_failed + 환불, result_code=NETWORK_ERROR', async () => {
       await seedGoodsAndCuration(supabase, 'A', 1500);
       await setPhone(supabase, testUser.id, '01012345678');

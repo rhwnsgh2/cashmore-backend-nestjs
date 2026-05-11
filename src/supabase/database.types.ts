@@ -819,6 +819,7 @@ export type Database = {
           created_at: string
           exp_date: string | null
           id: number
+          idempotency_key: string | null
           order_id: string | null
           point_action_id: number | null
           result_code: string | null
@@ -835,6 +836,7 @@ export type Database = {
           created_at?: string
           exp_date?: string | null
           id?: number
+          idempotency_key?: string | null
           order_id?: string | null
           point_action_id?: number | null
           result_code?: string | null
@@ -851,6 +853,7 @@ export type Database = {
           created_at?: string
           exp_date?: string | null
           id?: number
+          idempotency_key?: string | null
           order_id?: string | null
           point_action_id?: number | null
           result_code?: string | null

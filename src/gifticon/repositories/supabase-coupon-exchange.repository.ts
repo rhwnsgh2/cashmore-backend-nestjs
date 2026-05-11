@@ -23,7 +23,59 @@ export class SupabaseCouponExchangeRepository implements ICouponExchangeReposito
         amount: input.amount,
         smartcon_goods_id: input.smartcon_goods_id,
         tr_id: input.tr_id,
+        idempotency_key: input.idempotency_key ?? null,
       })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as unknown as CouponExchangeRow;
+  }
+
+  async insertOrConflict(
+    input: CouponExchangeInsertInput,
+  ): Promise<CouponExchangeRow | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('coupon_exchanges')
+      .insert({
+        user_id: input.user_id,
+        point_action_id: input.point_action_id,
+        amount: input.amount,
+        smartcon_goods_id: input.smartcon_goods_id,
+        tr_id: input.tr_id,
+        idempotency_key: input.idempotency_key ?? null,
+      })
+      .select()
+      .single();
+    if (error) {
+      // PostgreSQL 23505 = unique_violation
+      if ((error as { code?: string }).code === '23505') return null;
+      throw error;
+    }
+    return data as unknown as CouponExchangeRow;
+  }
+
+  async findByIdempotencyKey(key: string): Promise<CouponExchangeRow | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('coupon_exchanges')
+      .select('*')
+      .eq('idempotency_key', key)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as unknown as CouponExchangeRow | null;
+  }
+
+  async updatePointActionId(
+    id: number,
+    pointActionId: number,
+  ): Promise<CouponExchangeRow> {
+    const now = new Date().toISOString();
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('coupon_exchanges')
+      .update({ point_action_id: pointActionId, updated_at: now })
+      .eq('id', id)
       .select()
       .single();
     if (error) throw error;

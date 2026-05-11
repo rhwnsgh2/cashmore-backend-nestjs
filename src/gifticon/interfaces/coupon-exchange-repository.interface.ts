@@ -11,6 +11,7 @@ export interface CouponExchangeRow {
   result_code: string | null;
   result_msg: string | null;
   send_status: 'pending' | 'sent' | 'send_failed' | 'refunded';
+  idempotency_key: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +22,11 @@ export interface CouponExchangeInsertInput {
   amount: number;
   smartcon_goods_id: string;
   tr_id: string;
+  idempotency_key?: string | null;
+}
+
+export interface CouponExchangeUpdatePointActionInput {
+  point_action_id: number;
 }
 
 export interface CouponExchangeUpdateInput {
@@ -34,10 +40,28 @@ export interface CouponExchangeUpdateInput {
 
 export interface ICouponExchangeRepository {
   insert(input: CouponExchangeInsertInput): Promise<CouponExchangeRow>;
+
+  /**
+   * INSERT 시 idempotency_key UNIQUE 충돌이면 null 반환 (호출자가 findByIdempotencyKey로 재조회).
+   * idempotency_key가 null이면 일반 insert와 동일.
+   */
+  insertOrConflict(
+    input: CouponExchangeInsertInput,
+  ): Promise<CouponExchangeRow | null>;
+
+  findByIdempotencyKey(key: string): Promise<CouponExchangeRow | null>;
+
   updateSendResult(
     id: number,
     patch: CouponExchangeUpdateInput,
   ): Promise<CouponExchangeRow>;
+
+  /** 차감 후 point_action_id를 채워넣기. */
+  updatePointActionId(
+    id: number,
+    pointActionId: number,
+  ): Promise<CouponExchangeRow>;
+
   findById(id: number): Promise<CouponExchangeRow | null>;
   findByUserId(userId: string, limit?: number): Promise<CouponExchangeRow[]>;
 }

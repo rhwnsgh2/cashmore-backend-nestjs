@@ -505,4 +505,121 @@ describe('CouponExchangeService', () => {
       expect(new Set(trIds).size).toBe(3);
     });
   });
+
+  // === 카테고리 6: Idempotency Key ===
+  describe('idempotencyKey', () => {
+    const KEY = 'idem-550e8400-e29b-41d4';
+
+    it('같은 키로 두 번 호출 → 같은 행 반환, 차감 1번만', async () => {
+      await setupCuratedGoods();
+
+      const first = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+        idempotencyKey: KEY,
+      });
+      const second = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+        idempotencyKey: KEY,
+      });
+
+      expect(second.id).toBe(first.id);
+      expect(second.tr_id).toBe(first.tr_id);
+      // 차감은 1번만 (재요청은 기존 행 반환만 함)
+      expect(pointActions).toHaveLength(1);
+      // 스마트콘도 1번만
+      expect(couponCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('idempotencyKey 미지정 → 호출 2번 = 주문 2번 (기존 동작)', async () => {
+      await setupCuratedGoods();
+      const a = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      const b = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+      });
+      expect(a.id).not.toBe(b.id);
+      expect(pointActions).toHaveLength(2);
+    });
+
+    it('동시 호출 (race) → 한 행만 만들어지고 차감도 1번', async () => {
+      await setupCuratedGoods();
+
+      const results = await Promise.all([
+        service.createOrder({
+          userId: USER_ID,
+          goodsId: GOODS_ID,
+          idempotencyKey: KEY,
+        }),
+        service.createOrder({
+          userId: USER_ID,
+          goodsId: GOODS_ID,
+          idempotencyKey: KEY,
+        }),
+        service.createOrder({
+          userId: USER_ID,
+          goodsId: GOODS_ID,
+          idempotencyKey: KEY,
+        }),
+      ]);
+
+      const ids = new Set(results.map((r) => r.id));
+      expect(ids.size).toBe(1);
+      expect(pointActions).toHaveLength(1);
+      expect(couponCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('coupon_exchanges.idempotency_key 컬럼에 키 박제', async () => {
+      await setupCuratedGoods();
+      const order = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+        idempotencyKey: KEY,
+      });
+      expect(order.idempotency_key).toBe(KEY);
+    });
+
+    it('다른 키 → 서로 다른 주문', async () => {
+      await setupCuratedGoods();
+      const a = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+        idempotencyKey: 'k1',
+      });
+      const b = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+        idempotencyKey: 'k2',
+      });
+      expect(a.id).not.toBe(b.id);
+      expect(pointActions).toHaveLength(2);
+    });
+
+    it('첫 요청 실패(send_failed) 후 재요청 → 실패한 행 그대로 반환 (재시도 X)', async () => {
+      await setupCuratedGoods();
+      couponCreate.mockResolvedValueOnce({
+        RESULTCODE: '99',
+        RESULTMSG: 'fail',
+      });
+      const first = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+        idempotencyKey: KEY,
+      });
+      expect(first.send_status).toBe('send_failed');
+
+      const second = await service.createOrder({
+        userId: USER_ID,
+        goodsId: GOODS_ID,
+        idempotencyKey: KEY,
+      });
+      expect(second.id).toBe(first.id);
+      expect(second.send_status).toBe('send_failed');
+      expect(couponCreate).toHaveBeenCalledTimes(1);
+    });
+  });
 });

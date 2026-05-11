@@ -48,6 +48,7 @@ export class GifticonController {
     const exchange = await this.couponExchangeService.createOrder({
       userId,
       goodsId: body.goodsId,
+      idempotencyKey: body.idempotencyKey,
     });
     return {
       id: exchange.id,
