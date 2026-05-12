@@ -138,8 +138,7 @@ export class GifticonService {
    * - goodsIds 안에 다른 브랜드 상품이 섞여 있으면 400.
    */
   async reorder(brand: string, goodsIds: string[]): Promise<void> {
-    const scope =
-      await this.smartconGoodsRepository.findGoodsIdsByBrand(brand);
+    const scope = await this.smartconGoodsRepository.findGoodsIdsByBrand(brand);
     if (scope.length === 0) {
       throw new NotFoundException(`brand not found: ${brand}`);
     }

@@ -548,7 +548,12 @@ describe('GifticonService', () => {
       const list = await service.listVisible(EVENT_ID);
       // BHC가 1,2 / 컴포즈는 NULL이라 뒤로
       expect(list.slice(0, 2).map((p) => p.goods_id)).toEqual(['X', 'Y']);
-      expect(list.slice(2).map((p) => p.goods_id).sort()).toEqual(['A', 'B']);
+      expect(
+        list
+          .slice(2)
+          .map((p) => p.goods_id)
+          .sort(),
+      ).toEqual(['A', 'B']);
     });
   });
 });

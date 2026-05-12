@@ -8,7 +8,9 @@ import { AdminInvitationPartnerController } from './admin-invitation-partner.con
 import { AdminUserController } from './admin-user.controller';
 import { AdminSmartconController } from './admin-smartcon.controller';
 import { AdminGifticonController } from './admin-gifticon.controller';
+import { AdminPointController } from './admin-point.controller';
 import { NaverPayModule } from '../naver-pay/naver-pay.module';
+import { PointModule } from '../point/point.module';
 import { ExchangePointModule } from '../exchange-point/exchange-point.module';
 import { AdvertiserAuthModule } from '../advertiser-auth/advertiser-auth.module';
 import { BannerAdModule } from '../banner-ad/banner-ad.module';
@@ -27,6 +29,7 @@ import { GifticonModule } from '../gifticon/gifticon.module';
     InvitationModule,
     SmartconModule,
     GifticonModule,
+    PointModule,
   ],
   controllers: [
     AdminNaverPayController,
@@ -38,6 +41,7 @@ import { GifticonModule } from '../gifticon/gifticon.module';
     AdminUserController,
     AdminSmartconController,
     AdminGifticonController,
+    AdminPointController,
   ],
 })
 export class AdminModule {}
