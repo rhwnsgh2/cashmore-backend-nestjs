@@ -15,6 +15,7 @@ import { AccountInfoService } from '../account-info/account-info.service';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
 import { PointWriteService } from '../point-write/point-write.service';
 import { StubPointWriteRepository } from '../point-write/repositories/stub-point-write.repository';
+import { PointService } from '../point/point.service';
 
 const stubFcmService = {
   pushNotification: async () => {},
@@ -69,6 +70,16 @@ describe('ExchangePointService', () => {
         {
           provide: POINT_WRITE_SERVICE,
           useFactory: () => new PointWriteService(stubPointWriteRepo),
+        },
+        {
+          // 잔액 조회를 stub repo의 누적 결과로 위임 — 기존 setPointActions/차감
+          // 흐름을 그대로 사용할 수 있게 함.
+          provide: PointService,
+          useValue: {
+            getPointTotal: async (uid: string) => ({
+              totalPoint: await repository.getTotalPoints(uid),
+            }),
+          },
         },
       ],
     }).compile();

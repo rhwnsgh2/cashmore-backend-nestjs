@@ -89,9 +89,7 @@ export class SupabasePointRepository implements IPointRepository {
     };
   }
 
-  async findBalancesByUserIds(
-    userIds: string[],
-  ): Promise<Map<string, number>> {
+  async findBalancesByUserIds(userIds: string[]): Promise<Map<string, number>> {
     if (userIds.length === 0) return new Map();
     const { data, error } = await this.supabaseService
       .getClient()

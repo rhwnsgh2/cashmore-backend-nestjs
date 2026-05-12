@@ -17,6 +17,7 @@ import type { ICashExchangeRepository } from './interfaces/cash-exchange-reposit
 import { CASH_EXCHANGE_REPOSITORY } from './interfaces/cash-exchange-repository.interface';
 import type { IPointWriteService } from '../point-write/point-write.interface';
 import { POINT_WRITE_SERVICE } from '../point-write/point-write.interface';
+import { PointService } from '../point/point.service';
 
 export interface ExchangePointResponse {
   id: number;
@@ -112,6 +113,7 @@ export class ExchangePointService {
     private fcmService: FcmService,
     @Inject(POINT_WRITE_SERVICE)
     private pointWriteService: IPointWriteService,
+    private pointService: PointService,
   ) {}
 
   async getPendingWithAccountInfo(): Promise<GetPendingWithAccountInfoResult> {
@@ -301,10 +303,8 @@ export class ExchangePointService {
       throw new BadRequestException('Invalid amount. Minimum is 1000');
     }
 
-    const totalPoints =
-      await this.exchangePointRepository.getTotalPoints(userId);
-
-    if (totalPoints < amount) {
+    const { totalPoint } = await this.pointService.getPointTotal(userId);
+    if (totalPoint < amount) {
       throw new BadRequestException('Insufficient points');
     }
 
