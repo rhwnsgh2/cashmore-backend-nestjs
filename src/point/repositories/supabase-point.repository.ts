@@ -89,6 +89,26 @@ export class SupabasePointRepository implements IPointRepository {
     };
   }
 
+  async findBalancesByUserIds(
+    userIds: string[],
+  ): Promise<Map<string, number>> {
+    if (userIds.length === 0) return new Map();
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('user_point_balance')
+      .select('user_id, total_point')
+      .in('user_id', userIds);
+    if (error) throw error;
+    const map = new Map<string, number>();
+    for (const row of (data ?? []) as Array<{
+      user_id: string;
+      total_point: number;
+    }>) {
+      map.set(row.user_id, Number(row.total_point));
+    }
+    return map;
+  }
+
   async findSumUpToId(userId: string, maxId: number): Promise<number> {
     const { data, error } = await this.supabaseService
       .getClient()

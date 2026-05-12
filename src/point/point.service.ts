@@ -116,6 +116,19 @@ export class PointService {
     return this.pointRepository.findTotalPointSum(userId);
   }
 
+  /**
+   * 어드민 큐 등 N+1 회피용 배치 잔액 조회.
+   * user_point_balance row 없으면 0으로 반환 (어드민 큐에 등장한다는 건 차감 이력이 있다는 뜻이라 보통 row 존재).
+   */
+  async getTotalPointsMap(userIds: string[]): Promise<Map<string, number>> {
+    const unique = Array.from(new Set(userIds));
+    const map = await this.pointRepository.findBalancesByUserIds(unique);
+    for (const id of unique) {
+      if (!map.has(id)) map.set(id, 0);
+    }
+    return map;
+  }
+
   async deductPoint(
     userId: string,
     amount: number,

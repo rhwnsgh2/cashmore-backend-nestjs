@@ -5,7 +5,13 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiHeader,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { IsUUID } from 'class-validator';
 import { PointService } from '../point/point.service';
@@ -31,7 +37,11 @@ export class AdminPointController {
       '임의 userId의 보유 포인트와 소멸 예정 포인트를 반환. 유저용 GET /point/total과 동일한 응답 형태.',
   })
   @ApiHeader({ name: 'x-admin-api-key', required: true })
-  @ApiQuery({ name: 'userId', required: true, description: 'public.user.id (UUID)' })
+  @ApiQuery({
+    name: 'userId',
+    required: true,
+    description: 'public.user.id (UUID)',
+  })
   @ApiResponse({ status: 200, type: PointTotalResponseDto })
   async getPointTotal(
     @Headers('x-admin-api-key') apiKey: string,

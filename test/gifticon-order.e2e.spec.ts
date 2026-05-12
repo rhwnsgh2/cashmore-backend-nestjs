@@ -315,6 +315,21 @@ describe('Gifticon Order (e2e) - Real DB', () => {
       expect(res.body.map((r: { id: number }) => r.id)).toEqual([a.id, b.id]);
     });
 
+    it('응답에 user_total_point(차감 후 잔액) 포함', async () => {
+      await seedReady();
+      // seedReady에서 5000P 적립, 1500P 차감 → 잔액 3500
+      const order = await placeOrder();
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(200);
+
+      const row = (res.body as Array<{ id: number; user_total_point: number }>)
+        .find((r) => r.id === order.id);
+      expect(row?.user_total_point).toBe(3500);
+    });
+
     it('status=sent 필터', async () => {
       await seedReady();
       const a = await placeOrder();

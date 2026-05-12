@@ -57,6 +57,12 @@ export class AdminExchangeItemDto {
   @ApiProperty()
   user_id!: string;
 
+  @ApiProperty({
+    description:
+      '해당 유저의 현재 보유 포인트 (이미 차감된 상태). 어드민이 승인/거절 판단에 참고.',
+  })
+  user_total_point!: number;
+
   @ApiProperty()
   amount!: number;
 

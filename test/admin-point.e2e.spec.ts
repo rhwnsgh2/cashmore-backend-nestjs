@@ -1,11 +1,4 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterAll,
-  beforeEach,
-} from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -75,7 +68,11 @@ describe('Admin Point API (e2e) - Real DB', () => {
       const testUser: TestUser = await createTestUser(supabase);
       await createPointActions(supabase, [
         { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
-        { user_id: testUser.id, point_amount: -1500, type: 'GIFTICON_PURCHASE' },
+        {
+          user_id: testUser.id,
+          point_amount: -1500,
+          type: 'GIFTICON_PURCHASE',
+        },
       ]);
 
       const res = await request(app.getHttpServer())

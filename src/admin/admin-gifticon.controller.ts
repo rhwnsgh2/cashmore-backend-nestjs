@@ -21,6 +21,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { GifticonService } from '../gifticon/gifticon.service';
 import { CouponExchangeService } from '../gifticon/coupon-exchange.service';
+import { PointService } from '../point/point.service';
 import {
   CatalogItemDto,
   CurationDto,
@@ -48,6 +49,7 @@ export class AdminGifticonController {
   constructor(
     private readonly gifticonService: GifticonService,
     private readonly couponExchangeService: CouponExchangeService,
+    private readonly pointService: PointService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -127,9 +129,13 @@ export class AdminGifticonController {
       throw new UnauthorizedException(`invalid status: ${status}`);
     }
     const rows = await this.couponExchangeService.listByStatus(s);
+    const pointMap = await this.pointService.getTotalPointsMap(
+      rows.map((r) => r.user_id),
+    );
     return rows.map((r) => ({
       id: r.id,
       user_id: r.user_id,
+      user_total_point: pointMap.get(r.user_id) ?? 0,
       amount: r.amount,
       smartcon_goods_id: r.smartcon_goods_id,
       tr_id: r.tr_id,

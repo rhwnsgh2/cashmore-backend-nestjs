@@ -54,6 +54,8 @@ export interface IPointRepository {
     endDate: string,
   ): Promise<EarnedPointAction[]>;
   findBalance(userId: string): Promise<PointBalance | null>;
+  /** userIds 배치 잔액 조회 (어드민 큐 등 N+1 회피용). row 없으면 map에 미포함. */
+  findBalancesByUserIds(userIds: string[]): Promise<Map<string, number>>;
   findSumUpToId(userId: string, maxId: number): Promise<number>;
   findTotalPointSumViaRpc(userId: string, maxId: number): Promise<number>;
   findTotalPointSum(userId: string): Promise<number>;
