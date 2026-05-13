@@ -29,12 +29,12 @@ import {
   ReorderDto,
 } from '../gifticon/dto/curation.dto';
 import {
-  AdminExchangeItemDto,
+  AdminExchangeListResponseDto,
   DailyStatsResponseDto,
   OrderResponseDto,
   RejectDto,
 } from '../gifticon/dto/order.dto';
-import { IsInt, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { CouponExchangeStatus } from '../gifticon/interfaces/coupon-exchange-repository.interface';
 
@@ -45,6 +45,25 @@ const VALID_STATUSES: CouponExchangeStatus[] = [
   'refunded',
   'rejected',
 ];
+
+class ExchangesQueryDto {
+  @IsOptional()
+  // status validation은 컨트롤러에서 다시 함 (VALID_STATUSES)
+  status?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  pageSize?: number;
+}
 
 class DailyStatsQueryDto {
   @Type(() => Number)
@@ -125,9 +144,9 @@ export class AdminGifticonController {
 
   @Get('exchanges')
   @ApiOperation({
-    summary: '쿠폰 교환 목록 (status별)',
+    summary: '쿠폰 교환 목록 (status별, 페이지네이션)',
     description:
-      'pending(승인 대기)은 오래된 순. status 미지정 시 pending. 최대 100건.',
+      'pending(승인 대기)은 created_at ASC(FIFO), 그 외는 DESC. status 미지정 시 pending. page=1, pageSize=50 기본.',
   })
   @ApiHeader({ name: 'x-admin-api-key', required: true })
   @ApiQuery({
@@ -135,34 +154,47 @@ export class AdminGifticonController {
     required: false,
     enum: ['pending', 'sent', 'send_failed', 'refunded', 'rejected'],
   })
-  @ApiResponse({ status: 200, type: [AdminExchangeItemDto] })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, example: 50 })
+  @ApiResponse({ status: 200, type: AdminExchangeListResponseDto })
   async listExchanges(
     @Headers('x-admin-api-key') apiKey: string,
-    @Query('status') status?: string,
-  ): Promise<AdminExchangeItemDto[]> {
+    @Query() query: ExchangesQueryDto,
+  ): Promise<AdminExchangeListResponseDto> {
     this.validateApiKey(apiKey);
-    const s = (status ?? 'pending') as CouponExchangeStatus;
+    const s = (query.status ?? 'pending') as CouponExchangeStatus;
     if (!VALID_STATUSES.includes(s)) {
-      throw new UnauthorizedException(`invalid status: ${status}`);
+      throw new UnauthorizedException(`invalid status: ${query.status}`);
     }
-    const rows = await this.couponExchangeService.listByStatus(s);
+    const { items, total, page, pageSize, totalPages } =
+      await this.couponExchangeService.listByStatus(
+        s,
+        query.page,
+        query.pageSize,
+      );
     const pointMap = await this.pointService.getTotalPointsMap(
-      rows.map((r) => r.user_id),
+      items.map((r) => r.user_id),
     );
-    return rows.map((r) => ({
-      id: r.id,
-      user_id: r.user_id,
-      user_total_point: pointMap.get(r.user_id) ?? 0,
-      amount: r.amount,
-      smartcon_goods_id: r.smartcon_goods_id,
-      tr_id: r.tr_id,
-      send_status: r.send_status,
-      barcode_num: r.barcode_num,
-      exp_date: r.exp_date,
-      result_code: r.result_code,
-      result_msg: r.result_msg,
-      created_at: r.created_at,
-    }));
+    return {
+      items: items.map((r) => ({
+        id: r.id,
+        user_id: r.user_id,
+        user_total_point: pointMap.get(r.user_id) ?? 0,
+        amount: r.amount,
+        smartcon_goods_id: r.smartcon_goods_id,
+        tr_id: r.tr_id,
+        send_status: r.send_status,
+        barcode_num: r.barcode_num,
+        exp_date: r.exp_date,
+        result_code: r.result_code,
+        result_msg: r.result_msg,
+        created_at: r.created_at,
+      })),
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
   }
 
   @Get('stats/daily')

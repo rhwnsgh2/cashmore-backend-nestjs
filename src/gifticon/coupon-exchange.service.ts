@@ -262,9 +262,30 @@ export class CouponExchangeService {
 
   async listByStatus(
     status: CouponExchangeRow['send_status'],
-    limit = 100,
-  ): Promise<CouponExchangeRow[]> {
-    return this.couponExchangeRepository.findByStatus(status, limit);
+    page = 1,
+    pageSize = 50,
+  ): Promise<{
+    items: CouponExchangeRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    const safePage = Math.max(1, Math.floor(page));
+    const safeSize = Math.min(200, Math.max(1, Math.floor(pageSize)));
+    const offset = (safePage - 1) * safeSize;
+
+    const [items, total] = await Promise.all([
+      this.couponExchangeRepository.findByStatusPaged(status, offset, safeSize),
+      this.couponExchangeRepository.countByStatus(status),
+    ]);
+    return {
+      items,
+      total,
+      page: safePage,
+      pageSize: safeSize,
+      totalPages: Math.max(1, Math.ceil(total / safeSize)),
+    };
   }
 
   /**

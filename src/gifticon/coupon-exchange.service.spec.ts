@@ -574,7 +574,7 @@ describe('CouponExchangeService', () => {
 
   // === 카테고리 6: listByStatus (어드민 큐 조회) ===
   describe('listByStatus', () => {
-    it('pending은 오래된 순(created_at ASC), sent/rejected는 제외', async () => {
+    it('pending은 오래된 순(ASC), sent/rejected는 최신순(DESC), 상태별 분리', async () => {
       await setupCuratedGoods();
       const a = await service.createOrder({
         userId: USER_ID,
@@ -596,13 +596,61 @@ describe('CouponExchangeService', () => {
       await service.reject(c.id);
 
       const pending = await service.listByStatus('pending');
-      expect(pending.map((r) => r.id)).toEqual([a.id]);
+      expect(pending.items.map((r) => r.id)).toEqual([a.id]);
+      expect(pending.total).toBe(1);
 
       const sent = await service.listByStatus('sent');
-      expect(sent.map((r) => r.id)).toEqual([b.id]);
+      expect(sent.items.map((r) => r.id)).toEqual([b.id]);
+      expect(sent.total).toBe(1);
 
       const rejected = await service.listByStatus('rejected');
-      expect(rejected.map((r) => r.id)).toEqual([c.id]);
+      expect(rejected.items.map((r) => r.id)).toEqual([c.id]);
+    });
+
+    it('페이지네이션: total/totalPages/page/pageSize 메타 반환', async () => {
+      await setupCuratedGoods();
+      // pending 5건 생성
+      for (let i = 0; i < 5; i++) {
+        await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
+        await new Promise((r) => setTimeout(r, 2));
+      }
+
+      const p1 = await service.listByStatus('pending', 1, 2);
+      expect(p1.items).toHaveLength(2);
+      expect(p1.total).toBe(5);
+      expect(p1.page).toBe(1);
+      expect(p1.pageSize).toBe(2);
+      expect(p1.totalPages).toBe(3);
+
+      const p2 = await service.listByStatus('pending', 2, 2);
+      expect(p2.items).toHaveLength(2);
+
+      const p3 = await service.listByStatus('pending', 3, 2);
+      expect(p3.items).toHaveLength(1);
+
+      // 페이지 간 겹침 없음
+      const allIds = [
+        ...p1.items.map((r) => r.id),
+        ...p2.items.map((r) => r.id),
+        ...p3.items.map((r) => r.id),
+      ];
+      expect(new Set(allIds).size).toBe(5);
+    });
+
+    it('pageSize는 1..200으로 클램프', async () => {
+      await setupCuratedGoods();
+      await service.createOrder({ userId: USER_ID, goodsId: GOODS_ID });
+
+      const tooSmall = await service.listByStatus('pending', 1, 0);
+      expect(tooSmall.pageSize).toBe(1);
+
+      const tooBig = await service.listByStatus('pending', 1, 9999);
+      expect(tooBig.pageSize).toBe(200);
+    });
+
+    it('page < 1 → 1로 클램프', async () => {
+      const r = await service.listByStatus('pending', 0, 50);
+      expect(r.page).toBe(1);
     });
   });
 

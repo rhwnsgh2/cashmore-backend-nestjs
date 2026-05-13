@@ -46,7 +46,10 @@ export class DailyStatItemDto {
   @ApiProperty({ description: '해당 일 sent 건수', example: 3 })
   count!: number;
 
-  @ApiProperty({ description: '해당 일 sent 금액 합계 (포인트)', example: 4500 })
+  @ApiProperty({
+    description: '해당 일 sent 금액 합계 (포인트)',
+    example: 4500,
+  })
   amount!: number;
 }
 
@@ -73,6 +76,23 @@ export class RejectDto {
   @IsString()
   @MaxLength(255)
   reason?: string;
+}
+
+export class AdminExchangeListResponseDto {
+  @ApiProperty({ type: () => [AdminExchangeItemDto] })
+  items!: AdminExchangeItemDto[];
+
+  @ApiProperty({ description: '필터에 매칭되는 총 행 수', example: 137 })
+  total!: number;
+
+  @ApiProperty({ description: '현재 페이지 (1-base)', example: 1 })
+  page!: number;
+
+  @ApiProperty({ description: '페이지 크기', example: 50 })
+  pageSize!: number;
+
+  @ApiProperty({ description: '전체 페이지 수', example: 3 })
+  totalPages!: number;
 }
 
 export class AdminExchangeItemDto {

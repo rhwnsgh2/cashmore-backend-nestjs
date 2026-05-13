@@ -301,7 +301,7 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .expect(401);
     });
 
-    it('status 미지정 → pending만, 오래된 순', async () => {
+    it('status 미지정 → pending만, 오래된 순, 페이지네이션 메타 포함', async () => {
       await seedReady();
       const a = await placeOrder();
       await new Promise((r) => setTimeout(r, 10));
@@ -312,7 +312,14 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(200);
 
-      expect(res.body.map((r: { id: number }) => r.id)).toEqual([a.id, b.id]);
+      expect(res.body.items.map((r: { id: number }) => r.id)).toEqual([
+        a.id,
+        b.id,
+      ]);
+      expect(res.body.total).toBe(2);
+      expect(res.body.page).toBe(1);
+      expect(res.body.pageSize).toBe(50);
+      expect(res.body.totalPages).toBe(1);
     });
 
     it('응답에 user_total_point(차감 후 잔액) 포함', async () => {
@@ -326,9 +333,62 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .expect(200);
 
       const row = (
-        res.body as Array<{ id: number; user_total_point: number }>
+        res.body.items as Array<{ id: number; user_total_point: number }>
       ).find((r) => r.id === order.id);
       expect(row?.user_total_point).toBe(3500);
+    });
+
+    it('페이지네이션: page=2, pageSize=2로 5건 중 두 번째 페이지 2건', async () => {
+      await seedReady();
+      // 5건 주문하려면 1500 * 5 = 7500 필요 → 추가 적립
+      await createPointActions(supabase, [
+        { user_id: testUser.id, point_amount: 5000, type: 'EVENT' },
+      ]);
+      const ids: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const o = await placeOrder();
+        ids.push(o.id);
+        await new Promise((r) => setTimeout(r, 5));
+      }
+
+      const p1 = await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges?page=1&pageSize=2')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(200);
+      expect(p1.body.items).toHaveLength(2);
+      expect(p1.body.total).toBe(5);
+      expect(p1.body.totalPages).toBe(3);
+
+      const p2 = await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges?page=2&pageSize=2')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(200);
+      expect(p2.body.items).toHaveLength(2);
+
+      const p3 = await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges?page=3&pageSize=2')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(200);
+      expect(p3.body.items).toHaveLength(1);
+
+      const allIds: number[] = [
+        ...p1.body.items.map((r: { id: number }) => r.id),
+        ...p2.body.items.map((r: { id: number }) => r.id),
+        ...p3.body.items.map((r: { id: number }) => r.id),
+      ];
+      expect(new Set(allIds).size).toBe(5);
+    });
+
+    it('잘못된 pageSize(0 이하 또는 >200) → 400', async () => {
+      await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges?pageSize=0')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get('/admin/gifticon/exchanges?pageSize=300')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(400);
     });
 
     it('GET /admin/gifticon/stats/daily — 잘못된 API 키 → 401', async () => {
@@ -447,8 +507,9 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(200);
 
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].send_status).toBe('sent');
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].send_status).toBe('sent');
+      expect(res.body.total).toBe(1);
     });
   });
 

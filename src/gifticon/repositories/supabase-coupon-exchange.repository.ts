@@ -129,19 +129,33 @@ export class SupabaseCouponExchangeRepository implements ICouponExchangeReposito
     return (data ?? []) as unknown as CouponExchangeRow[];
   }
 
-  async findByStatus(
+  async findByStatusPaged(
     status: CouponExchangeRow['send_status'],
-    limit = 100,
+    offset: number,
+    limit: number,
   ): Promise<CouponExchangeRow[]> {
+    const ascending = status === 'pending';
     const { data, error } = await this.supabaseService
       .getClient()
       .from('coupon_exchanges')
       .select('*')
       .eq('send_status', status)
-      .order('created_at', { ascending: true })
-      .limit(limit);
+      .order('created_at', { ascending })
+      .range(offset, offset + limit - 1);
     if (error) throw error;
     return (data ?? []) as unknown as CouponExchangeRow[];
+  }
+
+  async countByStatus(
+    status: CouponExchangeRow['send_status'],
+  ): Promise<number> {
+    const { count, error } = await this.supabaseService
+      .getClient()
+      .from('coupon_exchanges')
+      .select('id', { count: 'exact', head: true })
+      .eq('send_status', status);
+    if (error) throw error;
+    return count ?? 0;
   }
 
   async findSentByUpdatedAtRange(

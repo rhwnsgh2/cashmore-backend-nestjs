@@ -67,11 +67,19 @@ export interface ICouponExchangeRepository {
   findById(id: number): Promise<CouponExchangeRow | null>;
   findByUserId(userId: string, limit?: number): Promise<CouponExchangeRow[]>;
 
-  /** 어드민용 status별 조회 (오래된 것부터 — 승인 큐는 FIFO). */
-  findByStatus(
+  /**
+   * 어드민용 status별 조회.
+   * pending은 created_at ASC (FIFO 큐), 그 외는 DESC (최근 순).
+   * offset 기반 페이지네이션.
+   */
+  findByStatusPaged(
     status: CouponExchangeStatus,
-    limit?: number,
+    offset: number,
+    limit: number,
   ): Promise<CouponExchangeRow[]>;
+
+  /** 어드민용 status별 행 수. */
+  countByStatus(status: CouponExchangeStatus): Promise<number>;
 
   /**
    * 통계용 — updated_at 범위 안의 sent 행 (amount만 필요).

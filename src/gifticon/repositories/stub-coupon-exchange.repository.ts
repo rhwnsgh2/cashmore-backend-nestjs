@@ -105,14 +105,27 @@ export class StubCouponExchangeRepository implements ICouponExchangeRepository {
       .slice(0, limit);
   }
 
-  async findByStatus(
+  async findByStatusPaged(
     status: CouponExchangeRow['send_status'],
-    limit = 100,
+    offset: number,
+    limit: number,
   ): Promise<CouponExchangeRow[]> {
-    return [...this.store.values()]
+    const ascending = status === 'pending';
+    const sorted = [...this.store.values()]
       .filter((r) => r.send_status === status)
-      .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .slice(0, limit);
+      .sort((a, b) =>
+        ascending
+          ? a.created_at.localeCompare(b.created_at)
+          : b.created_at.localeCompare(a.created_at),
+      );
+    return sorted.slice(offset, offset + limit);
+  }
+
+  async countByStatus(
+    status: CouponExchangeRow['send_status'],
+  ): Promise<number> {
+    return [...this.store.values()].filter((r) => r.send_status === status)
+      .length;
   }
 
   async findSentByUpdatedAtRange(
