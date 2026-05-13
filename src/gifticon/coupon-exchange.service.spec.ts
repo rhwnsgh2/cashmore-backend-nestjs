@@ -606,6 +606,131 @@ describe('CouponExchangeService', () => {
     });
   });
 
+  // === 카테고리 6.5: getDailyStats ===
+  describe('getDailyStats', () => {
+    function makeSent(updatedAtIso: string, amount: number) {
+      const id = Math.floor(Math.random() * 1_000_000);
+      exchangeRepo['store'].set(id, {
+        id,
+        user_id: USER_ID,
+        point_action_id: 1,
+        amount,
+        smartcon_goods_id: GOODS_ID,
+        tr_id: `tr-${id}`,
+        order_id: null,
+        barcode_num: null,
+        exp_date: null,
+        result_code: null,
+        result_msg: null,
+        send_status: 'sent',
+        idempotency_key: null,
+        created_at: updatedAtIso,
+        updated_at: updatedAtIso,
+      });
+    }
+
+    it('월의 첫째~마지막 날까지 모든 날짜를 0으로 채워 반환', async () => {
+      const result = await service.getDailyStats(2026, 5); // 31일
+
+      expect(result.items).toHaveLength(31);
+      expect(result.items[0].date).toBe('2026-05-01');
+      expect(result.items[30].date).toBe('2026-05-31');
+      expect(result.totalCount).toBe(0);
+      expect(result.totalAmount).toBe(0);
+    });
+
+    it('KST 기준 일별 집계 — sent만 합산', async () => {
+      // KST 5/1 12:00 = UTC 5/1 03:00
+      makeSent('2026-05-01T03:00:00.000Z', 1500);
+      makeSent('2026-05-01T03:30:00.000Z', 2000);
+      // KST 5/2 12:00
+      makeSent('2026-05-02T03:00:00.000Z', 1000);
+      // KST 4/30 23:59 (UTC 4/30 14:59) — 월 범위 밖
+      makeSent('2026-04-30T14:59:00.000Z', 9999);
+      // KST 6/1 00:01 (UTC 5/31 15:01) — 월 범위 밖
+      makeSent('2026-05-31T15:01:00.000Z', 9999);
+
+      const result = await service.getDailyStats(2026, 5);
+
+      const may1 = result.items.find((i) => i.date === '2026-05-01')!;
+      expect(may1.count).toBe(2);
+      expect(may1.amount).toBe(3500);
+
+      const may2 = result.items.find((i) => i.date === '2026-05-02')!;
+      expect(may2.count).toBe(1);
+      expect(may2.amount).toBe(1000);
+
+      expect(result.totalCount).toBe(3);
+      expect(result.totalAmount).toBe(4500);
+    });
+
+    it('KST 경계: UTC 5/31 15:00 (= KST 6/1 00:00)은 5월에서 제외', async () => {
+      makeSent('2026-05-31T15:00:00.000Z', 1234);
+
+      const result = await service.getDailyStats(2026, 5);
+      expect(result.totalCount).toBe(0);
+    });
+
+    it('KST 경계: UTC 5/31 14:59 (= KST 5/31 23:59)는 5월에 포함', async () => {
+      makeSent('2026-05-31T14:59:00.000Z', 1234);
+
+      const result = await service.getDailyStats(2026, 5);
+      expect(result.totalCount).toBe(1);
+      expect(result.totalAmount).toBe(1234);
+      const may31 = result.items.find((i) => i.date === '2026-05-31')!;
+      expect(may31.count).toBe(1);
+    });
+
+    it('pending/rejected는 집계에서 제외', async () => {
+      // pending — stub에 직접 추가
+      const pid = 1001;
+      exchangeRepo['store'].set(pid, {
+        id: pid,
+        user_id: USER_ID,
+        point_action_id: 1,
+        amount: 5000,
+        smartcon_goods_id: GOODS_ID,
+        tr_id: 'tr-p',
+        order_id: null,
+        barcode_num: null,
+        exp_date: null,
+        result_code: null,
+        result_msg: null,
+        send_status: 'pending',
+        idempotency_key: null,
+        created_at: '2026-05-10T03:00:00.000Z',
+        updated_at: '2026-05-10T03:00:00.000Z',
+      });
+      // rejected
+      const rid = 1002;
+      exchangeRepo['store'].set(rid, {
+        ...exchangeRepo['store'].get(pid)!,
+        id: rid,
+        tr_id: 'tr-r',
+        send_status: 'rejected',
+      });
+
+      const result = await service.getDailyStats(2026, 5);
+      expect(result.totalCount).toBe(0);
+      expect(result.totalAmount).toBe(0);
+    });
+
+    it('잘못된 month → BadRequestException', async () => {
+      await expect(service.getDailyStats(2026, 0)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.getDailyStats(2026, 13)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('2월(28일) 길이 처리', async () => {
+      const result = await service.getDailyStats(2026, 2);
+      expect(result.items).toHaveLength(28);
+      expect(result.items[27].date).toBe('2026-02-28');
+    });
+  });
+
   // === 카테고리 7: TR_ID ===
   describe('TR_ID', () => {
     it('형식: cashmore + 17자 timestamp + 4자 hex', async () => {

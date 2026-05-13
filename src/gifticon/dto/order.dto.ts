@@ -39,6 +39,31 @@ export class OrderResponseDto {
   result_msg!: string | null;
 }
 
+export class DailyStatItemDto {
+  @ApiProperty({ description: 'KST 일자 (YYYY-MM-DD)', example: '2026-05-01' })
+  date!: string;
+
+  @ApiProperty({ description: '해당 일 sent 건수', example: 3 })
+  count!: number;
+
+  @ApiProperty({ description: '해당 일 sent 금액 합계 (포인트)', example: 4500 })
+  amount!: number;
+}
+
+export class DailyStatsResponseDto {
+  @ApiProperty({
+    description: '월의 첫째 날부터 마지막 날까지 (빈 날은 count=0, amount=0)',
+    type: [DailyStatItemDto],
+  })
+  items!: DailyStatItemDto[];
+
+  @ApiProperty({ description: '월 전체 건수', example: 27 })
+  totalCount!: number;
+
+  @ApiProperty({ description: '월 전체 금액', example: 40500 })
+  totalAmount!: number;
+}
+
 export class RejectDto {
   @ApiPropertyOptional({
     description: '거절 사유 (result_msg에 박제). 미전송 시 null.',

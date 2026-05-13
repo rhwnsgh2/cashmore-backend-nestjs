@@ -31,8 +31,15 @@ import {
   type IGifticonProductRepository,
 } from './interfaces/gifticon-product-repository.interface';
 import { generateTrId } from './utils/tr-id';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const POINT_TYPE = 'GIFTICON_PURCHASE';
+const KST = 'Asia/Seoul';
 
 @Injectable()
 export class CouponExchangeService {
@@ -261,6 +268,53 @@ export class CouponExchangeService {
   }
 
   /**
+   * 어드민 — 월별 일일 발송 통계 (sent만, updated_at 기준 KST).
+   * 빈 날은 count=0, amount=0으로 채워서 반환.
+   */
+  async getDailyStats(
+    year: number,
+    month: number, // 1-12
+  ): Promise<{
+    items: Array<{ date: string; count: number; amount: number }>;
+    totalCount: number;
+    totalAmount: number;
+  }> {
+    if (month < 1 || month > 12) {
+      throw new BadRequestException('month must be 1-12');
+    }
+    const startKst = dayjs.tz(`${year}-${pad2(month)}-01 00:00:00`, KST);
+    const endKst = startKst.add(1, 'month'); // 다음 달 1일 00:00 KST (exclusive)
+
+    const rows = await this.couponExchangeRepository.findSentByUpdatedAtRange(
+      startKst.toISOString(),
+      endKst.toISOString(),
+    );
+
+    const dayMap = new Map<string, { count: number; amount: number }>();
+    for (const r of rows) {
+      const dateKst = dayjs(r.updated_at).tz(KST).format('YYYY-MM-DD');
+      const cur = dayMap.get(dateKst) ?? { count: 0, amount: 0 };
+      cur.count += 1;
+      cur.amount += r.amount;
+      dayMap.set(dateKst, cur);
+    }
+
+    // 빈 날 채워서 정렬된 array
+    const items: Array<{ date: string; count: number; amount: number }> = [];
+    let cur = startKst;
+    while (cur.isBefore(endKst)) {
+      const d = cur.format('YYYY-MM-DD');
+      const v = dayMap.get(d) ?? { count: 0, amount: 0 };
+      items.push({ date: d, count: v.count, amount: v.amount });
+      cur = cur.add(1, 'day');
+    }
+
+    const totalCount = items.reduce((s, i) => s + i.count, 0);
+    const totalAmount = items.reduce((s, i) => s + i.amount, 0);
+    return { items, totalCount, totalAmount };
+  }
+
+  /**
    * 어드민 수동 환불.
    * send_status='sent' 상태만 환불 가능 (pending/send_failed/refunded/rejected는 거부).
    */
@@ -319,4 +373,8 @@ export class CouponExchangeService {
 function formatExpDate(yyyymmdd: string): string {
   if (yyyymmdd.length !== 8) return yyyymmdd;
   return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
 }

@@ -325,9 +325,113 @@ describe('Gifticon Order (e2e) - Real DB', () => {
         .set('x-admin-api-key', ADMIN_API_KEY)
         .expect(200);
 
-      const row = (res.body as Array<{ id: number; user_total_point: number }>)
-        .find((r) => r.id === order.id);
+      const row = (
+        res.body as Array<{ id: number; user_total_point: number }>
+      ).find((r) => r.id === order.id);
       expect(row?.user_total_point).toBe(3500);
+    });
+
+    it('GET /admin/gifticon/stats/daily — 잘못된 API 키 → 401', async () => {
+      await request(app.getHttpServer())
+        .get('/admin/gifticon/stats/daily?year=2026&month=5')
+        .set('x-admin-api-key', 'wrong')
+        .expect(401);
+    });
+
+    it('GET /admin/gifticon/stats/daily — sent만 KST 일별 집계, 빈 날 0 채움', async () => {
+      // 어드민이라 직접 DB seed
+      await supabase.from('smartcon_goods').insert({
+        goods_id: 'A',
+        event_id: '64385',
+        raw_data: { GOODS_ID: 'A' },
+        is_active: true,
+      });
+      await supabase.from('gifticon_products').insert({
+        smartcon_goods_id: 'A',
+        point_price: 1500,
+        is_visible: true,
+      });
+
+      // KST 5/3 (UTC 5/3 03:00)에 sent 2건
+      await supabase.from('coupon_exchanges').insert([
+        {
+          user_id: testUser.id,
+          point_action_id: null,
+          amount: 1500,
+          smartcon_goods_id: 'A',
+          tr_id: 'tr-stats-1',
+          send_status: 'sent',
+          updated_at: '2026-05-03T03:00:00.000Z',
+        },
+        {
+          user_id: testUser.id,
+          point_action_id: null,
+          amount: 2000,
+          smartcon_goods_id: 'A',
+          tr_id: 'tr-stats-2',
+          send_status: 'sent',
+          updated_at: '2026-05-03T04:00:00.000Z',
+        },
+        // pending — 집계 제외
+        {
+          user_id: testUser.id,
+          point_action_id: null,
+          amount: 9999,
+          smartcon_goods_id: 'A',
+          tr_id: 'tr-stats-pending',
+          send_status: 'pending',
+          updated_at: '2026-05-03T05:00:00.000Z',
+        },
+        // 4월 — 월 범위 밖
+        {
+          user_id: testUser.id,
+          point_action_id: null,
+          amount: 8888,
+          smartcon_goods_id: 'A',
+          tr_id: 'tr-stats-april',
+          send_status: 'sent',
+          updated_at: '2026-04-25T03:00:00.000Z',
+        },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/gifticon/stats/daily?year=2026&month=5')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(200);
+
+      expect(res.body.items).toHaveLength(31); // 5월은 31일
+      expect(res.body.items[0].date).toBe('2026-05-01');
+
+      const may3 = (
+        res.body.items as Array<{
+          date: string;
+          count: number;
+          amount: number;
+        }>
+      ).find((i) => i.date === '2026-05-03')!;
+      expect(may3.count).toBe(2);
+      expect(may3.amount).toBe(3500);
+
+      // 빈 날 확인
+      const may1 = (
+        res.body.items as Array<{
+          date: string;
+          count: number;
+          amount: number;
+        }>
+      ).find((i) => i.date === '2026-05-01')!;
+      expect(may1.count).toBe(0);
+      expect(may1.amount).toBe(0);
+
+      expect(res.body.totalCount).toBe(2);
+      expect(res.body.totalAmount).toBe(3500);
+    });
+
+    it('GET /admin/gifticon/stats/daily — month=13 → 400', async () => {
+      await request(app.getHttpServer())
+        .get('/admin/gifticon/stats/daily?year=2026&month=13')
+        .set('x-admin-api-key', ADMIN_API_KEY)
+        .expect(400);
     });
 
     it('status=sent 필터', async () => {

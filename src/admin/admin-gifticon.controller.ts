@@ -30,9 +30,12 @@ import {
 } from '../gifticon/dto/curation.dto';
 import {
   AdminExchangeItemDto,
+  DailyStatsResponseDto,
   OrderResponseDto,
   RejectDto,
 } from '../gifticon/dto/order.dto';
+import { IsInt, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import type { CouponExchangeStatus } from '../gifticon/interfaces/coupon-exchange-repository.interface';
 
 const VALID_STATUSES: CouponExchangeStatus[] = [
@@ -42,6 +45,20 @@ const VALID_STATUSES: CouponExchangeStatus[] = [
   'refunded',
   'rejected',
 ];
+
+class DailyStatsQueryDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(2024)
+  @Max(2100)
+  year!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month!: number;
+}
 
 @ApiTags('Admin - Gifticon')
 @Controller('admin/gifticon')
@@ -146,6 +163,24 @@ export class AdminGifticonController {
       result_msg: r.result_msg,
       created_at: r.created_at,
     }));
+  }
+
+  @Get('stats/daily')
+  @ApiOperation({
+    summary: '월별 일일 발송 통계 (sent, KST)',
+    description:
+      'send_status=sent 행을 updated_at(승인된 시점) 기준으로 KST 일별 집계. 거래 없는 날도 count=0, amount=0으로 채워서 반환.',
+  })
+  @ApiHeader({ name: 'x-admin-api-key', required: true })
+  @ApiQuery({ name: 'year', required: true, example: 2026 })
+  @ApiQuery({ name: 'month', required: true, example: 5 })
+  @ApiResponse({ status: 200, type: DailyStatsResponseDto })
+  async getDailyStats(
+    @Headers('x-admin-api-key') apiKey: string,
+    @Query() query: DailyStatsQueryDto,
+  ): Promise<DailyStatsResponseDto> {
+    this.validateApiKey(apiKey);
+    return this.couponExchangeService.getDailyStats(query.year, query.month);
   }
 
   @Post('approve/:id')

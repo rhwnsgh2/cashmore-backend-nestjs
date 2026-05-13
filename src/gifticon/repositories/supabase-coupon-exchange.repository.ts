@@ -143,4 +143,19 @@ export class SupabaseCouponExchangeRepository implements ICouponExchangeReposito
     if (error) throw error;
     return (data ?? []) as unknown as CouponExchangeRow[];
   }
+
+  async findSentByUpdatedAtRange(
+    updatedAtFromIso: string,
+    updatedAtToIso: string,
+  ): Promise<Array<{ amount: number; updated_at: string }>> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('coupon_exchanges')
+      .select('amount, updated_at')
+      .eq('send_status', 'sent')
+      .gte('updated_at', updatedAtFromIso)
+      .lt('updated_at', updatedAtToIso);
+    if (error) throw error;
+    return (data ?? []) as Array<{ amount: number; updated_at: string }>;
+  }
 }

@@ -115,6 +115,20 @@ export class StubCouponExchangeRepository implements ICouponExchangeRepository {
       .slice(0, limit);
   }
 
+  async findSentByUpdatedAtRange(
+    fromIso: string,
+    toIso: string,
+  ): Promise<Array<{ amount: number; updated_at: string }>> {
+    return [...this.store.values()]
+      .filter(
+        (r) =>
+          r.send_status === 'sent' &&
+          r.updated_at >= fromIso &&
+          r.updated_at < toIso,
+      )
+      .map((r) => ({ amount: r.amount, updated_at: r.updated_at }));
+  }
+
   clear(): void {
     this.store.clear();
     this.byTrId.clear();

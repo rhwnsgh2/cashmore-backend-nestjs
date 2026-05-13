@@ -72,6 +72,15 @@ export interface ICouponExchangeRepository {
     status: CouponExchangeStatus,
     limit?: number,
   ): Promise<CouponExchangeRow[]>;
+
+  /**
+   * 통계용 — updated_at 범위 안의 sent 행 (amount만 필요).
+   * 기간 [updatedAtFromIso, updatedAtToIso).
+   */
+  findSentByUpdatedAtRange(
+    updatedAtFromIso: string,
+    updatedAtToIso: string,
+  ): Promise<Array<{ amount: number; updated_at: string }>>;
 }
 
 export const COUPON_EXCHANGE_REPOSITORY = Symbol('COUPON_EXCHANGE_REPOSITORY');
