@@ -26,18 +26,20 @@ export class StubCoupangVisitRepository implements ICoupangVisitRepository {
     return found ?? null;
   }
 
+  async findLatestByUserId(
+    userId: string,
+  ): Promise<CoupangVisitRecord | null> {
+    const userVisits = this.visits
+      .filter((v) => v.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return userVisits[0] ?? null;
+  }
+
   async insertVisit(
     userId: string,
     date: string,
     pointAmount: number,
   ): Promise<CoupangVisitRecord> {
-    const exists = this.visits.find(
-      (v) => v.userId === userId && v.createdAtDate === date,
-    );
-    if (exists) {
-      throw new Error('duplicate key value violates unique constraint');
-    }
-
     const visit: CoupangVisitRecord = {
       id: this.nextId++,
       userId,
@@ -45,6 +47,12 @@ export class StubCoupangVisitRepository implements ICoupangVisitRepository {
       pointAmount,
       createdAt: new Date().toISOString(),
     };
+    this.visits.push(visit);
+    return visit;
+  }
+
+  seedVisit(record: Omit<CoupangVisitRecord, 'id'>): CoupangVisitRecord {
+    const visit: CoupangVisitRecord = { id: this.nextId++, ...record };
     this.visits.push(visit);
     return visit;
   }

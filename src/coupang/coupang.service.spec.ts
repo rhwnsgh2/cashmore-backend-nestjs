@@ -387,6 +387,198 @@ describe('CoupangService', () => {
     });
   });
 
+  describe('recordVisitV2 (10시간 쿨다운)', () => {
+    const userId = 'user-1';
+
+    it('첫 방문이면 7P를 지급하고 success: true를 반환한다', async () => {
+      const result = await service.recordVisitV2(userId);
+
+      expect(result).toEqual({ success: true });
+
+      const visits = stubVisitRepo.getInsertedVisits();
+      expect(visits).toHaveLength(1);
+      expect(visits[0].pointAmount).toBe(7);
+    });
+
+    it('마지막 방문으로부터 10시간이 안 지났으면 거부한다', async () => {
+      const sixHoursAgo = new Date(
+        Date.now() - 6 * 60 * 60 * 1000,
+      ).toISOString();
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: sixHoursAgo.slice(0, 10),
+        pointAmount: 7,
+        createdAt: sixHoursAgo,
+      });
+
+      const result = await service.recordVisitV2(userId);
+
+      expect(result).toEqual({
+        success: false,
+        message: 'Cooldown not passed',
+      });
+      expect(stubVisitRepo.getInsertedVisits()).toHaveLength(1);
+    });
+
+    it('마지막 방문으로부터 정확히 10시간이 지나면 받을 수 있다', async () => {
+      const tenHoursAgo = new Date(
+        Date.now() - 10 * 60 * 60 * 1000,
+      ).toISOString();
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: tenHoursAgo.slice(0, 10),
+        pointAmount: 7,
+        createdAt: tenHoursAgo,
+      });
+
+      const result = await service.recordVisitV2(userId);
+
+      expect(result).toEqual({ success: true });
+      expect(stubVisitRepo.getInsertedVisits()).toHaveLength(2);
+    });
+
+    it('10시간 - 1초 경과면 거부 (경계값)', async () => {
+      const justUnder = new Date(
+        Date.now() - (10 * 60 * 60 * 1000 - 1000),
+      ).toISOString();
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: justUnder.slice(0, 10),
+        pointAmount: 7,
+        createdAt: justUnder,
+      });
+
+      const result = await service.recordVisitV2(userId);
+
+      expect(result.success).toBe(false);
+    });
+
+    it('하루에 여러 번 받을 수 있다 (같은 날짜 중복 insert 허용)', async () => {
+      const elevenHoursAgo = new Date(
+        Date.now() - 11 * 60 * 60 * 1000,
+      ).toISOString();
+      const today = elevenHoursAgo.slice(0, 10);
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: today,
+        pointAmount: 7,
+        createdAt: elevenHoursAgo,
+      });
+
+      const result = await service.recordVisitV2(userId);
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it('point_actions에 7P + COUPANG_VISIT 타입이 기록된다', async () => {
+      await service.recordVisitV2(userId);
+
+      const actions = stubPointWriteRepo.getInsertedActions();
+      const visitAction = actions.find((a) => a.type === 'COUPANG_VISIT');
+      expect(visitAction?.amount).toBe(7);
+
+      const visits = stubVisitRepo.getInsertedVisits();
+      expect(visitAction?.additionalData).toEqual({
+        coupang_visit_id: visits[0].id,
+      });
+    });
+
+    it('다른 유저의 최근 방문은 영향을 주지 않는다', async () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      stubVisitRepo.seedVisit({
+        userId: 'user-A',
+        createdAtDate: oneHourAgo.slice(0, 10),
+        pointAmount: 7,
+        createdAt: oneHourAgo,
+      });
+
+      const result = await service.recordVisitV2('user-B');
+
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('getVisitStatusV2', () => {
+    const userId = 'user-1';
+
+    it('방문 이력이 없으면 canVisit: true, 모든 시각은 null', async () => {
+      const result = await service.getVisitStatusV2(userId);
+
+      expect(result).toEqual({
+        canVisit: true,
+        lastVisitedAt: null,
+        nextAvailableAt: null,
+        remainingSeconds: 0,
+      });
+    });
+
+    it('쿨다운 중이면 canVisit: false와 남은 시간을 반환한다', async () => {
+      const threeHoursAgo = new Date(
+        Date.now() - 3 * 60 * 60 * 1000,
+      ).toISOString();
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: threeHoursAgo.slice(0, 10),
+        pointAmount: 7,
+        createdAt: threeHoursAgo,
+      });
+
+      const result = await service.getVisitStatusV2(userId);
+
+      expect(result.canVisit).toBe(false);
+      expect(result.lastVisitedAt).toBe(threeHoursAgo);
+      expect(result.nextAvailableAt).not.toBeNull();
+      // 약 7시간 남음 (오차 5초 허용)
+      expect(result.remainingSeconds).toBeGreaterThan(7 * 3600 - 5);
+      expect(result.remainingSeconds).toBeLessThanOrEqual(7 * 3600);
+    });
+
+    it('쿨다운 경과 후면 canVisit: true, remainingSeconds 0', async () => {
+      const twelveHoursAgo = new Date(
+        Date.now() - 12 * 60 * 60 * 1000,
+      ).toISOString();
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: twelveHoursAgo.slice(0, 10),
+        pointAmount: 7,
+        createdAt: twelveHoursAgo,
+      });
+
+      const result = await service.getVisitStatusV2(userId);
+
+      expect(result.canVisit).toBe(true);
+      expect(result.lastVisitedAt).toBe(twelveHoursAgo);
+      expect(result.remainingSeconds).toBe(0);
+    });
+
+    it('여러 방문 중 가장 최근 방문이 기준이 된다', async () => {
+      const twentyHoursAgo = new Date(
+        Date.now() - 20 * 60 * 60 * 1000,
+      ).toISOString();
+      const twoHoursAgo = new Date(
+        Date.now() - 2 * 60 * 60 * 1000,
+      ).toISOString();
+
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: twentyHoursAgo.slice(0, 10),
+        pointAmount: 7,
+        createdAt: twentyHoursAgo,
+      });
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: twoHoursAgo.slice(0, 10),
+        pointAmount: 7,
+        createdAt: twoHoursAgo,
+      });
+
+      const result = await service.getVisitStatusV2(userId);
+
+      expect(result.canVisit).toBe(false);
+      expect(result.lastVisitedAt).toBe(twoHoursAgo);
+    });
+  });
+
   describe('insertVisit DB 에러 처리', () => {
     const userId = 'user-1';
 

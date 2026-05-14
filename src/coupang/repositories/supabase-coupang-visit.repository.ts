@@ -46,6 +46,35 @@ export class SupabaseCoupangVisitRepository implements ICoupangVisitRepository {
     };
   }
 
+  async findLatestByUserId(
+    userId: string,
+  ): Promise<CoupangVisitRecord | null> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('coupang_visits')
+      .select('id, user_id, created_at_date, point_amount, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle<CoupangVisitRow>();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      createdAtDate: data.created_at_date,
+      pointAmount: data.point_amount,
+      createdAt: data.created_at,
+    };
+  }
+
   async insertVisit(
     userId: string,
     date: string,

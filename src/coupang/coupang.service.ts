@@ -22,6 +22,10 @@ const GOLDBOX_QUERY = 'subId=AF6906631&imageSize=140x140';
 const CACHE_KEY = 'coupang:goldbox:products';
 const CACHE_TTL = 86400; // 24시간
 
+const V2_COOLDOWN_HOURS = 10;
+const V2_COOLDOWN_MS = V2_COOLDOWN_HOURS * 60 * 60 * 1000;
+const V2_POINT_AMOUNT = 7;
+
 interface GoldBoxItem {
   productId: number;
   productName: string;
@@ -139,6 +143,66 @@ export class CoupangService {
       today,
     );
     return { hasVisitedToday: existing !== null };
+  }
+
+  async recordVisitV2(
+    userId: string,
+  ): Promise<{ success: boolean; message?: string }> {
+    const latest = await this.visitRepository.findLatestByUserId(userId);
+    const now = Date.now();
+
+    if (latest) {
+      const elapsed = now - new Date(latest.createdAt).getTime();
+      if (elapsed < V2_COOLDOWN_MS) {
+        return { success: false, message: 'Cooldown not passed' };
+      }
+    }
+
+    const today = this.getTodayKST();
+    const visit = await this.visitRepository.insertVisit(
+      userId,
+      today,
+      V2_POINT_AMOUNT,
+    );
+
+    await this.pointWriteService.addPoint({
+      userId,
+      amount: V2_POINT_AMOUNT,
+      type: 'COUPANG_VISIT',
+      additionalData: { coupang_visit_id: visit.id },
+    });
+
+    return { success: true };
+  }
+
+  async getVisitStatusV2(userId: string): Promise<{
+    canVisit: boolean;
+    lastVisitedAt: string | null;
+    nextAvailableAt: string | null;
+    remainingSeconds: number;
+  }> {
+    const latest = await this.visitRepository.findLatestByUserId(userId);
+
+    if (!latest) {
+      return {
+        canVisit: true,
+        lastVisitedAt: null,
+        nextAvailableAt: null,
+        remainingSeconds: 0,
+      };
+    }
+
+    const lastVisitedAt = new Date(latest.createdAt);
+    const nextAvailableAt = new Date(lastVisitedAt.getTime() + V2_COOLDOWN_MS);
+    const remainingMs = nextAvailableAt.getTime() - Date.now();
+    const canVisit = remainingMs <= 0;
+
+    return {
+      canVisit,
+      lastVisitedAt: lastVisitedAt.toISOString(),
+      nextAvailableAt: nextAvailableAt.toISOString(),
+      remainingSeconds: canVisit ? 0 : Math.ceil(remainingMs / 1000),
+    };
   }
 
   private getTodayKST(): string {

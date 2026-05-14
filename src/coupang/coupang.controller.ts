@@ -5,6 +5,7 @@ import { GoldBoxResponseDto } from './dto/goldbox-product.dto';
 import {
   CoupangVisitResponseDto,
   CoupangVisitTodayResponseDto,
+  CoupangVisitStatusResponseDto,
 } from './dto/coupang-visit.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth';
@@ -46,5 +47,35 @@ export class CoupangController {
     @CurrentUser('userId') userId: string,
   ): Promise<CoupangVisitTodayResponseDto> {
     return this.coupangService.getTodayVisitStatus(userId);
+  }
+
+  @Post('v2/visit')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: '쿠팡 방문 포인트 지급 (v2)',
+    description: '마지막 방문으로부터 10시간이 경과한 경우 7P를 지급합니다.',
+  })
+  @ApiResponse({ status: 200, type: CoupangVisitResponseDto })
+  @ApiResponse({ status: 401, description: '인증 실패' })
+  async recordVisitV2(
+    @CurrentUser('userId') userId: string,
+  ): Promise<CoupangVisitResponseDto> {
+    return this.coupangService.recordVisitV2(userId);
+  }
+
+  @Get('v2/visit/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: '쿠팡 방문 보상 쿨다운 상태 조회 (v2)',
+    description:
+      '마지막 방문 시각, 다음 방문 가능 시각, 남은 시간(초)을 반환합니다.',
+  })
+  @ApiResponse({ status: 200, type: CoupangVisitStatusResponseDto })
+  @ApiResponse({ status: 401, description: '인증 실패' })
+  async getVisitStatusV2(
+    @CurrentUser('userId') userId: string,
+  ): Promise<CoupangVisitStatusResponseDto> {
+    return this.coupangService.getVisitStatusV2(userId);
   }
 }

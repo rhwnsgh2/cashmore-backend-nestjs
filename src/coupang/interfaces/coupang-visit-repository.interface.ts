@@ -12,6 +12,8 @@ export interface ICoupangVisitRepository {
     date: string,
   ): Promise<CoupangVisitRecord | null>;
 
+  findLatestByUserId(userId: string): Promise<CoupangVisitRecord | null>;
+
   insertVisit(
     userId: string,
     date: string,

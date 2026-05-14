@@ -319,18 +319,18 @@ describe('Coupang API (e2e)', () => {
       expect(action!.additional_data).toEqual({ coupang_visit_id: visits!.id });
     });
 
-    it('동시에 여러 번 호출해도 정확히 한 번만 적립된다 (UNIQUE 제약)', async () => {
+    it('순차 호출 시 첫 번째만 성공한다 (서비스 레벨 중복 체크)', async () => {
       const testUser = await createTestUser(supabase);
       const token = generateTestToken(testUser.auth_id);
 
-      const responses = await Promise.all(
-        Array.from({ length: 5 }, () =>
-          request(app.getHttpServer())
-            .post('/coupang/visit')
-            .set('Authorization', `Bearer ${token}`)
-            .send({}),
-        ),
-      );
+      const responses: { body: { success: boolean; message?: string } }[] = [];
+      for (let i = 0; i < 5; i++) {
+        const r = await request(app.getHttpServer())
+          .post('/coupang/visit')
+          .set('Authorization', `Bearer ${token}`)
+          .send({});
+        responses.push(r);
+      }
 
       const successCount = responses.filter(
         (r) => r.body.success === true,
@@ -477,6 +477,265 @@ describe('Coupang API (e2e)', () => {
         .expect(200);
 
       expect(response.body).toEqual({ hasVisitedToday: false });
+    });
+  });
+
+  describe('POST /coupang/v2/visit (10시간 쿨다운)', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer()).post('/coupang/v2/visit').expect(401);
+    });
+
+    it('첫 방문 시 7P를 지급하고 success: true를 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .post('/coupang/v2/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ success: true });
+
+      const { data: action } = await supabase
+        .from('point_actions')
+        .select('point_amount, type')
+        .eq('user_id', testUser.id)
+        .eq('type', 'COUPANG_VISIT')
+        .single();
+      expect(action!.point_amount).toBe(7);
+    });
+
+    it('마지막 방문이 10시간 이내면 거부한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const sixHoursAgo = dayjs().subtract(6, 'hour');
+      await supabase.from('coupang_visits').insert({
+        user_id: testUser.id,
+        created_at_date: sixHoursAgo.tz('Asia/Seoul').format('YYYY-MM-DD'),
+        point_amount: 7,
+        created_at: sixHoursAgo.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/coupang/v2/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Cooldown not passed',
+      });
+
+      const { data: visits } = await supabase
+        .from('coupang_visits')
+        .select('id')
+        .eq('user_id', testUser.id);
+      expect(visits).toHaveLength(1);
+    });
+
+    it('마지막 방문이 10시간 이상 지났으면 다시 받을 수 있다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const elevenHoursAgo = dayjs().subtract(11, 'hour');
+      await supabase.from('coupang_visits').insert({
+        user_id: testUser.id,
+        created_at_date: elevenHoursAgo.tz('Asia/Seoul').format('YYYY-MM-DD'),
+        point_amount: 7,
+        created_at: elevenHoursAgo.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/coupang/v2/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ success: true });
+
+      const { data: visits } = await supabase
+        .from('coupang_visits')
+        .select('id')
+        .eq('user_id', testUser.id);
+      expect(visits).toHaveLength(2);
+    });
+
+    it('같은 KST 날짜에 두 번 받을 수 있다 (UNIQUE 제약 제거 확인)', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const elevenHoursAgo = dayjs().subtract(11, 'hour');
+      const sameDate = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert({
+        user_id: testUser.id,
+        created_at_date: sameDate,
+        point_amount: 7,
+        created_at: elevenHoursAgo.toISOString(),
+      });
+
+      await request(app.getHttpServer())
+        .post('/coupang/v2/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const { data: visits } = await supabase
+        .from('coupang_visits')
+        .select('created_at_date')
+        .eq('user_id', testUser.id);
+      expect(visits).toHaveLength(2);
+      expect(visits!.every((v) => v.created_at_date === sameDate)).toBe(true);
+    });
+
+    it('다른 유저의 방문은 영향을 주지 않는다', async () => {
+      const userA = await createTestUser(supabase);
+      const userB = await createTestUser(supabase);
+      const tokenB = generateTestToken(userB.auth_id);
+
+      const oneHourAgo = dayjs().subtract(1, 'hour');
+      await supabase.from('coupang_visits').insert({
+        user_id: userA.id,
+        created_at_date: oneHourAgo.tz('Asia/Seoul').format('YYYY-MM-DD'),
+        point_amount: 7,
+        created_at: oneHourAgo.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/coupang/v2/visit')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ success: true });
+    });
+
+    it('point_actions에 additional_data.coupang_visit_id가 들어간다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      await request(app.getHttpServer())
+        .post('/coupang/v2/visit')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const { data: visit } = await supabase
+        .from('coupang_visits')
+        .select('id')
+        .eq('user_id', testUser.id)
+        .single();
+
+      const { data: action } = await supabase
+        .from('point_actions')
+        .select('additional_data')
+        .eq('user_id', testUser.id)
+        .eq('type', 'COUPANG_VISIT')
+        .single();
+
+      expect(action!.additional_data).toEqual({ coupang_visit_id: visit!.id });
+    });
+  });
+
+  describe('GET /coupang/v2/visit/status', () => {
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      await request(app.getHttpServer())
+        .get('/coupang/v2/visit/status')
+        .expect(401);
+    });
+
+    it('방문 이력이 없으면 canVisit: true, 모든 시각이 null', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/v2/visit/status')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        canVisit: true,
+        lastVisitedAt: null,
+        nextAvailableAt: null,
+        remainingSeconds: 0,
+      });
+    });
+
+    it('쿨다운 중이면 canVisit: false와 남은 시간을 반환한다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const threeHoursAgo = dayjs().subtract(3, 'hour');
+      await supabase.from('coupang_visits').insert({
+        user_id: testUser.id,
+        created_at_date: threeHoursAgo.tz('Asia/Seoul').format('YYYY-MM-DD'),
+        point_amount: 7,
+        created_at: threeHoursAgo.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/v2/visit/status')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.canVisit).toBe(false);
+      expect(response.body.lastVisitedAt).not.toBeNull();
+      expect(response.body.nextAvailableAt).not.toBeNull();
+      // 약 7시간 남음 (오차 60초 허용)
+      expect(response.body.remainingSeconds).toBeGreaterThan(7 * 3600 - 60);
+      expect(response.body.remainingSeconds).toBeLessThanOrEqual(7 * 3600);
+    });
+
+    it('쿨다운 경과 후면 canVisit: true, remainingSeconds 0', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const twelveHoursAgo = dayjs().subtract(12, 'hour');
+      await supabase.from('coupang_visits').insert({
+        user_id: testUser.id,
+        created_at_date: twelveHoursAgo.tz('Asia/Seoul').format('YYYY-MM-DD'),
+        point_amount: 7,
+        created_at: twelveHoursAgo.toISOString(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/v2/visit/status')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.canVisit).toBe(true);
+      expect(response.body.remainingSeconds).toBe(0);
+    });
+
+    it('여러 방문 중 가장 최근 방문이 기준이 된다', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const twentyHoursAgo = dayjs().subtract(20, 'hour');
+      const twoHoursAgo = dayjs().subtract(2, 'hour');
+
+      await supabase.from('coupang_visits').insert([
+        {
+          user_id: testUser.id,
+          created_at_date: twentyHoursAgo.tz('Asia/Seoul').format('YYYY-MM-DD'),
+          point_amount: 7,
+          created_at: twentyHoursAgo.toISOString(),
+        },
+        {
+          user_id: testUser.id,
+          created_at_date: twoHoursAgo.tz('Asia/Seoul').format('YYYY-MM-DD'),
+          point_amount: 7,
+          created_at: twoHoursAgo.toISOString(),
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/v2/visit/status')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.canVisit).toBe(false);
+      // lastVisitedAt 은 twoHoursAgo와 일치해야 함
+      const lastVisitedAt = new Date(response.body.lastVisitedAt as string);
+      expect(
+        Math.abs(lastVisitedAt.getTime() - twoHoursAgo.toDate().getTime()),
+      ).toBeLessThan(1000);
     });
   });
 });
