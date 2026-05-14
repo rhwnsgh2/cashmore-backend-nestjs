@@ -189,6 +189,7 @@ export class AdminGifticonController {
         result_code: r.result_code,
         result_msg: r.result_msg,
         created_at: r.created_at,
+        updated_at: r.updated_at,
       })),
       total,
       page,

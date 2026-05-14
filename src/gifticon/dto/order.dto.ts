@@ -136,4 +136,10 @@ export class AdminExchangeItemDto {
 
   @ApiProperty()
   created_at!: string;
+
+  @ApiProperty({
+    description:
+      '마지막 상태 변경 시각. send_status가 sent/rejected/refunded인 경우 승인/거절/환불된 시점.',
+  })
+  updated_at!: string;
 }
