@@ -360,6 +360,28 @@ describe('CoupangService', () => {
 
       expect(result).toEqual({ hasVisitedToday: false });
     });
+
+    it('같은 날짜에 v2로 여러 행이 쌓여 있어도 true를 반환한다', async () => {
+      const today = new Date(Date.now() + 9 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: today,
+        pointAmount: 7,
+        createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+      });
+      stubVisitRepo.seedVisit({
+        userId,
+        createdAtDate: today,
+        pointAmount: 7,
+        createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+      });
+
+      const result = await service.getTodayVisitStatus(userId);
+
+      expect(result).toEqual({ hasVisitedToday: true });
+    });
   });
 
   describe('KST 날짜 변환', () => {
@@ -523,7 +545,9 @@ describe('CoupangService', () => {
     });
 
     it('Redis 장애 시 fail-open으로 진행되어 보상이 지급된다', async () => {
-      mockRedis.set.mockRejectedValueOnce(new Error('redis connection refused'));
+      mockRedis.set.mockRejectedValueOnce(
+        new Error('redis connection refused'),
+      );
 
       const result = await service.recordVisitV2(userId);
 

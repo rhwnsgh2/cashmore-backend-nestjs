@@ -27,6 +27,8 @@ export class SupabaseCoupangVisitRepository implements ICoupangVisitRepository {
       .select('id, user_id, created_at_date, point_amount, created_at')
       .eq('user_id', userId)
       .eq('created_at_date', date)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle<CoupangVisitRow>();
 
     if (error) {
