@@ -478,6 +478,32 @@ describe('Coupang API (e2e)', () => {
 
       expect(response.body).toEqual({ hasVisitedToday: false });
     });
+
+    it('같은 날짜에 2건 이상의 방문 기록이 있어도 500이 아니라 hasVisitedToday: true를 반환한다 (v2 다회 방문 회귀 방지)', async () => {
+      const testUser = await createTestUser(supabase);
+      const token = generateTestToken(testUser.auth_id);
+
+      const today = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
+      await supabase.from('coupang_visits').insert([
+        {
+          user_id: testUser.id,
+          created_at_date: today,
+          point_amount: 7,
+        },
+        {
+          user_id: testUser.id,
+          created_at_date: today,
+          point_amount: 7,
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/coupang/visit/today')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body).toEqual({ hasVisitedToday: true });
+    });
   });
 
   describe('POST /coupang/v2/visit (10시간 쿨다운)', () => {
