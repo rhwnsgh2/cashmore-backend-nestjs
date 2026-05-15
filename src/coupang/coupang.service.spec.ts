@@ -12,6 +12,7 @@ import { StubPointWriteRepository } from '../point-write/repositories/stub-point
 const mockRedis = {
   get: vi.fn(),
   setex: vi.fn(),
+  set: vi.fn(),
 };
 
 vi.mock('@upstash/redis', () => ({
@@ -31,6 +32,7 @@ describe('CoupangService', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockRedis.set.mockResolvedValue('OK');
     stubPointWriteRepo = new StubPointWriteRepository();
     stubVisitRepo = new StubCoupangVisitRepository();
 
@@ -495,6 +497,47 @@ describe('CoupangService', () => {
       const result = await service.recordVisitV2('user-B');
 
       expect(result).toEqual({ success: true });
+    });
+
+    it('동시 호출 시 락을 획득하지 못한 요청은 거부된다', async () => {
+      mockRedis.set.mockResolvedValueOnce(null);
+
+      const result = await service.recordVisitV2(userId);
+
+      expect(result).toEqual({
+        success: false,
+        message: 'Cooldown not passed',
+      });
+      expect(stubVisitRepo.getInsertedVisits()).toHaveLength(0);
+      expect(stubPointWriteRepo.getInsertedActions()).toHaveLength(0);
+    });
+
+    it('락 키는 userId 기반이고 NX + 5초 TTL로 설정된다', async () => {
+      await service.recordVisitV2(userId);
+
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        `coupang:visit:v2:lock:${userId}`,
+        '1',
+        { nx: true, ex: 5 },
+      );
+    });
+
+    it('Redis 장애 시 fail-open으로 진행되어 보상이 지급된다', async () => {
+      mockRedis.set.mockRejectedValueOnce(new Error('redis connection refused'));
+
+      const result = await service.recordVisitV2(userId);
+
+      expect(result).toEqual({ success: true });
+      expect(stubVisitRepo.getInsertedVisits()).toHaveLength(1);
+    });
+
+    it('두 번째 동시 호출은 락에서 막혀 쿨다운 체크조차 도달하지 않는다', async () => {
+      const findSpy = vi.spyOn(stubVisitRepo, 'findLatestByUserId');
+      mockRedis.set.mockResolvedValueOnce(null);
+
+      await service.recordVisitV2(userId);
+
+      expect(findSpy).not.toHaveBeenCalled();
     });
   });
 

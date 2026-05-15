@@ -25,6 +25,7 @@ const CACHE_TTL = 86400; // 24시간
 const V2_COOLDOWN_HOURS = 10;
 const V2_COOLDOWN_MS = V2_COOLDOWN_HOURS * 60 * 60 * 1000;
 const V2_POINT_AMOUNT = 7;
+const V2_LOCK_TTL_SECONDS = 5;
 
 interface GoldBoxItem {
   productId: number;
@@ -148,6 +149,25 @@ export class CoupangService {
   async recordVisitV2(
     userId: string,
   ): Promise<{ success: boolean; message?: string }> {
+    const lockKey = `coupang:visit:v2:lock:${userId}`;
+    let lockAcquired = false;
+    try {
+      const result = await this.redis.set(lockKey, '1', {
+        nx: true,
+        ex: V2_LOCK_TTL_SECONDS,
+      });
+      lockAcquired = result === 'OK';
+    } catch (err) {
+      this.logger.warn(
+        `Redis lock failed for ${userId}, proceeding fail-open: ${(err as Error)?.message ?? err}`,
+      );
+      lockAcquired = true;
+    }
+
+    if (!lockAcquired) {
+      return { success: false, message: 'Cooldown not passed' };
+    }
+
     const latest = await this.visitRepository.findLatestByUserId(userId);
     const now = Date.now();
 
